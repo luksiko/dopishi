@@ -225,6 +225,22 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCompletionIncludeCrossLayout, forKey: Keys.autoCompletionIncludeCrossLayout) }
     }
 
+    /// Autocompletion display presentation style (popup HUD, inline ghost text, or both). Default: .both.
+    @Published var autoCompletionDisplayMode: AutocompletionDisplayMode {
+        didSet {
+            defaults.set(autoCompletionDisplayMode.rawValue, forKey: Keys.autoCompletionDisplayMode)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Applications where autocompletion and auto-correction are disabled.
+    @Published var excludedAppBundleIDs: [String] {
+        didSet {
+            defaults.set(excludedAppBundleIDs, forKey: Keys.excludedAppBundleIDs)
+            NotificationCenter.default.post(name: .autoCorrectionSettingsChanged, object: nil)
+        }
+    }
+
     /// Style of icon in the macOS menu bar. Default: language badge in a frame (RU, EN).
     @Published var statusBarIconStyle: StatusBarIconStyle {
         didSet {
@@ -299,6 +315,22 @@ final class SettingsManager: ObservableObject {
         }
     }
     
+    // MARK: - Excluded Apps Management
+    
+    func addExcludedApp(bundleID: String) {
+        guard !bundleID.isEmpty, !excludedAppBundleIDs.contains(bundleID) else { return }
+        excludedAppBundleIDs.append(bundleID)
+    }
+    
+    func removeExcludedApp(bundleID: String) {
+        excludedAppBundleIDs.removeAll { $0 == bundleID }
+    }
+    
+    func isAppExcluded(bundleID: String?) -> Bool {
+        guard let bid = bundleID else { return false }
+        return excludedAppBundleIDs.contains(bid)
+    }
+    
     // MARK: - Keys
     
     private enum Keys {
@@ -326,6 +358,8 @@ final class SettingsManager: ObservableObject {
         static let autoCompletionMinPrefixLength = "autoCompletionMinPrefixLength"
         static let autoCompletionUseNumberShortcuts = "autoCompletionUseNumberShortcuts"
         static let autoCompletionIncludeCrossLayout = "autoCompletionIncludeCrossLayout"
+        static let autoCompletionDisplayMode = "autoCompletionDisplayMode"
+        static let excludedAppBundleIDs = "excludedAppBundleIDs"
         static let statusBarIconStyle = "statusBarIconStyle"
         static let thoughtRecoveryEnabled = "thoughtRecoveryEnabled"
         static let thoughtRecoveryPreview = "thoughtRecoveryPreview"
@@ -376,6 +410,11 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
         self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true
         self.autoCompletionIncludeCrossLayout = defaults.object(forKey: Keys.autoCompletionIncludeCrossLayout) as? Bool ?? true
+        let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
+        self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? 2) ?? .both
+        
+        let savedExcluded = defaults.stringArray(forKey: Keys.excludedAppBundleIDs)
+        self.excludedAppBundleIDs = savedExcluded ?? Array(AutoCorrectionGate.defaultExcludedBundleIDs).sorted()
         
         self.thoughtRecoveryEnabled = defaults.object(forKey: Keys.thoughtRecoveryEnabled) as? Bool ?? true  // Default: ON
         self.thoughtRecoveryPreview = defaults.object(forKey: Keys.thoughtRecoveryPreview) as? Bool ?? false // Default: OFF

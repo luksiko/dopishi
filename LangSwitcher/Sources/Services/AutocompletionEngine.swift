@@ -9,6 +9,7 @@ final class AutocompletionEngine {
     
     private let spellCheckService: SpellCheckService
     private let userDictionary: UserDictionary
+    private let adaptiveStore: AutocompletionAdaptiveStore
     
     // Cached word arrays for fast prefix scanning
     private static let englishWords: [String] = {
@@ -29,15 +30,19 @@ final class AutocompletionEngine {
     
     init(
         spellCheckService: SpellCheckService = .shared,
-        userDictionary: UserDictionary? = nil
+        userDictionary: UserDictionary? = nil,
+        adaptiveStore: AutocompletionAdaptiveStore? = nil
     ) {
         self.spellCheckService = spellCheckService
         self.userDictionary = userDictionary ?? .shared
+        self.adaptiveStore = adaptiveStore ?? .shared
     }
     
-    /// Generate completions for the given partial word.
+    /// Generate completions for the given partial word, taking into account
+    /// personal word frequencies and the preceding word (bigram context).
     func suggest(
         for partialWord: String,
+        previousWord: String? = nil,
         activeLayoutID: String,
         enabledLayouts: [KeyboardLayout],
         maxSuggestions: Int = 4,
@@ -57,29 +62,54 @@ final class AutocompletionEngine {
         let activeLayout = enabledLayouts.first(where: { $0.id == effectiveActiveLayoutID })
         let activeLang = activeLayout?.languageCode ?? "en"
         
-        // 1. Check User Dictionary first (highest priority score: 1000)
-        for userWord in userDictionary.words {
-            if userWord.lowercased().hasPrefix(lower) && userWord.lowercased() != lower {
-                let formatted = formatCase(userWord, isCapitalized: isCapitalized)
+        func calculateScore(base: Int, word: String) -> Int {
+            let freqBonus = adaptiveStore.frequencyScore(for: word)
+            let bigramBonus = adaptiveStore.bigramBonus(for: word, after: previousWord)
+            return base + freqBonus + bigramBonus
+        }
+        
+        // 0. Check contextual bigram continuations for previousWord first
+        if let prev = previousWord, !prev.isEmpty {
+            let continuations = adaptiveStore.topContinuations(after: prev, limit: 10)
+            for cont in continuations where cont.hasPrefix(lower) {
+                let formatted = formatCase(cont, isCapitalized: isCapitalized)
                 if seenWords.insert(formatted.lowercased()).inserted {
+                    let score = calculateScore(base: 1200, word: cont)
                     results.append(AutocompletionCandidate(
                         word: formatted,
                         targetLayoutID: effectiveActiveLayoutID,
                         isCrossLayout: false,
-                        score: 1000
+                        score: score
                     ))
                 }
             }
         }
         
-        // 2. Frequency wordlist prefix matches in active language (score: 500 down to 100)
+        // 1. Check User Dictionary (base: 1000)
+        for userWord in userDictionary.words {
+            if userWord.lowercased().hasPrefix(lower) && userWord.lowercased() != lower {
+                let formatted = formatCase(userWord, isCapitalized: isCapitalized)
+                if seenWords.insert(formatted.lowercased()).inserted {
+                    let score = calculateScore(base: 1000, word: userWord)
+                    results.append(AutocompletionCandidate(
+                        word: formatted,
+                        targetLayoutID: effectiveActiveLayoutID,
+                        isCrossLayout: false,
+                        score: score
+                    ))
+                }
+            }
+        }
+        
+        // 2. Frequency wordlist prefix matches in active language (base: 500 down to 100)
         let wordlist = wordsForLanguage(activeLang)
         var countFromWordlist = 0
         for (index, word) in wordlist.enumerated() {
             if word.hasPrefix(lower) && word != lower {
                 let formatted = formatCase(word, isCapitalized: isCapitalized)
                 if seenWords.insert(formatted.lowercased()).inserted {
-                    let score = max(100, 500 - index)
+                    let baseScore = max(100, 500 - index)
+                    let score = calculateScore(base: baseScore, word: word)
                     results.append(AutocompletionCandidate(
                         word: formatted,
                         targetLayoutID: effectiveActiveLayoutID,
@@ -87,7 +117,7 @@ final class AutocompletionEngine {
                         score: score
                     ))
                     countFromWordlist += 1
-                    if countFromWordlist >= maxSuggestions { break }
+                    if countFromWordlist >= maxSuggestions * 2 { break }
                 }
             }
         }
@@ -99,11 +129,12 @@ final class AutocompletionEngine {
             if wordLower.hasPrefix(lower) && wordLower != lower {
                 let formatted = formatCase(word, isCapitalized: isCapitalized)
                 if seenWords.insert(formatted.lowercased()).inserted {
+                    let score = calculateScore(base: 50, word: word)
                     results.append(AutocompletionCandidate(
                         word: formatted,
                         targetLayoutID: effectiveActiveLayoutID,
                         isCrossLayout: false,
-                        score: 50
+                        score: score
                     ))
                 }
             }
@@ -123,7 +154,8 @@ final class AutocompletionEngine {
                         if word.hasPrefix(convertedLower) {
                             let formatted = formatCase(word, isCapitalized: isCapitalized)
                             if seenWords.insert(formatted.lowercased()).inserted {
-                                let score = max(50, 400 - index)
+                                let baseScore = max(50, 400 - index)
+                                let score = calculateScore(base: baseScore, word: word)
                                 results.append(AutocompletionCandidate(
                                     word: formatted,
                                     targetLayoutID: otherLayout.id,
@@ -143,11 +175,12 @@ final class AutocompletionEngine {
                         if wordLower.hasPrefix(convertedLower) {
                             let formatted = formatCase(word, isCapitalized: isCapitalized)
                             if seenWords.insert(formatted.lowercased()).inserted {
+                                let score = calculateScore(base: 40, word: word)
                                 results.append(AutocompletionCandidate(
                                     word: formatted,
                                     targetLayoutID: otherLayout.id,
                                     isCrossLayout: true,
-                                    score: 40
+                                    score: score
                                 ))
                             }
                         }

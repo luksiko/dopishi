@@ -30,10 +30,13 @@ final class AutoCorrectionService {
     private let spellCheckService: SpellCheckService
     private let autocompletionEngine: AutocompletionEngine
     private let overlayController: AutocompletionOverlayController
+    private let ghostTextController: GhostTextOverlayController
+    private let adaptiveStore: AutocompletionAdaptiveStore
 
     // MARK: - State
 
     private var wordBuffer: String = ""
+    private var previousWord: String?
     private var isProcessingCorrection = false
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -51,13 +54,18 @@ final class AutoCorrectionService {
          accessibilityService: AccessibilityService = AccessibilityService(),
          spellCheckService: SpellCheckService = .shared,
          autocompletionEngine: AutocompletionEngine? = nil,
-         overlayController: AutocompletionOverlayController? = nil) {
+         overlayController: AutocompletionOverlayController? = nil,
+         ghostTextController: GhostTextOverlayController? = nil,
+         adaptiveStore: AutocompletionAdaptiveStore? = nil) {
         self.settingsManager = settingsManager
         self.textConverter = textConverter
         self.accessibilityService = accessibilityService
         self.spellCheckService = spellCheckService
-        self.autocompletionEngine = autocompletionEngine ?? AutocompletionEngine(spellCheckService: spellCheckService)
+        let store = adaptiveStore ?? .shared
+        self.adaptiveStore = store
+        self.autocompletionEngine = autocompletionEngine ?? AutocompletionEngine(spellCheckService: spellCheckService, adaptiveStore: store)
         self.overlayController = overlayController ?? AutocompletionOverlayController()
+        self.ghostTextController = ghostTextController ?? GhostTextOverlayController()
     }
 
     deinit {
@@ -161,6 +169,7 @@ final class AutoCorrectionService {
     /// Stop monitoring keystrokes.
     func stop() {
         overlayController.hide()
+        ghostTextController.hide()
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
@@ -172,6 +181,7 @@ final class AutoCorrectionService {
             runLoopSource = nil
         }
         wordBuffer = ""
+        previousWord = nil
         ServiceStatus.shared.state = .disabled
         NSLog("[LangSwitcher] AutoCorrectionService: stopped")
     }
@@ -193,38 +203,41 @@ final class AutoCorrectionService {
         }
         wordBuffer = ""
         overlayController.hide()
+        ghostTextController.hide()
     }
 
     /// Check if the key should be intercepted synchronously by the autocompletion overlay.
     /// Returns true if consumed (tap callback returns nil).
     func interceptKeyIfOverlayVisible(event: CGEvent) -> Bool {
-        guard overlayController.isVisible else { return false }
+        let isOverlayActive = overlayController.isVisible || ghostTextController.isVisible
+        guard isOverlayActive else { return false }
         
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
         let noModifierFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
         
-        // 1. Escape: dismiss overlay
+        // 1. Escape: dismiss overlay & ghost text
         if keyCode == 0x35 && nonModFlags.isEmpty {
             overlayController.hide()
+            ghostTextController.hide()
             return true
         }
         
-        // 2. Up Arrow: navigate up
-        if keyCode == 0x7E && nonModFlags.isEmpty {
+        // 2. Up Arrow: navigate up in HUD
+        if keyCode == 0x7E && nonModFlags.isEmpty && overlayController.isVisible {
             overlayController.selectPrevious()
             return true
         }
         
-        // 3. Down Arrow: navigate down
-        if keyCode == 0x7D && nonModFlags.isEmpty {
+        // 3. Down Arrow: navigate down in HUD
+        if keyCode == 0x7D && nonModFlags.isEmpty && overlayController.isVisible {
             overlayController.selectNext()
             return true
         }
         
         // 4. Number shortcuts 1-5 (if enabled, requiring no Shift/Cmd/Opt/Ctrl so !@#$% are not caught)
-        if settingsManager.autoCompletionUseNumberShortcuts && noModifierFlags.isEmpty {
+        if settingsManager.autoCompletionUseNumberShortcuts && noModifierFlags.isEmpty && overlayController.isVisible {
             let numberKeyCodes: [UInt16: Int] = [
                 0x12: 0, // 1
                 0x13: 1, // 2
@@ -241,7 +254,10 @@ final class AutoCorrectionService {
         
         // 5. Configured Accept key
         if settingsManager.isAutocompletionAcceptKey(keyCode: keyCode, flags: flags) {
-            if let candidate = overlayController.selectedCandidate {
+            let candidate = overlayController.selectedCandidate
+                ?? overlayController.candidates.first
+                ?? ghostTextController.currentCandidate
+            if let candidate = candidate {
                 let appendSpace = (settingsManager.autoCompletionAcceptKey == .space)
                 acceptCandidate(candidate, appendSpace: appendSpace)
                 return true
@@ -271,6 +287,7 @@ final class AutoCorrectionService {
         if flags.contains(.maskCommand) {
             wordBuffer = ""
             overlayController.hide()
+            ghostTextController.hide()
             return
         }
 
@@ -288,28 +305,39 @@ final class AutoCorrectionService {
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
             wordBuffer = ""
             overlayController.hide()
+            ghostTextController.hide()
             return
 
         case 0x35: // Escape
             wordBuffer = ""
             overlayController.hide()
+            ghostTextController.hide()
             return
 
         case 0x30: // Tab
             wordBuffer = ""
             overlayController.hide()
+            ghostTextController.hide()
             return
 
         case 0x24: // Return/Enter
+            if !wordBuffer.isEmpty {
+                previousWord = wordBuffer.lowercased()
+            }
             wordBuffer = ""
             overlayController.hide()
+            ghostTextController.hide()
             return
 
         case 0x31: // Space
             overlayController.hide()
+            ghostTextController.hide()
             if settingsManager.autoCorrectionEnabled {
                 triggerCheckAndCorrect(triggerChar: " ")
             } else {
+                if !wordBuffer.isEmpty {
+                    previousWord = wordBuffer.lowercased()
+                }
                 wordBuffer = ""
             }
             return
@@ -326,9 +354,13 @@ final class AutoCorrectionService {
         // Check if it's a word boundary (punctuation)
         if !char.isLetter && !char.isNumber {
             overlayController.hide()
+            ghostTextController.hide()
             if settingsManager.autoCorrectionEnabled {
                 triggerCheckAndCorrect(triggerChar: char)
             } else {
+                if !wordBuffer.isEmpty {
+                    previousWord = wordBuffer.lowercased()
+                }
                 wordBuffer = ""
             }
             return
@@ -344,6 +376,7 @@ final class AutoCorrectionService {
     private func updateAutocompletion() {
         guard settingsManager.autoCompletionEnabled else {
             overlayController.hide()
+            ghostTextController.hide()
             return
         }
 
@@ -354,26 +387,31 @@ final class AutoCorrectionService {
             guard AutoCorrectionGate.allowsAutoCorrection(
                 role: focus?.role,
                 subrole: focus?.subrole,
-                bundleID: frontmostBundleID
+                bundleID: frontmostBundleID,
+                excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
             ) else {
                 overlayController.hide()
+                ghostTextController.hide()
                 return
             }
         }
 
         guard wordBuffer.count >= settingsManager.autoCompletionMinPrefixLength else {
             overlayController.hide()
+            ghostTextController.hide()
             return
         }
 
         guard !NSApp.isActive else {
             overlayController.hide()
+            ghostTextController.hide()
             return
         }
 
         let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
         let candidates = autocompletionEngine.suggest(
             for: wordBuffer,
+            previousWord: previousWord,
             activeLayoutID: activeLayoutID,
             enabledLayouts: settingsManager.enabledLayouts,
             maxSuggestions: settingsManager.autoCompletionMaxSuggestions,
@@ -382,31 +420,60 @@ final class AutoCorrectionService {
 
         guard !candidates.isEmpty else {
             overlayController.hide()
+            ghostTextController.hide()
             return
         }
 
         let caretRect = accessibilityService.caretScreenRect()
-        let hint = settingsManager.autoCompletionAcceptKey.shortcutHint(
-            customKeyCode: settingsManager.autoCompletionCustomKeyCode,
-            customModifiers: settingsManager.autoCompletionCustomModifiers
-        )
-        overlayController.show(
-            candidates: candidates,
-            caretRect: caretRect,
-            acceptKeyHint: hint,
-            onSelect: { [weak self] candidate in
-                self?.acceptCandidate(candidate, appendSpace: false)
+        let displayMode = settingsManager.autoCompletionDisplayMode
+
+        // 1. Ghost text inline tail
+        if displayMode == .ghostText || displayMode == .both {
+            if let topCandidate = candidates.first,
+               topCandidate.word.lowercased().hasPrefix(wordBuffer.lowercased()),
+               topCandidate.word.count > wordBuffer.count {
+                let suffixIndex = topCandidate.word.index(topCandidate.word.startIndex, offsetBy: wordBuffer.count)
+                let suffix = String(topCandidate.word[suffixIndex...])
+                ghostTextController.show(candidate: topCandidate, suffix: suffix, caretRect: caretRect)
+            } else {
+                ghostTextController.hide()
             }
-        )
+        } else {
+            ghostTextController.hide()
+        }
+
+        // 2. Floating popup HUD
+        if displayMode == .popup || displayMode == .both {
+            let hint = settingsManager.autoCompletionAcceptKey.shortcutHint(
+                customKeyCode: settingsManager.autoCompletionCustomKeyCode,
+                customModifiers: settingsManager.autoCompletionCustomModifiers
+            )
+            overlayController.show(
+                candidates: candidates,
+                caretRect: caretRect,
+                acceptKeyHint: hint,
+                onSelect: { [weak self] candidate in
+                    self?.acceptCandidate(candidate, appendSpace: false)
+                }
+            )
+        } else {
+            overlayController.hide()
+        }
     }
 
     /// Accept and insert the candidate completion.
     func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool) {
         let originalWord = wordBuffer
+        let precedingWord = previousWord
         wordBuffer = ""
         overlayController.hide()
+        ghostTextController.hide()
 
         guard !originalWord.isEmpty else { return }
+
+        // Adaptive learning: record word usage and bigram transition
+        adaptiveStore.recordWordUsage(word: candidate.word, after: precedingWord)
+        previousWord = candidate.word.lowercased()
 
         isProcessingCorrection = true
 
@@ -473,6 +540,9 @@ final class AutoCorrectionService {
     private func triggerCheckAndCorrect(triggerChar: Character) {
         let word = wordBuffer
         wordBuffer = ""
+        if !word.isEmpty {
+            previousWord = word.lowercased()
+        }
 
         // Skip triggering a new correction if one is already in flight
         guard !isProcessingCorrection else { return }
@@ -483,13 +553,14 @@ final class AutoCorrectionService {
         // Never touch our own windows (Settings search etc.)
         guard !NSApp.isActive else { return }
 
-        // Check AutoCorrectionGate: secure fields, non-text controls, and excluded apps (Terminal, iTerm)
+        // Check AutoCorrectionGate: secure fields, non-text controls, and excluded apps
         let focus = accessibilityService.focusedFieldRole()
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         guard AutoCorrectionGate.allowsAutoCorrection(
             role: focus?.role,
             subrole: focus?.subrole,
-            bundleID: frontmostBundleID
+            bundleID: frontmostBundleID,
+            excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
         ) else {
             NSLog("[LangSwitcher] AutoCorrection: vetoed by AutoCorrectionGate (role=\(focus?.role ?? "nil"), subrole=\(focus?.subrole ?? "nil"), bundleID=\(frontmostBundleID ?? "nil"))")
             return
@@ -535,6 +606,7 @@ final class AutoCorrectionService {
 
         // Step 4: Perform the replacement
         NSLog("[LangSwitcher] AutoCorrection: replacing '\(word)' with '\(convertedWord)'")
+        previousWord = convertedWord.lowercased()
         performReplacement(originalWord: word, correctedWord: convertedWord, triggerChar: triggerChar)
 
         // Step 5: Switch layout if needed

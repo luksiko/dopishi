@@ -180,6 +180,17 @@ struct GeneralSettingsTab: View {
                     .padding(.top, 2)
                 
                 if settingsManager.autoCompletionEnabled {
+                    Picker(l10n.t("autocompletion.displayMode"), selection: $settingsManager.autoCompletionDisplayMode) {
+                        ForEach(AutocompletionDisplayMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    
+                    Text(settingsManager.autoCompletionDisplayMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+
                     Picker(l10n.t("autocompletion.acceptKey"), selection: $settingsManager.autoCompletionAcceptKey) {
                         ForEach(AutocompletionAcceptKey.allCases) { key in
                             Text(key.displayName).tag(key)
@@ -205,7 +216,25 @@ struct GeneralSettingsTab: View {
                     Stepper("\(l10n.t("autocompletion.minPrefixLength")) \(settingsManager.autoCompletionMinPrefixLength)", value: $settingsManager.autoCompletionMinPrefixLength, in: 2...5)
                     
                     Stepper("\(l10n.t("autocompletion.maxSuggestions")) \(settingsManager.autoCompletionMaxSuggestions)", value: $settingsManager.autoCompletionMaxSuggestions, in: 1...6)
+                    
+                    Divider()
+                        .padding(.vertical, 2)
+                    
+                    HStack {
+                        Button(l10n.t("autocompletion.resetAdaptive")) {
+                            AutocompletionAdaptiveStore.shared.clearAll()
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Spacer()
+                    }
                 }
+            }
+            
+            Section(l10n.t("excludedApps.title")) {
+                ExcludedAppsSettingsView()
+                    .environmentObject(settingsManager)
+                    .environmentObject(l10n)
             }
             
             Section(l10n.t("general.howItWorks")) {
