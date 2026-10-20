@@ -16,6 +16,10 @@ final class AutocompletionAdaptiveStore: ObservableObject {
     // In-memory bigrams map: lowercased previousWord -> [lowercased nextWord : count]
     @Published private(set) var bigramFrequencies: [String: [String: Int]] = [:]
     
+    // Limits to prevent unbounded dictionary growth in UserDefaults
+    static let maxTrackedWords = 2000
+    static let maxTrackedBigramHeads = 1000
+    
     private let defaults = UserDefaults.standard
     
     private enum Keys {
@@ -88,7 +92,27 @@ final class AutocompletionAdaptiveStore: ObservableObject {
             bigramFrequencies[prev] = nextMap
         }
         
+        pruneIfNeeded()
         saveData()
+    }
+    
+    // Prune least frequent entries when capacity limits are exceeded
+    func pruneIfNeeded() {
+        if wordFrequencies.count > Self.maxTrackedWords {
+            let targetCount = Self.maxTrackedWords * 3 / 4
+            let sorted = wordFrequencies.sorted { $0.value > $1.value }
+            wordFrequencies = Dictionary(uniqueKeysWithValues: sorted.prefix(targetCount).map { ($0.key, $0.value) })
+        }
+        
+        if bigramFrequencies.count > Self.maxTrackedBigramHeads {
+            let targetCount = Self.maxTrackedBigramHeads * 3 / 4
+            let sorted = bigramFrequencies.sorted { lhs, rhs in
+                let sumL = lhs.value.values.reduce(0, +)
+                let sumR = rhs.value.values.reduce(0, +)
+                return sumL > sumR
+            }
+            bigramFrequencies = Dictionary(uniqueKeysWithValues: sorted.prefix(targetCount).map { ($0.key, $0.value) })
+        }
     }
     
     // MARK: - Scoring & Continuations

@@ -61,6 +61,9 @@ final class GhostTextOverlayController: NSObject {
         if origin.y < vf.minY {
             origin.y = vf.minY + 2
         }
+        if origin.y + frame.height > vf.maxY {
+            origin.y = vf.maxY - frame.height - 2
+        }
         
         p.setFrameOrigin(origin)
         p.orderFrontRegardless()

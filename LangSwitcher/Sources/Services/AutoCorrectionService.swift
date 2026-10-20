@@ -202,6 +202,7 @@ final class AutoCorrectionService {
             return
         }
         wordBuffer = ""
+        previousWord = nil
         overlayController.hide()
         ghostTextController.hide()
     }
@@ -304,12 +305,14 @@ final class AutoCorrectionService {
 
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
             wordBuffer = ""
+            previousWord = nil
             overlayController.hide()
             ghostTextController.hide()
             return
 
         case 0x35: // Escape
             wordBuffer = ""
+            previousWord = nil
             overlayController.hide()
             ghostTextController.hide()
             return

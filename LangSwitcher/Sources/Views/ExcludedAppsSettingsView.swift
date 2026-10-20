@@ -9,6 +9,7 @@ struct ExcludedAppsSettingsView: View {
     @EnvironmentObject var l10n: LocalizationManager
     
     @State private var runningApps: [NSRunningApplication] = []
+    @State private var appMetadataCache: [String: (name: String, icon: NSImage?)] = [:]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -25,8 +26,9 @@ struct ExcludedAppsSettingsView: View {
             } else {
                 List {
                     ForEach(settingsManager.excludedAppBundleIDs, id: \.self) { bundleID in
+                        let meta = metadata(for: bundleID)
                         HStack {
-                            if let icon = iconForBundle(bundleID) {
+                            if let icon = meta.icon {
                                 Image(nsImage: icon)
                                     .resizable()
                                     .frame(width: 20, height: 20)
@@ -36,7 +38,7 @@ struct ExcludedAppsSettingsView: View {
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(displayName(for: bundleID))
+                                Text(meta.name)
                                     .font(.subheadline)
                                 Text(bundleID)
                                     .font(.caption2)
@@ -107,6 +109,7 @@ struct ExcludedAppsSettingsView: View {
     }
     
     private func chooseAppFromDisk() {
+        NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = false
@@ -120,20 +123,28 @@ struct ExcludedAppsSettingsView: View {
         }
     }
     
-    private func displayName(for bundleID: String) -> String {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
-           let bundle = Bundle(url: url) {
-            return bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String
-                ?? bundle.infoDictionary?["CFBundleName"] as? String
-                ?? url.deletingPathExtension().lastPathComponent
+    private func metadata(for bundleID: String) -> (name: String, icon: NSImage?) {
+        if let cached = appMetadataCache[bundleID] {
+            return cached
         }
-        return bundleID
-    }
-    
-    private func iconForBundle(_ bundleID: String) -> NSImage? {
+        let name: String
+        var icon: NSImage?
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            return NSWorkspace.shared.icon(forFile: url.path)
+            if let bundle = Bundle(url: url) {
+                name = bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String
+                    ?? bundle.infoDictionary?["CFBundleName"] as? String
+                    ?? url.deletingPathExtension().lastPathComponent
+            } else {
+                name = url.deletingPathExtension().lastPathComponent
+            }
+            icon = NSWorkspace.shared.icon(forFile: url.path)
+        } else {
+            name = bundleID
         }
-        return nil
+        let data = (name: name, icon: icon)
+        DispatchQueue.main.async {
+            self.appMetadataCache[bundleID] = data
+        }
+        return data
     }
 }

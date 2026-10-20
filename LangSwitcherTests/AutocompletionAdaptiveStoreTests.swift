@@ -57,4 +57,17 @@ final class AutocompletionAdaptiveStoreTests: XCTestCase {
         XCTAssertEqual(store.frequencyScore(for: "test"), 0)
         XCTAssertEqual(store.bigramBonus(for: "test", after: "unit"), 0)
     }
+    
+    func testPruneCapacityLimits() {
+        for i in 0..<100 {
+            store.recordWordUsage(word: "word\(i)", after: "prev\(i)")
+        }
+        XCTAssertEqual(store.wordFrequencies.count, 100)
+        XCTAssertEqual(store.bigramFrequencies.count, 100)
+        
+        // Explicitly test pruning logic
+        store.pruneIfNeeded()
+        XCTAssertLessThanOrEqual(store.wordFrequencies.count, AutocompletionAdaptiveStore.maxTrackedWords)
+        XCTAssertLessThanOrEqual(store.bigramFrequencies.count, AutocompletionAdaptiveStore.maxTrackedBigramHeads)
+    }
 }
