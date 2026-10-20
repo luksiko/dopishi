@@ -718,15 +718,22 @@ final class AutoCorrectionService {
         guard let target = existingTarget ?? accessibilityService.captureReplacementTarget(),
               let operation = replacementSession.begin() else { return false }
         completionRefresh.cancel()
-        let revision = physicalInputRevision
         let layout = KeyboardLayoutDetector.getCurrentLayout()?.id
-        // The delimiter may not have reached the editor yet. During this delay
-        // all physical input passes through, and any further key cancels the edit.
+
+        // 1. Immediate path: replace immediately if the editor has already committed the delimiter
+        if accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target,
+                                                          preferPasteInWebEditors: true) {
+            replacementSession.finish(operation)
+            onSuccess(true)
+            return true
+        }
+
+        // 2. Delayed path: wait 35ms for the delimiter to reach web/remote editors
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
             guard let self else { return }
             guard self.replacementSession.isCurrent(operation) else { return }
-            guard revision == self.physicalInputRevision,
-                  layout == KeyboardLayoutDetector.getCurrentLayout()?.id else {
+            guard layout == KeyboardLayoutDetector.getCurrentLayout()?.id,
+                  self.accessibilityService.isCurrentReplacementTarget(target) else {
                 self.replacementSession.finish(operation)
                 return
             }
@@ -741,8 +748,7 @@ final class AutoCorrectionService {
                     guard let self, self.replacementSession.isCurrent(operation) else { return }
                     self.replacementSession.finish(operation)
                     if applied {
-                        let canSwitchLayout = revision == self.physicalInputRevision
-                            && layout == KeyboardLayoutDetector.getCurrentLayout()?.id
+                        let canSwitchLayout = layout == KeyboardLayoutDetector.getCurrentLayout()?.id
                             && self.accessibilityService.isCurrentReplacementTarget(target)
                         onSuccess(canSwitchLayout)
                     }

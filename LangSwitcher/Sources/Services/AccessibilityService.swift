@@ -639,9 +639,7 @@ final class AccessibilityService {
         guard Self.replacementWasApplied(original: text, range: plan, replacement: replacement,
                                          observed: updated as? String) else {
             // Never leave a word highlighted after an ignored/failed setter.
-            if updated as? String == text {
-                restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
-            }
+            restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
             return false
         }
         return true
@@ -677,19 +675,39 @@ final class AccessibilityService {
                                             &selectionValue) == .success,
               let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { completion(false); return }
         var original = CFRange()
-        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &original),
-              let plan = Self.verifiedSuffixRange(text: text, selection: original, expected: expected) else {
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &original) else {
             completion(false); return
         }
+
+        let plan: NSRange
+        if original.length == 0 {
+            guard let suffixPlan = Self.verifiedSuffixRange(text: text, selection: original, expected: expected) else {
+                completion(false); return
+            }
+            plan = suffixPlan
+        } else if original.length == expected.utf16.count {
+            // Text is already selected (e.g. from replaceVerifiedSuffix attempt)
+            var selected: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selected) == .success,
+                  selected as? String == expected else {
+                completion(false); return
+            }
+            plan = NSRange(location: original.location, length: original.length)
+        } else {
+            completion(false); return
+        }
+
         let source = CGEventSource(stateID: .hidSystemState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
             completion(false); return
         }
         var range = CFRange(location: plan.location, length: plan.length)
-        guard let rangeValue = AXValueCreate(.cfRange, &range),
-              AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, rangeValue) == .success else {
-            completion(false); return
+        if original.length == 0 {
+            guard let rangeValue = AXValueCreate(.cfRange, &range),
+                  AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, rangeValue) == .success else {
+                completion(false); return
+            }
         }
         // AX range changes can arrive asynchronously in Chromium editors.
         // Wait for the exact text AND range before touching the clipboard.
@@ -698,9 +716,11 @@ final class AccessibilityService {
             var observed: CFTypeRef?
             var selected: CFTypeRef?
             var selectedRange: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed) == .success,
-                  observed as? String == text,
-                  AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selected) == .success,
+            if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed) == .success,
+               let obs = observed as? String, obs != text {
+                return false
+            }
+            guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selected) == .success,
                   selected as? String == expected,
                   AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success,
                   let selectedRange, CFGetTypeID(selectedRange) == AXValueGetTypeID() else { return false }
@@ -743,6 +763,7 @@ final class AccessibilityService {
                     event.flags = .maskCommand
                     event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
                     event.postToPid(processID)
+                    event.post(tap: .cgAnnotatedSessionEventTap)
                 }
             })
             guard sent else {

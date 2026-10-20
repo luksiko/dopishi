@@ -41,7 +41,7 @@ if [[ -d "$installed_app" ]]; then
             echo "Cannot read the installed application's signing requirement." >&2
             exit 1
         fi
-        codesign --verify --strict -R "$requirement" "$staging_dir/LangSwitcher.app"
+        codesign --verify --strict -R "=$requirement" "$staging_dir/LangSwitcher.app"
     else
         echo "Migrating from ad-hoc signing: renew Accessibility consent after this installation."
     fi

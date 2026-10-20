@@ -29,9 +29,24 @@ final class SpellCheckService {
     // never sufficient evidence for automatic replacement.
     private static let russianApplicationWords: Set<String> = Set("""
         раскладка раскладки раскладке раскладку раскладкой раскладок раскладкам раскладками раскладках
+        автосмена автосмены автосмене автосмену автосменой
         автозамена автозамены автозамене автозамену автозаменой
         автодополнение автодополнения автодополнению автодополнением автодополнении
+        автоисправление автоисправления автоисправлению автоисправлением автоисправлении
+        автопереключение автопереключения автопереключению автопереключением
+        шорткат шорткаты шортката шорткатов шорткату шорткатом шорткатах
+        хоткей хоткеи хоткея хоткеев хоткею хоткеем хоткеях
+        клавиатура клавиатуры клавиатуре клавиатуру клавиатурой клавиатур клавиатурам клавиатурами клавиатурах
+        клавиатурный клавиатурная клавиатурное клавиатурные клавиатурного клавиатурной
+        бэкап бэкапы бэкапа бэкапов
+        логин логины логина логинов
+        скриншот скриншоты скриншота скриншотов
+        репозиторий репозитория репозитории репозиториев
         """.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+
+    private static let russianCompoundPrefixes: [String] = [
+        "авто", "видео", "аудио", "онлайн", "кибер", "микро", "макро", "мега", "мини", "мульти", "псевдо", "супер", "гипер", "экстра", "ультра", "эко"
+    ]
 
     private init() {}
 
@@ -80,6 +95,31 @@ final class SpellCheckService {
             return false
         }
 
+        let lower = trimmed.lowercased()
+        if lang == "ru" && Self.russianApplicationWords.contains(lower) {
+            return true
+        }
+
+        // Support compound words with common prefixes (e.g. автосмены -> авто + смены)
+        if (lang == "ru" || lang == "uk") {
+            for prefix in Self.russianCompoundPrefixes {
+                if lower.hasPrefix(prefix) && lower.count >= prefix.count + 3 {
+                    let remainder = String(lower.dropFirst(prefix.count))
+                    let remRange = checker.checkSpelling(
+                        of: remainder,
+                        startingAt: 0,
+                        language: lang,
+                        wrap: false,
+                        inSpellDocumentWithTag: 0,
+                        wordCount: nil
+                    )
+                    if remRange.location == NSNotFound || Self.russianApplicationWords.contains(remainder) {
+                        return true
+                    }
+                }
+            }
+        }
+
         let range = checker.checkSpelling(
             of: trimmed,
             startingAt: 0,
@@ -91,7 +131,6 @@ final class SpellCheckService {
 
         // If range.location == NSNotFound, no misspelling was found → word is valid
         let valid = range.location == NSNotFound
-            || (lang == "ru" && Self.russianApplicationWords.contains(trimmed.lowercased()))
         NSLog("[LangSwitcher] SpellCheckService.isValidWord('\(trimmed)', lang='\(lang)') = \(valid)")
         return valid
     }
