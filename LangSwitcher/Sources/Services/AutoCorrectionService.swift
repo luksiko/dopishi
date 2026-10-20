@@ -231,6 +231,7 @@ final class AutoCorrectionService {
         physicalInputRevision &+= 1
         guard !isProcessingCorrection else { return false }
         let isOverlayActive = overlayController.isVisible || ghostTextController.isVisible
+            || (phraseContinuationAnchor != nil && ghostTextController.currentCandidate != nil)
         guard isOverlayActive else {
             dismissAutocompletion()
             return false
@@ -245,7 +246,7 @@ final class AutoCorrectionService {
         // A subsequent Escape when overlay is hidden passes through to the active application.
         if keyCode == 0x35 && nonModFlags.isEmpty {
             snoozeUntil = Date().addingTimeInterval(5.0)
-            snoozeFieldIdentifier = accessibilityService.captureCaretContext()?.fieldIdentifier
+            snoozeFieldIdentifier = lastCaretContext?.fieldIdentifier ?? accessibilityService.captureCaretContext()?.fieldIdentifier
             dismissAutocompletion()
             return true
         }
@@ -578,8 +579,14 @@ final class AutoCorrectionService {
         // The prefix is already in the editor. Commit before consuming the accept
         // key, so later typing cannot cancel an edit whose key was swallowed.
         let replaced = replacementSession.performImmediately {
-            accessibility.replaceVerifiedSuffix(acceptance.expected,
-                with: acceptance.replacement, target: target)
+            if acceptance.expected.isEmpty {
+                return accessibility.insertAtCaret(acceptance.replacement, target: target)
+            }
+            if accessibility.replaceVerifiedSuffix(acceptance.expected,
+                with: acceptance.replacement, target: target) {
+                return true
+            }
+            return accessibility.insertAtCaret(insertionText, target: target)
         }
         guard replaced else {
             dismissAutocompletion()
@@ -604,8 +611,16 @@ final class AutoCorrectionService {
             suggestionTarget = accessibilityService.captureReplacementTarget()
             lastCaretContext = accessibilityService.captureCaretContext()
             overlayController.hide()
-            let caretRect = accessibilityService.caretScreenRect()
-            ghostTextController.show(candidate: remainingCandidate, suffix: remaining, caretRect: caretRect)
+            if let continuationTarget = suggestionTarget {
+                ghostTextController.showContinuation(candidate: remainingCandidate, suffix: remaining,
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                    isCurrent: { [weak self] in
+                        guard let self, self.phraseContinuationAnchor == insertionText else { return false }
+                        return self.accessibilityService.isCurrentReplacementTarget(continuationTarget)
+                    })
+            } else {
+                dismissAutocompletion()
+            }
         } else {
             dismissAutocompletion()
         }

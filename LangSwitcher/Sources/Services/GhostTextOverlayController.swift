@@ -7,10 +7,12 @@ import AppKit
 @MainActor
 final class GhostTextOverlayController: NSObject {
     
+    private var presentationRevision = 0
     private var panel: NSPanel?
     private var textView: GhostTextView?
     private(set) var currentSuffix: String = ""
     private(set) var currentCandidate: AutocompletionCandidate?
+    private(set) var lastCaretRect: CGRect?
     
     var isVisible: Bool {
         panel?.isVisible == true
@@ -21,11 +23,13 @@ final class GhostTextOverlayController: NSObject {
     }
     
     func show(candidate: AutocompletionCandidate, suffix: String, caretRect: CGRect?) {
-        guard !suffix.isEmpty, let caret = caretRect else {
+        let caret = caretRect ?? lastCaretRect
+        guard !suffix.isEmpty, let caret else {
             hide()
             return
         }
         
+        self.lastCaretRect = caret
         self.currentCandidate = candidate
         self.currentSuffix = suffix
         let p = getOrCreatePanel()
@@ -65,11 +69,42 @@ final class GhostTextOverlayController: NSObject {
     }
     
     func hide() {
+        presentationRevision &+= 1
         panel?.orderOut(nil)
         currentSuffix = ""
         currentCandidate = nil
+        lastCaretRect = nil
     }
     
+    /// Retain a known continuation while AX catches up with the insertion.
+    /// Keep the panel hidden until real caret coordinates are available.
+    func showContinuation(candidate: AutocompletionCandidate, suffix: String,
+                          caretProvider: @escaping () -> CGRect?, isCurrent: @escaping () -> Bool) {
+        hide()
+        guard !suffix.isEmpty else { return }
+        currentCandidate = candidate
+        currentSuffix = suffix
+        retryContinuation(candidate: candidate, suffix: suffix, caretProvider: caretProvider,
+                          isCurrent: isCurrent, revision: presentationRevision, attemptsLeft: 3)
+    }
+
+    private func retryContinuation(candidate: AutocompletionCandidate, suffix: String,
+                                   caretProvider: @escaping () -> CGRect?, isCurrent: @escaping () -> Bool,
+                                   revision: Int, attemptsLeft: Int) {
+        guard revision == presentationRevision else { return }
+        guard isCurrent() else { hide(); return }
+        if let caret = caretProvider() {
+            show(candidate: candidate, suffix: suffix, caretRect: caret)
+        } else if attemptsLeft > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
+                self?.retryContinuation(candidate: candidate, suffix: suffix, caretProvider: caretProvider,
+                    isCurrent: isCurrent, revision: revision, attemptsLeft: attemptsLeft - 1)
+            }
+        } else {
+            hide()
+        }
+    }
+
     private func getOrCreatePanel() -> NSPanel {
         if let existing = panel { return existing }
         

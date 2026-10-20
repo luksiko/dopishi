@@ -357,27 +357,9 @@ final class AccessibilityService {
         var valueRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
            let fullText = valueRef as? String {
-            let caretLoc = max(0, min(selectedRange.location, fullText.count))
-            let selEnd = max(caretLoc, min(selectedRange.location + selectedRange.length, fullText.count))
-            
-            let beforeStart = max(0, caretLoc - maxSurroundingLength)
-            let beforeIdxStart = fullText.index(fullText.startIndex, offsetBy: beforeStart, limitedBy: fullText.endIndex) ?? fullText.startIndex
-            let beforeIdxEnd = fullText.index(fullText.startIndex, offsetBy: caretLoc, limitedBy: fullText.endIndex) ?? fullText.endIndex
-            let textBefore = String(fullText[beforeIdxStart..<beforeIdxEnd])
-            
-            let afterEnd = min(fullText.count, selEnd + maxSurroundingLength)
-            let afterIdxStart = fullText.index(fullText.startIndex, offsetBy: selEnd, limitedBy: fullText.endIndex) ?? fullText.endIndex
-            let afterIdxEnd = fullText.index(fullText.startIndex, offsetBy: afterEnd, limitedBy: fullText.endIndex) ?? fullText.endIndex
-            let textAfter = String(fullText[afterIdxStart..<afterIdxEnd])
-            
-            return CaretContext(
-                fieldIdentifier: fieldID,
-                textBeforeCaret: textBefore,
-                textAfterCaret: textAfter,
-                selectedText: selectedText,
-                caretLocation: caretLoc,
-                fullTextLength: fullText.count
-            )
+            return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
+                                         selection: selectedRange, selectedText: selectedText,
+                                         maxSurroundingLength: maxSurroundingLength)
         }
         
         return CaretContext(
@@ -390,6 +372,28 @@ final class AccessibilityService {
         )
     }
     
+    /// AX ranges and stored caret locations are UTF-16 offsets. Expand only
+    /// the context window edges so a small window never splits an emoji.
+    static func makeCaretContext(fieldIdentifier: String, text: String, selection: CFRange,
+                                 selectedText: String, maxSurroundingLength: Int = 200) -> CaretContext {
+        let string = text as NSString
+        let count = string.length
+        let caret = max(0, min(selection.location, count))
+        let selectionEnd = caret + min(max(0, selection.length), count - caret)
+        let limit = min(max(0, maxSurroundingLength), count)
+        var start = caret - min(caret, limit)
+        var end = selectionEnd + min(count - selectionEnd, limit)
+        if start < caret { start = string.rangeOfComposedCharacterSequence(at: start).location }
+        if end > selectionEnd {
+            let last = string.rangeOfComposedCharacterSequence(at: end - 1)
+            end = last.location + last.length
+        }
+        return CaretContext(fieldIdentifier: fieldIdentifier,
+            textBeforeCaret: string.substring(with: NSRange(location: start, length: caret - start)),
+            textAfterCaret: string.substring(with: NSRange(location: selectionEnd, length: end - selectionEnd)),
+            selectedText: selectedText, caretLocation: caret, fullTextLength: count)
+    }
+
     // MARK: - Caret Positioning
     
     /// Only return measured insertion bounds. Field bounds and mouse location
@@ -630,6 +634,18 @@ final class AccessibilityService {
             return false
         }
         return true
+    }
+
+    /// Inserts text directly at the current insertion point (caret) without replacing existing content.
+    func insertAtCaret(_ text: String, target: ReplacementTarget) -> Bool {
+        guard isCurrentReplacementTarget(target) else { return false }
+        let element = target.element
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success,
+              settable.boolValue else { return false }
+        
+        let result = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFString)
+        return result == .success
     }
 
     /// Fallback for automatic word correction in editors with ignored AX setters.

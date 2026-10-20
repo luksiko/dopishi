@@ -588,6 +588,36 @@ final class Sprint1FeatureTests: XCTestCase {
         XCTAssertEqual(secondWord, "are ")
         XCTAssertEqual(nextRemainder, "you doing")
     }
+    
+    @MainActor
+    func testCaretContextSafeWithEmojiAndUTF16Offsets() {
+        // "Привет 🎉 мир" has emoji which takes 2 UTF-16 code units
+        let fullText = "Привет 🎉 мир"
+        let utf16Count = fullText.utf16.count
+        
+        let caret16 = 9 // right after 🎉 
+        let idxBefore = String.Index(utf16Offset: 0, in: fullText)
+        let idxCaret = String.Index(utf16Offset: caret16, in: fullText)
+        let textBefore = String(fullText[idxBefore..<idxCaret])
+        
+        XCTAssertEqual(textBefore, "Привет 🎉")
+        XCTAssertEqual(utf16Count, fullText.utf16.count)
+    }
+    
+    @MainActor
+    func testPhraseAcceptancePlanWithEmptyBufferAndAnchor() {
+        let planWithBuffer = PhraseAcceptancePlan(buffer: "hel", continuationAnchor: nil, insertion: "hello ")
+        XCTAssertEqual(planWithBuffer.expected, "hel")
+        XCTAssertEqual(planWithBuffer.replacement, "hello ")
+        
+        let planContinuation = PhraseAcceptancePlan(buffer: "", continuationAnchor: "hello ", insertion: "world ")
+        XCTAssertEqual(planContinuation.expected, "hello ")
+        XCTAssertEqual(planContinuation.replacement, "hello world ")
+        
+        let planContinuationDirect = PhraseAcceptancePlan(buffer: "", continuationAnchor: nil, insertion: "world ")
+        XCTAssertEqual(planContinuationDirect.expected, "")
+        XCTAssertEqual(planContinuationDirect.replacement, "world ")
+    }
 }
 
 
@@ -670,5 +700,42 @@ extension VerifiedPasteAndContinuationTests {
         current.check()
         old.check(final: true)
         XCTAssertEqual(receipts, ["old:false", "new:true"])
+    }
+}
+
+
+final class CaretContextUTF16Tests: XCTestCase {
+    func testEmojiAndCombiningMarksBeforeCyrillicSelection() {
+        let prefix = "a👨‍👩‍👧‍👦e\u{301}🇺🇦"
+        let text = prefix + "Привет" + "尾"
+        let context = AccessibilityService.makeCaretContext(fieldIdentifier: "field", text: text,
+            selection: CFRange(location: prefix.utf16.count, length: "Привет".utf16.count), selectedText: "Привет")
+        XCTAssertEqual(context.textBeforeCaret, prefix)
+        XCTAssertEqual(context.textAfterCaret, "尾")
+        XCTAssertEqual(context.selectedText, "Привет")
+        XCTAssertEqual(context.caretLocation, prefix.utf16.count)
+        XCTAssertEqual(context.fullTextLength, text.utf16.count)
+    }
+
+    func testSmallContextWindowDoesNotSplitEmoji() {
+        let family = "👨‍👩‍👧‍👦"
+        let flag = "🇺🇦"
+        let context = AccessibilityService.makeCaretContext(fieldIdentifier: "field", text: family + flag,
+            selection: CFRange(location: family.utf16.count, length: 0), selectedText: "", maxSurroundingLength: 1)
+        XCTAssertEqual(context.textBeforeCaret, family)
+        XCTAssertEqual(context.textAfterCaret, flag)
+    }
+
+    func testInvalidRangesAndWindowLengthsAreClampedWithoutOverflow() {
+        let end = AccessibilityService.makeCaretContext(fieldIdentifier: "field", text: "да😀",
+            selection: CFRange(location: Int.max, length: Int.max), selectedText: "", maxSurroundingLength: Int.max)
+        XCTAssertEqual(end.textBeforeCaret, "да😀")
+        XCTAssertEqual(end.textAfterCaret, "")
+        XCTAssertEqual(end.caretLocation, 4)
+        let start = AccessibilityService.makeCaretContext(fieldIdentifier: "field", text: "да😀",
+            selection: CFRange(location: -1, length: -1), selectedText: "", maxSurroundingLength: -1)
+        XCTAssertEqual(start.caretLocation, 0)
+        XCTAssertEqual(start.textBeforeCaret, "")
+        XCTAssertEqual(start.textAfterCaret, "")
     }
 }

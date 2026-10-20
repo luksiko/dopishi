@@ -151,3 +151,46 @@ final class GhostTextOverlayTests: XCTestCase {
     }
 
 }
+
+
+extension GhostTextOverlayTests {
+    func testContinuationRecoversWhenCaretTemporarilyUnavailable() async throws {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+        let candidate = AutocompletionCandidate(word: "are you", targetLayoutID: "com.apple.keylayout.US")
+        var calls = 0
+        ghost.showContinuation(candidate: candidate, suffix: "are you", caretProvider: {
+            calls += 1
+            return calls == 1 ? nil : CGRect(x: 100, y: 200, width: 1, height: 18)
+        }, isCurrent: { true })
+        XCTAssertFalse(ghost.isVisible)
+        XCTAssertEqual(ghost.currentCandidate, candidate)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.currentSuffix, "are you")
+    }
+
+    func testDismissalCancelsPendingContinuationPresentation() async throws {
+        let ghost = GhostTextOverlayController()
+        var calls = 0
+        ghost.showContinuation(candidate: AutocompletionCandidate(word: "next", targetLayoutID: "com.apple.keylayout.US"),
+            suffix: "next", caretProvider: { calls += 1; return nil }, isCurrent: { true })
+        ghost.hide()
+        try await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertEqual(calls, 1)
+        XCTAssertNil(ghost.currentCandidate)
+        XCTAssertFalse(ghost.isVisible)
+    }
+
+    func testFieldChangeDiscardsPendingContinuation() async throws {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+        var current = true
+        ghost.showContinuation(candidate: AutocompletionCandidate(word: "next", targetLayoutID: "com.apple.keylayout.US"),
+            suffix: "next", caretProvider: { nil }, isCurrent: { current })
+        current = false
+        try await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertNil(ghost.currentCandidate)
+        XCTAssertFalse(ghost.isVisible)
+    }
+}
