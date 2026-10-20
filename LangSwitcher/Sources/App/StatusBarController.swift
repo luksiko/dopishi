@@ -5,7 +5,7 @@ import SwiftUI
 // Manages the menu bar icon and dropdown menu
 
 @MainActor
-final class StatusBarController {
+final class StatusBarController: NSObject, NSMenuDelegate {
     
     private var statusBar: NSStatusBar
     private var statusItem: NSStatusItem
@@ -15,6 +15,7 @@ final class StatusBarController {
     private var aboutWindow: NSWindow?
     
     var onConvertAction: (() -> Void)?
+    var onSwitchLayoutAction: (() -> Void)?
     
     private var l10n: LocalizationManager { LocalizationManager.shared }
     
@@ -24,7 +25,16 @@ final class StatusBarController {
         self.statusItem = statusBar.statusItem(withLength: NSStatusItem.squareLength)
         self.menu = NSMenu()
         
+        super.init()
+        
+        menu.delegate = self
         setupStatusBarButton()
+        setupMenu()
+    }
+    
+    // MARK: - NSMenuDelegate
+    
+    func menuWillOpen(_ menu: NSMenu) {
         setupMenu()
     }
     
@@ -63,6 +73,21 @@ final class StatusBarController {
         )
         convertItem.target = self
         menu.addItem(convertItem)
+
+        // Direct switch layout action
+        let switchKeyTitle: String
+        if settingsManager.layoutSwitchKey != .disabled {
+            switchKeyTitle = "\(l10n.t("menu.switchLayout")) (\(settingsManager.layoutSwitchKey.displayName))"
+        } else {
+            switchKeyTitle = l10n.t("menu.switchLayout")
+        }
+        let switchItem = NSMenuItem(
+            title: switchKeyTitle,
+            action: #selector(switchLayoutAction),
+            keyEquivalent: ""
+        )
+        switchItem.target = self
+        menu.addItem(switchItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -71,9 +96,17 @@ final class StatusBarController {
         layoutsHeader.isEnabled = false
         menu.addItem(layoutsHeader)
         
+        let currentLayout = KeyboardLayoutDetector.getCurrentLayout()
         for layout in settingsManager.enabledLayouts {
-            let item = NSMenuItem(title: "  \(layout.displayName)", action: nil, keyEquivalent: "")
-            item.isEnabled = false
+            let isCurrent = (layout.id == currentLayout?.id || layout.languageCode.lowercased() == currentLayout?.languageCode.lowercased())
+            let prefix = isCurrent ? "✓ " : "   "
+            let item = NSMenuItem(
+                title: "\(prefix)\(layout.displayName)",
+                action: #selector(selectLayoutAction(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = layout.id
+            item.target = self
             menu.addItem(item)
         }
         
@@ -123,6 +156,16 @@ final class StatusBarController {
     
     @objc private func convertAction() {
         onConvertAction?()
+    }
+
+    @objc private func switchLayoutAction() {
+        onSwitchLayoutAction?()
+    }
+    
+    @objc private func selectLayoutAction(_ sender: NSMenuItem) {
+        if let targetID = sender.representedObject as? String {
+            KeyboardLayoutDetector.switchToLayout(targetID)
+        }
     }
     
     @objc private func openSettings() {

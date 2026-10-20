@@ -109,7 +109,7 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             }
-            
+
             Section(l10n.t("general.layoutSwitch")) {
                 Picker(l10n.t("general.mode"), selection: $settingsManager.layoutSwitchMode) {
                     ForEach(LayoutSwitchMode.allCases, id: \.self) { mode in
@@ -122,6 +122,26 @@ struct GeneralSettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
+            }
+            
+            Section(l10n.t("general.autoCorrection")) {
+                Toggle(l10n.t("general.autoCorrectionEnabled"), isOn: $settingsManager.autoCorrectionEnabled)
+                
+                Text(l10n.t("general.autoCorrectionDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+                
+                if settingsManager.autoCorrectionEnabled {
+                    Toggle(l10n.t("general.autoCorrectionSpellCheck"), isOn: $settingsManager.autoCorrectionUseSpellCheck)
+                    
+                    Text(l10n.t("general.autoCorrectionSpellCheckDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                    
+                    Toggle(l10n.t("general.autoCorrectionSwitchLayout"), isOn: $settingsManager.autoCorrectionSwitchLayout)
+                }
             }
             
             Section(l10n.t("general.howItWorks")) {
@@ -241,57 +261,89 @@ struct HotkeySettingsTab: View {
     @EnvironmentObject var l10n: LocalizationManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(l10n.t("hotkey.title"))
-                .font(.headline)
-            
-            Text(l10n.t("hotkey.description"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            
-            // Current shortcut display
-            HStack {
-                Text(l10n.t("hotkey.current"))
-                Spacer()
-                Text(settingsManager.hotkeyDescription)
-                    .font(.system(.title2, design: .rounded))
-                    .bold()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.blue.opacity(0.1))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Section 1: Single Key Layout Switch
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(l10n.t("layoutSwitchKey.title"))
+                        .font(.headline)
+                    
+                    Text(l10n.t("layoutSwitchKey.description"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack {
+                        Text(l10n.t("layoutSwitchKey.current"))
+                        Spacer()
+                        Picker("", selection: $settingsManager.layoutSwitchKey) {
+                            ForEach(LayoutSwitchKey.allCases) { key in
+                                Text(key.displayName).tag(key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 220)
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-            
-            Divider()
-            
-            // Double Shift toggle
-            Toggle(l10n.t("hotkey.useDoubleShift"), isOn: $settingsManager.useDoubleShift)
-                .toggleStyle(.switch)
-            
-            Text(l10n.t("hotkey.doubleShiftHint"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            
-            if !settingsManager.useDoubleShift {
+                    
+                    Text(l10n.t("layoutSwitchKey.hint"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                
                 Divider()
                 
-                Text(l10n.t("hotkey.customTitle"))
-                    .font(.subheadline)
-                    .bold()
-                
-                HotkeyRecorderView(
-                    keyCode: $settingsManager.hotkeyKeyCode,
-                    modifiers: Binding(
-                        get: { settingsManager.hotkeyModifierFlags },
-                        set: { settingsManager.hotkeyModifierFlags = $0 }
-                    )
-                )
-                .environmentObject(l10n)
+                // Section 2: Text Conversion Shortcut
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(l10n.t("hotkey.title"))
+                        .font(.headline)
+                    
+                    Text(l10n.t("hotkey.description"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    // Current shortcut display
+                    HStack {
+                        Text(l10n.t("hotkey.current"))
+                        Spacer()
+                        Text(settingsManager.hotkeyDescription)
+                            .font(.system(.title3, design: .rounded))
+                            .bold()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(.blue.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    
+                    // Double Shift toggle
+                    Toggle(l10n.t("hotkey.useDoubleShift"), isOn: $settingsManager.useDoubleShift)
+                        .toggleStyle(.switch)
+                    
+                    Text(l10n.t("hotkey.doubleShiftHint"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    if !settingsManager.useDoubleShift {
+                        Divider()
+                        
+                        Text(l10n.t("hotkey.customTitle"))
+                            .font(.subheadline)
+                            .bold()
+                        
+                        HotkeyRecorderView(
+                            keyCode: $settingsManager.hotkeyKeyCode,
+                            modifiers: Binding(
+                                get: { settingsManager.hotkeyModifierFlags },
+                                set: { settingsManager.hotkeyModifierFlags = $0 }
+                            )
+                        )
+                        .environmentObject(l10n)
+                    }
+                }
             }
-            
-            Spacer()
+            .padding()
         }
-        .padding()
     }
 }
 

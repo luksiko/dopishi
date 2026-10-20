@@ -10,6 +10,7 @@ enum Strings_ru {
         // ── Меню (StatusBarController) ──────────────────────────────
         "menu.header":                   "⌨ LangSwitcher",
         "menu.convertText":              "Конвертировать текст",
+        "menu.switchLayout":             "Переключить раскладку",
         "menu.activeLayouts":            "Активные раскладки:",
         "menu.conversions":              "Конвертаций:",
         "menu.settings":                 "Настройки...",
@@ -59,6 +60,23 @@ enum Strings_ru {
         "layouts.description":           "Эти раскладки определены из настроек системной клавиатуры. Конвертер сопоставляет символы между ними на основе физических позиций клавиш.",
         "layouts.refresh":               "Обновить из системы",
         "layouts.count":                 "Обнаружено раскладок: %d",
+
+        // ── Переключение раскладки одиночной клавишей ───────────────
+        "layoutSwitchKey.title":         "Клавиша переключения языка",
+        "layoutSwitchKey.description":   "Быстрое переключение системной раскладки одиночной клавишей без конвертации текста.",
+        "layoutSwitchKey.current":       "Клавиша переключения:",
+        "layoutSwitchKey.disabled":      "Отключено",
+        "layoutSwitchKey.capsLock":      "Caps Lock",
+        "layoutSwitchKey.rightOption":   "Правый Option (⌥)",
+        "layoutSwitchKey.rightCommand":  "Правый Command (⌘)",
+        "layoutSwitchKey.rightShift":    "Правый Shift (⇧)",
+        "layoutSwitchKey.rightControl":  "Правый Control (⌃)",
+        "layoutSwitchKey.leftOption":    "Левый Option (⌥)",
+        "layoutSwitchKey.leftControl":   "Левый Control (⌃)",
+        "layoutSwitchKey.leftCommand":   "Левый Command (⌘)",
+        "layoutSwitchKey.leftShift":     "Левый Shift (⇧)",
+        "layoutSwitchKey.fn":            "Fn / Globe (fn)",
+        "layoutSwitchKey.hint":          "Нажатие этой клавиши циклически переключает включенные раскладки клавиатуры. Быстро и независимо от конвертации текста.",
 
         // ── Вкладка «Горячая клавиша» ───────────────────────────────
         "hotkey.title":                  "Сочетание клавиш",
@@ -121,7 +139,7 @@ enum Strings_ru {
         // ── Окно «О программе» ──────────────────────────────────────
         "about.windowTitle":             "О программе LangSwitcher",
         "about.appName":                 "LangSwitcher",
-        "about.version":                 "Версия 1.0.0",
+        "about.version":                 "Версия 1.2.0",
         "about.tagline":                 "Конвертер раскладки клавиатуры для macOS с открытым кодом",
         "about.howToUse":                "Как использовать:",
         "about.step1":                   "Выделите текст, набранный не в той раскладке",
@@ -151,6 +169,57 @@ LangSwitcher нуждается в разрешении универсально
 
         // ── Общее ───────────────────────────────────────────────────
         "common.cancel":                 "Отмена",
+
+        "menu.previewRecovery":          "Предпросмотр восстановления...",
+        "general.autoCorrectOnSpace":      "Автокоррекция по пробелу",
+        "general.autoCorrectOnSpaceHint":  "Автоматически конвертировать последнее слово при нажатии пробела, если оно выглядит набранным в другой раскладке.",
+        "general.thoughtRecovery":         "Восстановление текста",
+        "general.thoughtRecoveryEnabled":  "Восстанавливать смешанные предложения",
+        "general.thoughtRecoveryPreview":  "Показывать предпросмотр перед применением",
+        "general.thoughtRecoveryHint":     "Исправляет только слова, сломанные раскладкой, внутри предложений со смешанными языками — код, ссылки и намеренные английские слова не трогаются. Выбор «оставить как есть» в предпросмотре учит личный словарь.",
+        "general.recoveryStats":           "Восстановлений:",
+        "general.recoveryRevertRate":      "отменено",
+        "hotkey.doubleShiftMode":        "Двойной Shift (⇧⇧)",
+        "hotkey.doubleOptionMode":       "Двойной Option (⌥⌥)",
+        "hotkey.customMode":             "Пользовательское сочетание",
+        "hotkey.doubleOptionHint":       "Быстро нажмите Option дважды для конвертации. Сочетания Option+клавиша (⌥+клавиша) игнорируются и не вызывают конвертацию.",
+        "permissions.inputMonitoringTitle":   "Мониторинг ввода",
+        "permissions.inputMonitoringGranted": "Предоставлен — горячие клавиши работают по всей системе",
+        "permissions.inputMonitoringNotGranted": "Не предоставлен — горячие клавиши могут не срабатывать в других приложениях",
+        "permissions.crossAppTitle":     "Текущее приложение",
+        "permissions.crossAppFrontmost": "Активное приложение:",
+        "permissions.crossAppFull":      "Конвертация в этом приложении должна работать",
+        "permissions.crossAppLimited":   "В этом приложении (например, терминале) конвертация может работать ограниченно — проверяйте результат",
+        "recovery.title":                "Восстановление текста",
+        "recovery.subtitle":             "Изменятся только выделенные слова.",
+        "recovery.nothingToChange":      "В этой строке нечего восстанавливать — она уже читается как язык.",
+        "recovery.original":             "Набрано",
+        "recovery.reconstructed":        "Восстановлено",
+        "recovery.alternatives":         "Другие варианты",
+        "recovery.changedSpans":         "Изменённые слова",
+        "recovery.confidence":           "Уверенность: %@",
+        "recovery.apply":                "Применить",
+        "recovery.copy":                 "Копировать",
+        "recovery.revert":               "Оставить как есть",
+        "recovery.revertHint":           "Вариант «оставить как есть» также запоминает эти слова — больше они не будут исправляться.",
+        "recovery.kind.wrongLayout":     "раскладка",
+        "recovery.kind.intentionalForeign": "другое слово",
+        "recovery.kind.code":            "код",
+        "recovery.kind.url":             "ссылка",
+        "recovery.kind.properName":      "имя",
+        "recovery.kind.ambiguous":       "неясно",
+        "recovery.kind.correct":         "верно",
+        "recovery.kind.separator":       "разделитель",
+
+        "notification.layoutSwitched":   "Раскладка: %@",
+
+        // ── Автоисправление ────────────────────────────────────────
+        "general.autoCorrection":                "Автоисправление",
+        "general.autoCorrectionEnabled":         "Автоисправление раскладки при пробеле/Enter",
+        "general.autoCorrectionDesc":            "Автоматически обнаруживает и исправляет слова, набранные в неправильной раскладке, при нажатии пробела, Enter или знака пунктуации. Использует системную проверку правописания для уменьшения ложных срабатываний.",
+        "general.autoCorrectionSpellCheck":      "Проверять системным словарём",
+        "general.autoCorrectionSpellCheckDesc":  "Автоисправление только когда преобразованное слово распознаётся проверкой правописания macOS. Уменьшает ложные срабатывания, но может пропускать некоторые слова.",
+        "general.autoCorrectionSwitchLayout":    "Переключать раскладку после автоисправления",
     ]
 
     @MainActor static func register() {

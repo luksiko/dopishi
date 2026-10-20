@@ -28,8 +28,16 @@
 		E10000010000000000000019 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000019 /* LocalizationManager.swift */; };
 		E10000010000000000000020 /* Strings_en.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000020 /* Strings_en.swift */; };
 		E10000010000000000000021 /* Strings_ru.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000021 /* Strings_ru.swift */; };
+		E10000010000000000000022 /* AutoCorrectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000022 /* AutoCorrectionService.swift */; };
+		E10000010000000000000023 /* SpellCheckService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000023 /* SpellCheckService.swift */; };
+		E10000010000000000000024 /* LayoutSwitchKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000024 /* LayoutSwitchKey.swift */; };
+		E10000010000000000000025 /* SingleKeyLayoutSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000025 /* SingleKeyLayoutSwitcher.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
+		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
+		E10000010000000000000104 /* KeyboardLayoutDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000104 /* KeyboardLayoutDetectorTests.swift */; };
+		E10000010000000000000105 /* SpellCheckServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000105 /* SpellCheckServiceTests.swift */; };
+		E10000010000000000000106 /* AutoCorrectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000106 /* AutoCorrectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,8 +72,16 @@
 		E10000020000000000000019 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
 		E10000020000000000000020 /* Strings_en.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_en.swift; sourceTree = "<group>"; };
 		E10000020000000000000021 /* Strings_ru.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_ru.swift; sourceTree = "<group>"; };
+		E10000020000000000000022 /* AutoCorrectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoCorrectionService.swift; sourceTree = "<group>"; };
+		E10000020000000000000023 /* SpellCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpellCheckService.swift; sourceTree = "<group>"; };
+		E10000020000000000000024 /* LayoutSwitchKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSwitchKey.swift; sourceTree = "<group>"; };
+		E10000020000000000000025 /* SingleKeyLayoutSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcher.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000104 /* KeyboardLayoutDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLayoutDetectorTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000105 /* SpellCheckServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpellCheckServiceTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000106 /* AutoCorrectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoCorrectionTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* LangSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LangSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -154,6 +170,9 @@
 				E10000020000000000000010 /* AccessibilityService.swift */,
 				E10000020000000000000011 /* SettingsManager.swift */,
 				E10000020000000000000017 /* ConversionLogStore.swift */,
+				E10000020000000000000022 /* AutoCorrectionService.swift */,
+				E10000020000000000000023 /* SpellCheckService.swift */,
+				E10000020000000000000025 /* SingleKeyLayoutSwitcher.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -163,6 +182,7 @@
 			children = (
 				E10000020000000000000012 /* KeyboardLayout.swift */,
 				E10000020000000000000016 /* ConversionLog.swift */,
+				E10000020000000000000024 /* LayoutSwitchKey.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -199,6 +219,10 @@
 			children = (
 				E10000020000000000000101 /* LayoutMapperTests.swift */,
 				E10000020000000000000102 /* TextConverterTests.swift */,
+				E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */,
+				E10000020000000000000104 /* KeyboardLayoutDetectorTests.swift */,
+				E10000020000000000000105 /* SpellCheckServiceTests.swift */,
+				E10000020000000000000106 /* AutoCorrectionTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -322,6 +346,10 @@
 				E10000010000000000000019 /* LocalizationManager.swift in Sources */,
 				E10000010000000000000020 /* Strings_en.swift in Sources */,
 				E10000010000000000000021 /* Strings_ru.swift in Sources */,
+				E10000010000000000000022 /* AutoCorrectionService.swift in Sources */,
+				E10000010000000000000023 /* SpellCheckService.swift in Sources */,
+				E10000010000000000000024 /* LayoutSwitchKey.swift in Sources */,
+				E10000010000000000000025 /* SingleKeyLayoutSwitcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -331,6 +359,10 @@
 			files = (
 				E10000010000000000000101 /* LayoutMapperTests.swift in Sources */,
 				E10000010000000000000102 /* TextConverterTests.swift in Sources */,
+				E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */,
+				E10000010000000000000104 /* KeyboardLayoutDetectorTests.swift in Sources */,
+				E10000010000000000000105 /* SpellCheckServiceTests.swift in Sources */,
+				E10000010000000000000106 /* AutoCorrectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -469,7 +501,7 @@
 				CODE_SIGN_ENTITLEMENTS = LangSwitcher/LangSwitcher.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 8445UJ958A;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -481,7 +513,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -497,7 +529,7 @@
 				CODE_SIGN_ENTITLEMENTS = LangSwitcher/LangSwitcher.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 8445UJ958A;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -509,7 +541,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -522,10 +554,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -539,10 +571,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

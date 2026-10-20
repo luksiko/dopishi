@@ -97,6 +97,14 @@ final class SettingsManager: ObservableObject {
         }
     }
     
+    /// Dedicated single key for toggling/cycling keyboard layout directly
+    @Published var layoutSwitchKey: LayoutSwitchKey {
+        didSet {
+            defaults.set(layoutSwitchKey.rawValue, forKey: Keys.layoutSwitchKey)
+            NotificationCenter.default.post(name: .layoutSwitchKeyChanged, object: nil)
+        }
+    }
+    
     @Published var launchAtLogin: Bool {
         didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) }
     }
@@ -131,6 +139,24 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(logMaxEntries, forKey: Keys.logMaxEntries) }
     }
     
+    /// Whether auto-correction on word boundary (space/enter/punctuation) is enabled.
+    @Published var autoCorrectionEnabled: Bool {
+        didSet {
+            defaults.set(autoCorrectionEnabled, forKey: Keys.autoCorrectionEnabled)
+            NotificationCenter.default.post(name: .autoCorrectionSettingsChanged, object: nil)
+        }
+    }
+    
+    /// Whether to use NSSpellChecker to validate converted words (reduces false positives).
+    @Published var autoCorrectionUseSpellCheck: Bool {
+        didSet { defaults.set(autoCorrectionUseSpellCheck, forKey: Keys.autoCorrectionUseSpellCheck) }
+    }
+    
+    /// Whether to switch the keyboard layout after auto-correction.
+    @Published var autoCorrectionSwitchLayout: Bool {
+        didSet { defaults.set(autoCorrectionSwitchLayout, forKey: Keys.autoCorrectionSwitchLayout) }
+    }
+
     // MARK: - Computed
     
     var hotkeyModifierFlags: NSEvent.ModifierFlags {
@@ -152,6 +178,7 @@ final class SettingsManager: ObservableObject {
     private enum Keys {
         static let enabledLayouts = "enabledLayouts"
         static let useDoubleShift = "useDoubleShift"
+        static let layoutSwitchKey = "layoutSwitchKey"
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifiers = "hotkeyModifiers"
         static let launchAtLogin = "launchAtLogin"
@@ -162,6 +189,9 @@ final class SettingsManager: ObservableObject {
         static let conversionCount = "conversionCount"
         static let loggingEnabled = "loggingEnabled"
         static let logMaxEntries = "logMaxEntries"
+        static let autoCorrectionEnabled = "autoCorrectionEnabled"
+        static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
+        static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
     }
     
     // MARK: - Init
@@ -170,6 +200,9 @@ final class SettingsManager: ObservableObject {
         // Default: double-shift mode
         let savedUseDoubleShift = defaults.object(forKey: Keys.useDoubleShift) as? Bool
         self.useDoubleShift = savedUseDoubleShift ?? true  // Default ON
+        
+        let savedLayoutSwitchKey = defaults.string(forKey: Keys.layoutSwitchKey)
+        self.layoutSwitchKey = savedLayoutSwitchKey.flatMap { LayoutSwitchKey(rawValue: $0) } ?? .disabled
         
         // Fallback hotkey settings (Option+S) for regular mode
         let savedKeyCode = defaults.object(forKey: Keys.hotkeyKeyCode) as? Int
@@ -190,14 +223,28 @@ final class SettingsManager: ObservableObject {
         self.conversionCount = defaults.integer(forKey: Keys.conversionCount)
         self.loggingEnabled = defaults.object(forKey: Keys.loggingEnabled) as? Bool ?? false  // Default: OFF
         self.logMaxEntries = defaults.object(forKey: Keys.logMaxEntries) as? Int ?? 100       // Default: 100
+        self.autoCorrectionEnabled = defaults.object(forKey: Keys.autoCorrectionEnabled) as? Bool ?? false     // Default: OFF
+        self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
+        self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
         
-        // Load layouts
+        // Load layouts: validate against actual system installed layouts
+        let systemLayouts = KeyboardLayoutDetector.getInstalledLayouts()
+        let systemIDs = Set(systemLayouts.map { $0.id.lowercased() })
+        
         if let data = defaults.data(forKey: Keys.enabledLayouts),
-           let layouts = try? JSONDecoder().decode([KeyboardLayout].self, from: data),
-           !layouts.isEmpty {
-            self.enabledLayouts = layouts
+           let savedLayouts = try? JSONDecoder().decode([KeyboardLayout].self, from: data),
+           !savedLayouts.isEmpty {
+            let valid = savedLayouts.filter { systemIDs.contains($0.id.lowercased()) }
+            if valid.count >= 2 {
+                self.enabledLayouts = valid
+            } else {
+                self.enabledLayouts = systemLayouts
+                if let encoded = try? JSONEncoder().encode(systemLayouts) {
+                    defaults.set(encoded, forKey: Keys.enabledLayouts)
+                }
+            }
         } else {
-            self.enabledLayouts = KeyboardLayoutDetector.getInstalledLayouts()
+            self.enabledLayouts = systemLayouts
         }
     }
     

@@ -9,8 +9,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let conversionLogStore = ConversionLogStore.shared
     private var statusBarController: StatusBarController?
     private let hotkeyManager = HotkeyManager()
+    private let layoutSwitcher = SingleKeyLayoutSwitcher()
     private let accessibilityService = AccessibilityService()
     private lazy var textConverter = TextConverter(settingsManager: settingsManager)
+    private lazy var autoCorrectionService = AutoCorrectionService(
+        settingsManager: settingsManager,
+        textConverter: textConverter
+    )
     
     private var l10n: LocalizationManager { LocalizationManager.shared }
     
@@ -24,9 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController?.onConvertAction = { [weak self] in
             self?.performConversion()
         }
+        statusBarController?.onSwitchLayoutAction = { [weak self] in
+            self?.performDirectLayoutSwitch()
+        }
         
-        // Register hotkey
+        // Register hotkeys
         registerHotkey()
+        registerLayoutSwitchKey()
         
         // Check accessibility permissions and log status
         let trusted = AccessibilityService.hasAccessibilityPermission
@@ -39,13 +48,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Request notification permissions
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         
-        // Listen for settings changes to re-register hotkey
+        // Listen for settings changes to re-register hotkeys
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(hotkeySettingsChanged),
             name: .hotkeySettingsChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(layoutSwitchKeyChanged),
+            name: .layoutSwitchKeyChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(autoCorrectionSettingsChanged),
+            name: .autoCorrectionSettingsChanged,
+            object: nil
+        )
+        
+        // Start auto-correction if enabled
+        if settingsManager.autoCorrectionEnabled {
+            autoCorrectionService.start()
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if settingsManager.autoCorrectionEnabled && !autoCorrectionService.isRunning {
+            autoCorrectionService.start()
+        }
     }
     
     // MARK: - Hotkey Registration
@@ -71,6 +103,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func hotkeySettingsChanged() {
         registerHotkey()
+    }
+    
+    @objc private func autoCorrectionSettingsChanged() {
+        autoCorrectionService.restart()
+    }
+    
+    // MARK: - Single Key Layout Switch Registration
+    
+    func registerLayoutSwitchKey() {
+        layoutSwitcher.register(key: settingsManager.layoutSwitchKey) { [weak self] in
+            Task { @MainActor in
+                self?.performDirectLayoutSwitch()
+            }
+        }
+    }
+    
+    @objc private func layoutSwitchKeyChanged() {
+        registerLayoutSwitchKey()
+    }
+    
+    func performDirectLayoutSwitch() {
+        guard let newLayout = KeyboardLayoutDetector.switchToNextLayout(among: settingsManager.enabledLayouts) else {
+            return
+        }
+        playFeedback()
+        showLayoutSwitchNotification(layout: newLayout)
     }
     
     // MARK: - Core Conversion Logic
@@ -114,14 +172,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             switchLayoutIfNeeded(targetLayoutID: capturedTargetLayout, conversionOccurred: true)
             playFeedback()
             showConversionNotification(input: capturedInput, output: capturedOutput)
-        } else {
-            NSLog("[LangSwitcher] No selected text, trying smart conversion after short delay...")
-            usleep(50_000) // 50ms
-            performSmartConversion()
+            return
         }
+        
+        // Smart conversion fallback when no text is explicitly selected
+        NSLog("[LangSwitcher] Direct conversion failed/no selection. Trying smart conversion...")
+        performSmartConversion()
     }
     
-    /// When no text is selected, use the configured smart conversion mode
+    // MARK: - Smart Conversion Modes
+    
+    /// Routes to the appropriate smart conversion strategy based on user settings
     private func performSmartConversion() {
         let mode = settingsManager.smartConversionMode
         NSLog("[LangSwitcher] performSmartConversion() mode=\(mode.displayName)")
@@ -193,6 +254,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showConversionNotification(input: capturedInput, output: capturedOutput)
         }
     }
+
+
     
     // MARK: - Conversion Logging
     
@@ -262,6 +325,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Show a macOS notification when switching layout via single key.
+    private func showLayoutSwitchNotification(layout: KeyboardLayout) {
+        guard settingsManager.showNotifications else { return }
+        
+        let activeLayout = KeyboardLayoutDetector.getCurrentLayout() ?? layout
+        
+        let content = UNMutableNotificationContent()
+        content.title = "LangSwitcher"
+        content.body = l10n.t("notification.layoutSwitched").replacingOccurrences(of: "%@", with: activeLayout.displayName)
+        content.sound = nil
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                NSLog("[LangSwitcher] Failed to show layout switch notification: \(error)")
+            }
+        }
+    }
+    
     // MARK: - Feedback
     
     private func playFeedback() {
@@ -292,4 +379,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension Notification.Name {
     static let hotkeySettingsChanged = Notification.Name("hotkeySettingsChanged")
+    static let layoutSwitchKeyChanged = Notification.Name("layoutSwitchKeyChanged")
+    static let autoCorrectionSettingsChanged = Notification.Name("autoCorrectionSettingsChanged")
 }

@@ -84,14 +84,50 @@ final class KeyboardLayoutDetector {
             return
         }
         
+        // Pass 1: exact match
         for source in inputSources {
             guard let sourceIDPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { continue }
             let sourceID = Unmanaged<CFString>.fromOpaque(sourceIDPtr).takeUnretainedValue() as String
             
-            if sourceID == targetID {
+            if sourceID.caseInsensitiveCompare(targetID) == .orderedSame {
                 let status = TISSelectInputSource(source)
                 if status == noErr {
-                    NSLog("[LangSwitcher] switchToLayout: switched to '\(targetID)'")
+                    NSLog("[LangSwitcher] switchToLayout: switched to exact '\(targetID)'")
+                } else {
+                    NSLog("[LangSwitcher] switchToLayout: TISSelectInputSource failed with status \(status)")
+                }
+                return
+            }
+        }
+        
+        // Pass 2: family fallback match (e.g. RussianWin <-> Russian, ABC <-> US)
+        let targetLower = targetID.lowercased()
+        for source in inputSources {
+            guard let sourceIDPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { continue }
+            let sourceID = Unmanaged<CFString>.fromOpaque(sourceIDPtr).takeUnretainedValue() as String
+            let sourceLower = sourceID.lowercased()
+            
+            var matched = false
+            if targetLower.contains("russian") && sourceLower.contains("russian") {
+                matched = true
+            } else if (targetLower.contains("us") || targetLower.contains("abc")) && (sourceLower.contains("us") || sourceLower.contains("abc")) {
+                matched = true
+            } else if targetLower.contains("ukrainian") && sourceLower.contains("ukrainian") {
+                matched = true
+            } else if targetLower.contains("polish") && sourceLower.contains("polish") {
+                matched = true
+            } else if targetLower.contains("german") && sourceLower.contains("german") {
+                matched = true
+            } else if targetLower.contains("french") && sourceLower.contains("french") {
+                matched = true
+            } else if targetLower.contains("spanish") && sourceLower.contains("spanish") {
+                matched = true
+            }
+            
+            if matched {
+                let status = TISSelectInputSource(source)
+                if status == noErr {
+                    NSLog("[LangSwitcher] switchToLayout: switched to family match '\(sourceID)' for '\(targetID)'")
                 } else {
                     NSLog("[LangSwitcher] switchToLayout: TISSelectInputSource failed with status \(status)")
                 }
@@ -100,6 +136,57 @@ final class KeyboardLayoutDetector {
         }
         
         NSLog("[LangSwitcher] switchToLayout: layout '\(targetID)' not found in system sources")
+    }
+    
+    /// Calculate the next keyboard layout in the sequence.
+    /// Pure function for testability.
+    static func nextLayout(
+        currentID: String?,
+        currentLanguageCode: String? = nil,
+        among layouts: [KeyboardLayout]
+    ) -> KeyboardLayout? {
+        guard layouts.count > 1 else { return nil }
+        
+        var currentIndex: Int? = nil
+        if let currentID = currentID {
+            currentIndex = layouts.firstIndex(where: {
+                $0.id.caseInsensitiveCompare(currentID) == .orderedSame
+            })
+        }
+        if currentIndex == nil, let lang = currentLanguageCode {
+            currentIndex = layouts.firstIndex(where: {
+                $0.languageCode.lowercased() == lang.lowercased()
+            })
+        }
+        
+        let index = currentIndex ?? -1
+        let nextIndex = (index + 1) % layouts.count
+        return layouts[nextIndex]
+    }
+    
+    /// Switch to the next enabled layout in a cyclic sequence.
+    /// If there are 2 layouts (e.g. EN, RU), toggles between them.
+    /// If there are 3+, cycles through them in order.
+    @discardableResult
+    static func switchToNextLayout(among layouts: [KeyboardLayout]? = nil) -> KeyboardLayout? {
+        let candidateLayouts: [KeyboardLayout]
+        if let layouts = layouts, !layouts.isEmpty {
+            candidateLayouts = layouts
+        } else {
+            candidateLayouts = getInstalledLayouts()
+        }
+        
+        let current = getCurrentLayout()
+        guard let target = nextLayout(
+            currentID: current?.id,
+            currentLanguageCode: current?.languageCode,
+            among: candidateLayouts
+        ) else {
+            return nil
+        }
+        
+        switchToLayout(target.id)
+        return target
     }
     
     /// Default fallback layouts

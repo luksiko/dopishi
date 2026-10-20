@@ -11,6 +11,7 @@ enum Strings_en {
         // ── Menu (StatusBarController) ──────────────────────────────
         "menu.header":                   "⌨ LangSwitcher",
         "menu.convertText":              "Convert Text",
+        "menu.switchLayout":             "Switch Keyboard Layout",
         "menu.activeLayouts":            "Active Layouts:",
         "menu.conversions":              "Conversions:",
         "menu.settings":                 "Settings...",
@@ -60,6 +61,23 @@ enum Strings_en {
         "layouts.description":           "These layouts are detected from your system keyboard settings. The converter maps characters between them based on physical key positions.",
         "layouts.refresh":               "Refresh from System",
         "layouts.count":                 "%d layouts detected",
+
+        // ── Single Key Layout Switching ──────────────────────────────
+        "layoutSwitchKey.title":         "Keyboard Language Switch Key",
+        "layoutSwitchKey.description":   "Quickly switch the system keyboard layout with a single key, without converting text.",
+        "layoutSwitchKey.current":       "Switch key:",
+        "layoutSwitchKey.disabled":      "Disabled",
+        "layoutSwitchKey.capsLock":      "Caps Lock",
+        "layoutSwitchKey.rightOption":   "Right Option (⌥)",
+        "layoutSwitchKey.rightCommand":  "Right Command (⌘)",
+        "layoutSwitchKey.rightShift":    "Right Shift (⇧)",
+        "layoutSwitchKey.rightControl":  "Right Control (⌃)",
+        "layoutSwitchKey.leftOption":    "Left Option (⌥)",
+        "layoutSwitchKey.leftControl":   "Left Control (⌃)",
+        "layoutSwitchKey.leftCommand":   "Left Command (⌘)",
+        "layoutSwitchKey.leftShift":     "Left Shift (⇧)",
+        "layoutSwitchKey.fn":            "Fn / Globe (fn)",
+        "layoutSwitchKey.hint":          "Tap this key to cycle through enabled keyboard layouts. Fast and responsive, independent of text conversion.",
 
         // ── Hotkey Tab ──────────────────────────────────────────────
         "hotkey.title":                  "Keyboard Shortcut",
@@ -122,7 +140,7 @@ enum Strings_en {
         // ── About Window ────────────────────────────────────────────
         "about.windowTitle":             "About LangSwitcher",
         "about.appName":                 "LangSwitcher",
-        "about.version":                 "Version 1.0.0",
+        "about.version":                 "Version 1.2.0",
         "about.tagline":                 "Open-source keyboard layout text converter for macOS",
         "about.howToUse":                "How to use:",
         "about.step1":                   "Select text typed in wrong layout",
@@ -152,6 +170,57 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
 
         // ── Common ──────────────────────────────────────────────────
         "common.cancel":                 "Cancel",
+
+        "menu.previewRecovery":          "Preview Recovery...",
+        "general.autoCorrectOnSpace":      "Auto-correct on Space",
+        "general.autoCorrectOnSpaceHint":  "Automatically convert the last word when Space is pressed if it looks like the wrong layout.",
+        "general.thoughtRecovery":         "Thought Recovery",
+        "general.thoughtRecoveryEnabled":  "Recover mixed-layout lines",
+        "general.thoughtRecoveryPreview":  "Show preview before applying",
+        "general.thoughtRecoveryHint":     "Rewrites only wrong-layout words inside mixed lines, leaving code, links and intentional English words untouched. Reverting in the preview teaches your personal dictionary.",
+        "general.recoveryStats":           "Recoveries:",
+        "general.recoveryRevertRate":      "reverted",
+        "hotkey.doubleShiftMode":        "Double Shift (⇧⇧)",
+        "hotkey.doubleOptionMode":       "Double Option (⌥⌥)",
+        "hotkey.customMode":             "Custom Shortcut",
+        "hotkey.doubleOptionHint":       "Quickly press Option twice to trigger conversion. Option+key shortcuts (⌥+key) are ignored and won't trigger conversion.",
+        "permissions.inputMonitoringTitle":   "Input Monitoring",
+        "permissions.inputMonitoringGranted": "Granted — conversion hotkeys work system-wide",
+        "permissions.inputMonitoringNotGranted": "Not granted — hotkeys may not fire in other apps",
+        "permissions.crossAppTitle":     "Current App",
+        "permissions.crossAppFrontmost": "Frontmost app:",
+        "permissions.crossAppFull":      "Conversion is expected to work in this app",
+        "permissions.crossAppLimited":   "Conversion is known to be limited in this app (e.g. terminal) — verify the result",
+        "recovery.title":                "Thought Recovery",
+        "recovery.subtitle":             "Only the highlighted words will change.",
+        "recovery.nothingToChange":      "Nothing to recover in this line — it already reads as natural text.",
+        "recovery.original":             "Original",
+        "recovery.reconstructed":        "Recovered",
+        "recovery.alternatives":         "Other alternatives",
+        "recovery.changedSpans":         "Changed words",
+        "recovery.confidence":           "Confidence: %@",
+        "recovery.apply":                "Apply",
+        "recovery.copy":                 "Copy",
+        "recovery.revert":               "Keep original",
+        "recovery.revertHint":           "Keeping the original also teaches these words to your personal dictionary — they won't be rewritten again.",
+        "recovery.kind.wrongLayout":     "wrong layout",
+        "recovery.kind.intentionalForeign": "foreign word",
+        "recovery.kind.code":            "code",
+        "recovery.kind.url":             "link",
+        "recovery.kind.properName":      "name",
+        "recovery.kind.ambiguous":       "ambiguous",
+        "recovery.kind.correct":         "correct",
+        "recovery.kind.separator":       "separator",
+
+        "notification.layoutSwitched":   "Layout: %@",
+
+        // ── Auto-Correction ────────────────────────────────────────
+        "general.autoCorrection":                "Auto-Correction",
+        "general.autoCorrectionEnabled":         "Auto-correct wrong layout on Space/Enter",
+        "general.autoCorrectionDesc":            "Automatically detects and corrects words typed in the wrong keyboard layout when you press Space, Enter, or punctuation. Uses system spell checker to reduce false positives.",
+        "general.autoCorrectionSpellCheck":      "Validate with system spell checker",
+        "general.autoCorrectionSpellCheckDesc":  "Only auto-correct when the converted word is recognized by macOS spell checker. Reduces false positives but may miss some valid words.",
+        "general.autoCorrectionSwitchLayout":    "Switch layout after auto-correction",
     ]
 
     @MainActor static func register() {
