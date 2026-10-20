@@ -39,6 +39,11 @@
 		E10000010000000000000030 /* UserDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000030 /* UserDictionary.swift */; };
 		E10000010000000000000031 /* ThoughtRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000031 /* ThoughtRecovery.swift */; };
 		E10000010000000000000032 /* RecoveryPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000032 /* RecoveryPreviewView.swift */; };
+		E10000010000000000000033 /* AutocompletionAcceptKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000033 /* AutocompletionAcceptKey.swift */; };
+		E10000010000000000000034 /* AutocompletionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000034 /* AutocompletionEngine.swift */; };
+		E10000010000000000000035 /* AutocompletionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000035 /* AutocompletionOverlayController.swift */; };
+		E10000010000000000000036 /* AutocompletionPopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000036 /* AutocompletionPopupView.swift */; };
+		E10000010000000000000037 /* AutocompletionKeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000037 /* AutocompletionKeyRecorderView.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -49,6 +54,7 @@
 		E10000010000000000000108 /* HotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000108 /* HotkeyManagerTests.swift */; };
 		E10000010000000000000109 /* LanguageWordlistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000109 /* LanguageWordlistTests.swift */; };
 		E10000010000000000000110 /* ThoughtRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000110 /* ThoughtRecoveryTests.swift */; };
+		E10000010000000000000111 /* AutocompletionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000111 /* AutocompletionEngineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -94,6 +100,11 @@
 		E10000020000000000000030 /* UserDictionary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDictionary.swift; sourceTree = "<group>"; };
 		E10000020000000000000031 /* ThoughtRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThoughtRecovery.swift; sourceTree = "<group>"; };
 		E10000020000000000000032 /* RecoveryPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryPreviewView.swift; sourceTree = "<group>"; };
+		E10000020000000000000033 /* AutocompletionAcceptKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionAcceptKey.swift; sourceTree = "<group>"; };
+		E10000020000000000000034 /* AutocompletionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionEngine.swift; sourceTree = "<group>"; };
+		E10000020000000000000035 /* AutocompletionOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionOverlayController.swift; sourceTree = "<group>"; };
+		E10000020000000000000036 /* AutocompletionPopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionPopupView.swift; sourceTree = "<group>"; };
+		E10000020000000000000037 /* AutocompletionKeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionKeyRecorderView.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -104,6 +115,7 @@
 		E10000020000000000000108 /* HotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000109 /* LanguageWordlistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageWordlistTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000110 /* ThoughtRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThoughtRecoveryTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000111 /* AutocompletionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionEngineTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* LangSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LangSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -179,6 +191,8 @@
 				E10000020000000000000015 /* PermissionsView.swift */,
 				E10000020000000000000018 /* ConversionLogView.swift */,
 				E10000020000000000000032 /* RecoveryPreviewView.swift */,
+				E10000020000000000000036 /* AutocompletionPopupView.swift */,
+				E10000020000000000000037 /* AutocompletionKeyRecorderView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -202,6 +216,8 @@
 				E10000020000000000000029 /* LanguageWordlists.swift */,
 				E10000020000000000000030 /* UserDictionary.swift */,
 				E10000020000000000000031 /* ThoughtRecovery.swift */,
+				E10000020000000000000034 /* AutocompletionEngine.swift */,
+				E10000020000000000000035 /* AutocompletionOverlayController.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -212,6 +228,7 @@
 				E10000020000000000000012 /* KeyboardLayout.swift */,
 				E10000020000000000000016 /* ConversionLog.swift */,
 				E10000020000000000000024 /* LayoutSwitchKey.swift */,
+				E10000020000000000000033 /* AutocompletionAcceptKey.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -256,6 +273,7 @@
 				E10000020000000000000108 /* HotkeyManagerTests.swift */,
 				E10000020000000000000109 /* LanguageWordlistTests.swift */,
 				E10000020000000000000110 /* ThoughtRecoveryTests.swift */,
+				E10000020000000000000111 /* AutocompletionEngineTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -390,6 +408,11 @@
 				E10000010000000000000030 /* UserDictionary.swift in Sources */,
 				E10000010000000000000031 /* ThoughtRecovery.swift in Sources */,
 				E10000010000000000000032 /* RecoveryPreviewView.swift in Sources */,
+				E10000010000000000000033 /* AutocompletionAcceptKey.swift in Sources */,
+				E10000010000000000000034 /* AutocompletionEngine.swift in Sources */,
+				E10000010000000000000035 /* AutocompletionOverlayController.swift in Sources */,
+				E10000010000000000000036 /* AutocompletionPopupView.swift in Sources */,
+				E10000010000000000000037 /* AutocompletionKeyRecorderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -407,6 +430,7 @@
 				E10000010000000000000108 /* HotkeyManagerTests.swift in Sources */,
 				E10000010000000000000109 /* LanguageWordlistTests.swift in Sources */,
 				E10000010000000000000110 /* ThoughtRecoveryTests.swift in Sources */,
+				E10000010000000000000111 /* AutocompletionEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

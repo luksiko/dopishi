@@ -106,6 +106,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .autoCorrectionSettingsChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(autoCorrectionSettingsChanged),
+            name: .autoCompletionSettingsChanged,
+            object: nil
+        )
         
         ServiceStatus.shared.onRestart = { [weak self] in
             self?.autoCorrectionService.restart()
@@ -596,6 +602,7 @@ extension Notification.Name {
     static let hotkeySettingsChanged = Notification.Name("hotkeySettingsChanged")
     static let layoutSwitchKeyChanged = Notification.Name("layoutSwitchKeyChanged")
     static let autoCorrectionSettingsChanged = Notification.Name("autoCorrectionSettingsChanged")
+    static let autoCompletionSettingsChanged = Notification.Name("autoCompletionSettingsChanged")
     static let statusBarIconStyleChanged = Notification.Name("statusBarIconStyleChanged")
     static let keyboardLayoutSelectionChanged = Notification.Name("keyboardLayoutSelectionChanged")
 }

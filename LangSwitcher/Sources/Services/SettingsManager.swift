@@ -173,6 +173,58 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionSwitchLayout, forKey: Keys.autoCorrectionSwitchLayout) }
     }
 
+    /// Whether real-time word autocompletion HUD is enabled. Default: true.
+    @Published var autoCompletionEnabled: Bool {
+        didSet {
+            defaults.set(autoCompletionEnabled, forKey: Keys.autoCompletionEnabled)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Key used to accept autocompletion suggestion. Default: .tab.
+    @Published var autoCompletionAcceptKey: AutocompletionAcceptKey {
+        didSet {
+            defaults.set(autoCompletionAcceptKey.rawValue, forKey: Keys.autoCompletionAcceptKey)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Custom key code when acceptKey is .custom. Default: 0x30 (Tab).
+    @Published var autoCompletionCustomKeyCode: UInt16 {
+        didSet {
+            defaults.set(Int(autoCompletionCustomKeyCode), forKey: Keys.autoCompletionCustomKeyCode)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Custom modifiers when acceptKey is .custom. Default: 0.
+    @Published var autoCompletionCustomModifiers: UInt {
+        didSet {
+            defaults.set(autoCompletionCustomModifiers, forKey: Keys.autoCompletionCustomModifiers)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Max autocompletion suggestions to show (1...6). Default: 4.
+    @Published var autoCompletionMaxSuggestions: Int {
+        didSet { defaults.set(autoCompletionMaxSuggestions, forKey: Keys.autoCompletionMaxSuggestions) }
+    }
+
+    /// Minimum prefix length before showing completions (2...5). Default: 2.
+    @Published var autoCompletionMinPrefixLength: Int {
+        didSet { defaults.set(autoCompletionMinPrefixLength, forKey: Keys.autoCompletionMinPrefixLength) }
+    }
+
+    /// Whether number keys (1...5) select completions directly. Default: true.
+    @Published var autoCompletionUseNumberShortcuts: Bool {
+        didSet { defaults.set(autoCompletionUseNumberShortcuts, forKey: Keys.autoCompletionUseNumberShortcuts) }
+    }
+
+    /// Whether cross-layout suggestions (e.g. ghbd -> привет) are included. Default: true.
+    @Published var autoCompletionIncludeCrossLayout: Bool {
+        didSet { defaults.set(autoCompletionIncludeCrossLayout, forKey: Keys.autoCompletionIncludeCrossLayout) }
+    }
+
     /// Style of icon in the macOS menu bar. Default: language badge in a frame (RU, EN).
     @Published var statusBarIconStyle: StatusBarIconStyle {
         didSet {
@@ -225,6 +277,28 @@ final class SettingsManager: ObservableObject {
         return "\(mods)\(key)"
     }
     
+    /// Determines whether the given event matches the configured autocompletion accept key
+    func isAutocompletionAcceptKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
+        switch autoCompletionAcceptKey {
+        case .tab:
+            return keyCode == 0x30 && nonModFlags.isEmpty
+        case .space:
+            return keyCode == 0x31 && nonModFlags.isEmpty
+        case .enter:
+            return keyCode == 0x24 && nonModFlags.isEmpty
+        case .rightArrow:
+            return keyCode == 0x7C && nonModFlags.isEmpty
+        case .custom:
+            if keyCode != autoCompletionCustomKeyCode { return false }
+            let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
+            let actualMods = UInt(flags.rawValue & relevantMask)
+            let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: autoCompletionCustomModifiers).intersection(.deviceIndependentFlagsMask)
+            let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
+            return actualNSEventMods == expectedNSEventMods
+        }
+    }
+    
     // MARK: - Keys
     
     private enum Keys {
@@ -244,6 +318,14 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionEnabled = "autoCorrectionEnabled"
         static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
         static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
+        static let autoCompletionEnabled = "autoCompletionEnabled"
+        static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
+        static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
+        static let autoCompletionCustomModifiers = "autoCompletionCustomModifiers"
+        static let autoCompletionMaxSuggestions = "autoCompletionMaxSuggestions"
+        static let autoCompletionMinPrefixLength = "autoCompletionMinPrefixLength"
+        static let autoCompletionUseNumberShortcuts = "autoCompletionUseNumberShortcuts"
+        static let autoCompletionIncludeCrossLayout = "autoCompletionIncludeCrossLayout"
         static let statusBarIconStyle = "statusBarIconStyle"
         static let thoughtRecoveryEnabled = "thoughtRecoveryEnabled"
         static let thoughtRecoveryPreview = "thoughtRecoveryPreview"
@@ -283,6 +365,17 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionEnabled = defaults.object(forKey: Keys.autoCorrectionEnabled) as? Bool ?? false     // Default: OFF
         self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
         self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
+        
+        self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
+        let savedAcceptKey = defaults.string(forKey: Keys.autoCompletionAcceptKey)
+        self.autoCompletionAcceptKey = savedAcceptKey.flatMap { AutocompletionAcceptKey(rawValue: $0) } ?? .tab
+        let savedCustomCode = defaults.object(forKey: Keys.autoCompletionCustomKeyCode) as? Int
+        self.autoCompletionCustomKeyCode = UInt16(savedCustomCode ?? 0x30)
+        self.autoCompletionCustomModifiers = defaults.object(forKey: Keys.autoCompletionCustomModifiers) as? UInt ?? 0
+        self.autoCompletionMaxSuggestions = defaults.object(forKey: Keys.autoCompletionMaxSuggestions) as? Int ?? 4
+        self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
+        self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true
+        self.autoCompletionIncludeCrossLayout = defaults.object(forKey: Keys.autoCompletionIncludeCrossLayout) as? Bool ?? true
         
         self.thoughtRecoveryEnabled = defaults.object(forKey: Keys.thoughtRecoveryEnabled) as? Bool ?? true  // Default: ON
         self.thoughtRecoveryPreview = defaults.object(forKey: Keys.thoughtRecoveryPreview) as? Bool ?? false // Default: OFF

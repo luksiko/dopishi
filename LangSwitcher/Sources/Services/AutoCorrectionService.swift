@@ -28,6 +28,8 @@ final class AutoCorrectionService {
     private let textConverter: TextConverter
     private let accessibilityService: AccessibilityService
     private let spellCheckService: SpellCheckService
+    private let autocompletionEngine: AutocompletionEngine
+    private let overlayController: AutocompletionOverlayController
 
     // MARK: - State
 
@@ -47,11 +49,15 @@ final class AutoCorrectionService {
     init(settingsManager: SettingsManager,
          textConverter: TextConverter,
          accessibilityService: AccessibilityService = AccessibilityService(),
-         spellCheckService: SpellCheckService = .shared) {
+         spellCheckService: SpellCheckService = .shared,
+         autocompletionEngine: AutocompletionEngine? = nil,
+         overlayController: AutocompletionOverlayController? = nil) {
         self.settingsManager = settingsManager
         self.textConverter = textConverter
         self.accessibilityService = accessibilityService
         self.spellCheckService = spellCheckService
+        self.autocompletionEngine = autocompletionEngine ?? AutocompletionEngine(spellCheckService: spellCheckService)
+        self.overlayController = overlayController ?? AutocompletionOverlayController()
     }
 
     deinit {
@@ -66,10 +72,10 @@ final class AutoCorrectionService {
 
     // MARK: - Public API
 
-    /// Start monitoring keystrokes for auto-correction.
+    /// Start monitoring keystrokes for auto-correction and autocompletion.
     /// Requires Accessibility permissions (same as existing hotkey functionality).
     func start() {
-        guard settingsManager.autoCorrectionEnabled else {
+        guard settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled else {
             ServiceStatus.shared.state = .disabled
             return
         }
@@ -119,7 +125,7 @@ final class AutoCorrectionService {
     /// Reconcile real tap state, including permission changes and invalid ports.
     func checkHealth() {
         let action = ServiceRecovery.action(
-            enabled: settingsManager.autoCorrectionEnabled,
+            enabled: settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled,
             trusted: AccessibilityService.hasAccessibilityPermission,
             valid: eventTap.map { CFMachPortIsValid($0) } ?? false,
             running: isRunning
@@ -136,6 +142,7 @@ final class AutoCorrectionService {
             start()
         case .enable:
             wordBuffer = ""
+            overlayController.hide()
             if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
             if isRunning {
                 ServiceStatus.shared.state = .running
@@ -153,6 +160,7 @@ final class AutoCorrectionService {
 
     /// Stop monitoring keystrokes.
     func stop() {
+        overlayController.hide()
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
@@ -171,7 +179,7 @@ final class AutoCorrectionService {
     /// Restart monitoring (e.g., when settings change).
     func restart() {
         stop()
-        if settingsManager.autoCorrectionEnabled {
+        if settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled {
             start()
         }
     }
@@ -181,6 +189,62 @@ final class AutoCorrectionService {
     /// Reset word buffer when user clicks with mouse
     func handleMouseDown() {
         wordBuffer = ""
+        overlayController.hide()
+    }
+
+    /// Check if the key should be intercepted synchronously by the autocompletion overlay.
+    /// Returns true if consumed (tap callback returns nil).
+    func interceptKeyIfOverlayVisible(event: CGEvent) -> Bool {
+        guard overlayController.isVisible else { return false }
+        
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+        let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
+        
+        // 1. Escape: dismiss overlay
+        if keyCode == 0x35 && nonModFlags.isEmpty {
+            overlayController.hide()
+            return true
+        }
+        
+        // 2. Up Arrow: navigate up
+        if keyCode == 0x7E && nonModFlags.isEmpty {
+            overlayController.selectPrevious()
+            return true
+        }
+        
+        // 3. Down Arrow: navigate down
+        if keyCode == 0x7D && nonModFlags.isEmpty {
+            overlayController.selectNext()
+            return true
+        }
+        
+        // 4. Number shortcuts 1-5 (if enabled)
+        if settingsManager.autoCompletionUseNumberShortcuts && nonModFlags.isEmpty {
+            let numberKeyCodes: [UInt16: Int] = [
+                0x12: 0, // 1
+                0x13: 1, // 2
+                0x14: 2, // 3
+                0x15: 3, // 4
+                0x17: 4  // 5
+            ]
+            if let index = numberKeyCodes[keyCode], index < overlayController.candidates.count {
+                let candidate = overlayController.candidates[index]
+                acceptCandidate(candidate, appendSpace: false)
+                return true
+            }
+        }
+        
+        // 5. Configured Accept key
+        if settingsManager.isAutocompletionAcceptKey(keyCode: keyCode, flags: flags) {
+            if let candidate = overlayController.selectedCandidate {
+                let appendSpace = (settingsManager.autoCompletionAcceptKey == .space)
+                acceptCandidate(candidate, appendSpace: appendSpace)
+                return true
+            }
+        }
+        
+        return false
     }
 
     /// Process a keyDown event. Dispatches to MainActor via DispatchQueue.main.async to guarantee FIFO order.
@@ -197,12 +261,12 @@ final class AutoCorrectionService {
     // MARK: - Key Processing
 
     private func processKey(keyCode: UInt16, flags: CGEventFlags, characters: String?) {
-        // Skip if auto-correction is disabled
-        guard settingsManager.autoCorrectionEnabled else { return }
+        guard settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled else { return }
 
         // Ignore events with Command modifier (⌘C, ⌘V, etc.)
         if flags.contains(.maskCommand) {
             wordBuffer = ""
+            overlayController.hide()
             return
         }
 
@@ -212,27 +276,36 @@ final class AutoCorrectionService {
             if !wordBuffer.isEmpty {
                 wordBuffer.removeLast()
             }
+            updateAutocompletion()
             return
 
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
             wordBuffer = ""
+            overlayController.hide()
             return
 
         case 0x35: // Escape
             wordBuffer = ""
+            overlayController.hide()
             return
 
         case 0x30: // Tab
             wordBuffer = ""
+            overlayController.hide()
             return
 
         case 0x24: // Return/Enter
-            // Clear buffer on Enter to avoid racing with form submissions/chat sends
             wordBuffer = ""
+            overlayController.hide()
             return
 
         case 0x31: // Space
-            triggerCheckAndCorrect(triggerChar: " ")
+            overlayController.hide()
+            if settingsManager.autoCorrectionEnabled {
+                triggerCheckAndCorrect(triggerChar: " ")
+            } else {
+                wordBuffer = ""
+            }
             return
 
         default:
@@ -246,12 +319,146 @@ final class AutoCorrectionService {
 
         // Check if it's a word boundary (punctuation)
         if !char.isLetter && !char.isNumber {
-            triggerCheckAndCorrect(triggerChar: char)
+            overlayController.hide()
+            if settingsManager.autoCorrectionEnabled {
+                triggerCheckAndCorrect(triggerChar: char)
+            } else {
+                wordBuffer = ""
+            }
             return
         }
 
         // Accumulate character in word buffer
         wordBuffer.append(char)
+        updateAutocompletion()
+    }
+
+    // MARK: - Autocompletion Logic
+
+    private func updateAutocompletion() {
+        guard settingsManager.autoCompletionEnabled else {
+            overlayController.hide()
+            return
+        }
+
+        // Check gate: do not show completions in secure fields or excluded apps
+        if !wordBuffer.isEmpty {
+            let focus = accessibilityService.focusedFieldRole()
+            let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            guard AutoCorrectionGate.allowsAutoCorrection(
+                role: focus?.role,
+                subrole: focus?.subrole,
+                bundleID: frontmostBundleID
+            ) else {
+                overlayController.hide()
+                return
+            }
+        }
+
+        guard wordBuffer.count >= settingsManager.autoCompletionMinPrefixLength else {
+            overlayController.hide()
+            return
+        }
+
+        guard !NSApp.isActive else {
+            overlayController.hide()
+            return
+        }
+
+        let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
+        let candidates = autocompletionEngine.suggest(
+            for: wordBuffer,
+            activeLayoutID: activeLayoutID,
+            enabledLayouts: settingsManager.enabledLayouts,
+            maxSuggestions: settingsManager.autoCompletionMaxSuggestions,
+            includeCrossLayout: settingsManager.autoCompletionIncludeCrossLayout
+        )
+
+        guard !candidates.isEmpty else {
+            overlayController.hide()
+            return
+        }
+
+        let caretRect = accessibilityService.caretScreenRect()
+        let hint = settingsManager.autoCompletionAcceptKey.shortcutHint(
+            customKeyCode: settingsManager.autoCompletionCustomKeyCode,
+            customModifiers: settingsManager.autoCompletionCustomModifiers
+        )
+        overlayController.show(
+            candidates: candidates,
+            caretRect: caretRect,
+            acceptKeyHint: hint,
+            onSelect: { [weak self] candidate in
+                self?.acceptCandidate(candidate, appendSpace: false)
+            }
+        )
+    }
+
+    /// Accept and insert the candidate completion.
+    func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool) {
+        let originalWord = wordBuffer
+        wordBuffer = ""
+        overlayController.hide()
+
+        guard !originalWord.isEmpty else { return }
+
+        isProcessingCorrection = true
+
+        let deleteCount = originalWord.count
+        let replacementText = candidate.word + (appendSpace ? " " : "")
+
+        let pasteboard = NSPasteboard.general
+        let savedContents = savePasteboard()
+
+        pasteboard.clearContents()
+        pasteboard.setString(replacementText, forType: .string)
+
+        let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+        let autoGeneratedType = NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType")
+        pasteboard.setString("", forType: transientType)
+        pasteboard.setString("", forType: autoGeneratedType)
+
+        let source = CGEventSource(stateID: .hidSystemState)
+        for _ in 0..<deleteCount {
+            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
+               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
+                downEvent.flags = []
+                upEvent.flags = []
+                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                downEvent.post(tap: .cgAnnotatedSessionEventTap)
+                upEvent.post(tap: .cgAnnotatedSessionEventTap)
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+            guard let self = self else { return }
+
+            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
+                downEvent.flags = .maskCommand
+                upEvent.flags = .maskCommand
+                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                downEvent.post(tap: .cgAnnotatedSessionEventTap)
+                upEvent.post(tap: .cgAnnotatedSessionEventTap)
+            }
+
+            if candidate.isCrossLayout {
+                KeyboardLayoutDetector.switchToLayout(candidate.targetLayoutID)
+            }
+
+            if self.settingsManager.playSounds {
+                NSSound(named: .init("Tink"))?.play()
+            }
+
+            self.settingsManager.incrementConversionCount()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                self?.restorePasteboard(savedContents)
+                self?.isProcessingCorrection = false
+            }
+        }
     }
 
     // MARK: - Auto-Correction Logic
@@ -481,9 +688,25 @@ private func autoCorrectionEventCallback(
         return Unmanaged.passUnretained(event)
     }
 
+    // Check if the key should be consumed by active autocompletion overlay
+    let intercepted: Bool
+    if Thread.isMainThread {
+        intercepted = MainActor.assumeIsolated {
+            service.interceptKeyIfOverlayVisible(event: event)
+        }
+    } else {
+        intercepted = DispatchQueue.main.sync {
+            service.interceptKeyIfOverlayVisible(event: event)
+        }
+    }
+
+    if intercepted {
+        return nil
+    }
+
     service.handleKeyEvent(event)
 
-    // Always pass the event through (defaultTap mode)
+    // Pass the event through if not consumed
     return Unmanaged.passUnretained(event)
 }
 

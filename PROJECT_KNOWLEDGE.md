@@ -151,6 +151,11 @@
 - **Rule**: All PBX IDs in `LangSwitcher.xcodeproj/project.pbxproj` MUST follow the 24-character hexadecimal format `E1000000XXXXXXXXXXXX`.
 - **Verification Script**: Use `python3 scripts/verify-pbxproj.py` to ensure project file integrity and prevent build breaks.
 
+### 6. `LSMultipleInstancesProhibited` and Test Runner Conflicts
+- **Problem**: `Info.plist` includes `<key>LSMultipleInstancesProhibited</key><true/>` and `AppDelegate` enforces single-instance locking via `instance.lock`.
+- **Symptom**: If `/Applications/LangSwitcher.app` is already running when `xcodebuild test` runs, LaunchServices rejects launching the test runner app with `IDELaunchServicesLauncher: Code: 20` ("The LaunchServices launcher has returned an error").
+- **Permanent Solution**: Terminate any running app instance (`killall LangSwitcher`) before launching `xcodebuild test`.
+
 ---
 
 ## 5. Mandatory Verification & Test Rules
@@ -165,6 +170,22 @@
      CODE_SIGNING_REQUIRED=NO \
      CODE_SIGNING_ALLOWED=NO
    ```
-2. **All 222 tests must pass** prior to committing any Swift file modification.
+2. **All 238 tests must pass** prior to committing any Swift file modification.
 3. **Dual Localization**: Every new UI string key must be registered in both `Strings_en.swift` and `Strings_ru.swift`.
 4. **MainActor Context**: Views, `SettingsManager`, `LocalizationManager`, `TextConverter`, and `AutoCorrectionService` require `@MainActor` annotations.
+
+---
+
+## 6. Word Autocompletion System (Stage 2)
+
+- **Engine (`AutocompletionEngine.swift`)**:
+  - Scores prefix matches from `UserDictionary` (1000 pts), embedded frequency wordlists (100–500 pts), system `SpellCheckService.completions` (50 pts), and cross-layout translations via `LayoutMapper.convert` (40–400 pts).
+  - Cross-layout completions automatically detect opposite layouts (e.g. `ghbd` → `привет`, `рудд` → `hello`).
+- **Overlay Controller & Popup (`AutocompletionOverlayController.swift`, `AutocompletionPopupView.swift`)**:
+  - Floating non-activating `NSPanel` (.popUpMenu level) positioned relative to the text caret via `AccessibilityService.caretScreenRect()`.
+  - Number badges (`1`–`5`), cross-layout tags (`RU ⇄ EN`), smooth selection highlight, and key hints.
+- **Configurable Accept Key & Custom Key Recording (`AutocompletionAcceptKey.swift`, `AutocompletionKeyRecorderView.swift`)**:
+  - Accept options: Tab (`⇥`), Space (`␣`), Enter (`↩`), Right Arrow (`→`), or Custom Key.
+  - Interactive key recorder captures any single key or key+modifier combo.
+  - Number keys `1`–`5` directly insert candidate without extra navigation.
+  - Dedicated event interception in `AutoCorrectionService` event tap guarantees keys are swallowed (`return nil`) without leaking to the host app.

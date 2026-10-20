@@ -317,6 +317,73 @@ final class AccessibilityService {
         return (role, subrole)
     }
     
+    // MARK: - Caret Positioning
+    
+    /// Returns the screen rectangle (in AppKit bottom-left origin coordinate space)
+    /// of the active text caret or cursor. Falls back to element bounds or mouse location.
+    func caretScreenRect() -> CGRect? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedElement: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedElement
+        ) == .success, let element = focusedElement else {
+            let mouse = NSEvent.mouseLocation
+            return CGRect(x: mouse.x, y: mouse.y, width: 2, height: 18)
+        }
+        
+        let axElement = element as! AXUIElement
+        let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 1080
+        
+        // 1. Try to get caret bounds via kAXBoundsForRangeParameterizedAttribute
+        var selectedRangeValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextRangeAttribute as CFString, &selectedRangeValue) == .success,
+           let selectedRangeValue = selectedRangeValue,
+           CFGetTypeID(selectedRangeValue) == AXValueGetTypeID() {
+            let axValue = selectedRangeValue as! AXValue
+            var range = CFRange()
+            if AXValueGetValue(axValue, .cfRange, &range) {
+                var searchRange = CFRange(location: max(0, range.location > 0 ? range.location - 1 : 0), length: max(1, range.length))
+                if let rangeAXValue = AXValueCreate(.cfRange, &searchRange) {
+                    var boundsValue: CFTypeRef?
+                    if AXUIElementCopyParameterizedAttributeValue(
+                        axElement,
+                        kAXBoundsForRangeParameterizedAttribute as CFString,
+                        rangeAXValue,
+                        &boundsValue
+                    ) == .success, let boundsVal = boundsValue, CFGetTypeID(boundsVal) == AXValueGetTypeID() {
+                        var rect = CGRect.zero
+                        if AXValueGetValue(boundsVal as! AXValue, .cgRect, &rect), rect.width > 0 || rect.height > 0 {
+                            let cocoaY = mainScreenHeight - rect.origin.y - rect.height
+                            return CGRect(x: rect.origin.x, y: cocoaY, width: rect.width, height: rect.height)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. Fallback: try element position and size
+        var posVal: CFTypeRef?
+        var sizeVal: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axElement, kAXPositionAttribute as CFString, &posVal) == .success,
+           AXUIElementCopyAttributeValue(axElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
+           let posVal = posVal, let sizeVal = sizeVal,
+           CFGetTypeID(posVal) == AXValueGetTypeID(), CFGetTypeID(sizeVal) == AXValueGetTypeID() {
+            var point = CGPoint.zero
+            var size = CGSize.zero
+            if AXValueGetValue(posVal as! AXValue, .cgPoint, &point),
+               AXValueGetValue(sizeVal as! AXValue, .cgSize, &size) {
+                let cocoaY = mainScreenHeight - point.y - size.height
+                return CGRect(x: point.x, y: cocoaY, width: size.width, height: size.height)
+            }
+        }
+        
+        // 3. Fallback: mouse location
+        let mouse = NSEvent.mouseLocation
+        return CGRect(x: mouse.x, y: mouse.y, width: 2, height: 18)
+    }
+    
     // MARK: - Pasteboard Save/Restore
     
     private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {

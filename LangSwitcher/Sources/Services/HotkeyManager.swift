@@ -186,6 +186,8 @@ final class HotkeyManager {
             0x7A: "F1", 0x78: "F2", 0x63: "F3", 0x76: "F4",
             0x60: "F5", 0x61: "F6", 0x62: "F7", 0x64: "F8",
             0x65: "F9", 0x6D: "F10", 0x67: "F11", 0x6F: "F12",
+            0x7C: "→", 0x7B: "←", 0x7D: "↓", 0x7E: "↑",
+            0x32: "`", 0x0A: "§",
         ]
         return keyMap[keyCode] ?? "Key\(keyCode)"
     }

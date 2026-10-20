@@ -171,6 +171,43 @@ struct GeneralSettingsTab: View {
                 }
             }
             
+            Section(l10n.t("general.autocompletion")) {
+                Toggle(l10n.t("autocompletion.enabled"), isOn: $settingsManager.autoCompletionEnabled)
+                
+                Text(l10n.t("autocompletion.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+                
+                if settingsManager.autoCompletionEnabled {
+                    Picker(l10n.t("autocompletion.acceptKey"), selection: $settingsManager.autoCompletionAcceptKey) {
+                        ForEach(AutocompletionAcceptKey.allCases) { key in
+                            Text(key.displayName).tag(key)
+                        }
+                    }
+                    
+                    if settingsManager.autoCompletionAcceptKey == .custom {
+                        AutocompletionKeyRecorderView(
+                            keyCode: $settingsManager.autoCompletionCustomKeyCode,
+                            modifiers: $settingsManager.autoCompletionCustomModifiers
+                        )
+                    }
+                    
+                    Toggle(l10n.t("autocompletion.useNumberShortcuts"), isOn: $settingsManager.autoCompletionUseNumberShortcuts)
+                    
+                    Toggle(l10n.t("autocompletion.includeCrossLayout"), isOn: $settingsManager.autoCompletionIncludeCrossLayout)
+                    
+                    Text(l10n.t("autocompletion.crossLayoutDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                    
+                    Stepper("\(l10n.t("autocompletion.minPrefixLength")) \(settingsManager.autoCompletionMinPrefixLength)", value: $settingsManager.autoCompletionMinPrefixLength, in: 2...5)
+                    
+                    Stepper("\(l10n.t("autocompletion.maxSuggestions")) \(settingsManager.autoCompletionMaxSuggestions)", value: $settingsManager.autoCompletionMaxSuggestions, in: 1...6)
+                }
+            }
+            
             Section(l10n.t("general.howItWorks")) {
                 Text(l10n.t("general.howItWorksText"))
                     .font(.caption)

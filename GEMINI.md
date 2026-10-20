@@ -28,6 +28,7 @@ langSwitcher/
 │       │   ├── AppDelegate.swift       # NSApplicationDelegate, initializes core services & event monitors
 │       │   └── StatusBarController.swift # NSStatusItem management, menu items, status bar icon
 │       ├── Models/
+│       │   ├── AutocompletionAcceptKey.swift # Autocompletion candidates & accept key options
 │       │   ├── KeyboardLayout.swift    # KeyboardLayout model, layout IDs, names, localized labels
 │       │   ├── LayoutSwitchKey.swift   # Single-key modifier options (rightOption, capsLock, etc.)
 │       │   └── ConversionLog.swift     # SQLite log entry record & export structure
@@ -35,6 +36,8 @@ langSwitcher/
 │       │   ├── AccessibilityService.swift # AXUIElement text inspection & synthetic key event emission
 │       │   ├── AutoCorrectionGate.swift   # Password/secure field and sensitive app filter
 │       │   ├── AutoCorrectionService.swift# Real-time background typing monitor & inline corrector
+│       │   ├── AutocompletionEngine.swift # Real-time prefix completion and cross-layout candidate generator
+│       │   ├── AutocompletionOverlayController.swift # Floating candidate popup window manager
 │       │   ├── ConversionLogStore.swift   # Direct C SQLite3 store for conversion history
 │       │   ├── DoubleTapDetector.swift    # Generic modifier double-tap detection
 │       │   ├── HotkeyManager.swift        # Global hotkey registration & Double-Shift tap detection
@@ -50,6 +53,8 @@ langSwitcher/
 │       │   └── WordlistData.swift         # Compact embedded wordlist frequency data
 │       ├── Views/
 │       │   ├── AboutView.swift            # About dialog view (app info, links, donations)
+│       │   ├── AutocompletionKeyRecorderView.swift # Custom key recording view for accept key
+│       │   ├── AutocompletionPopupView.swift # Floating HUD candidate suggestions view
 │       │   ├── ConversionLogView.swift    # SQLite history browser, rating, and JSON export view
 │       │   ├── HotkeyRecorderView.swift   # Interactive key recording UI for custom shortcuts
 │       │   ├── PermissionsView.swift      # Accessibility permission tutorial & status view
