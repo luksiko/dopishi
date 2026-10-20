@@ -35,6 +35,11 @@ final class LayoutMapper {
         // keep the original character. This handles cases like "?" -> "," where the user
         // intentionally typed "?" and it should stay "?", not become ",".
         // But ";" -> "ж" still converts because the target is a letter.
+        let isPolishSource = sourceLayoutID.lowercased().contains("polish")
+        let sourceOptionMap = LayoutCharacterMap.optionCharacterMap(for: sourceLayoutID) ?? [:]
+        let reverseSourceOption = Dictionary(sourceOptionMap.map { ($0.value, $0.key) }, uniquingKeysWith: { first, _ in first })
+        let targetOptionMap = LayoutCharacterMap.optionCharacterMap(for: targetLayoutID) ?? [:]
+
         var result = ""
         var unmappedCount = 0
         for char in text {
@@ -46,6 +51,18 @@ final class LayoutMapper {
                     result.append(char)
                 } else {
                     result.append(targetChar)
+                }
+            } else if isPolishSource,
+                      let baseKey = LayoutCharacterMap.polishDiacriticBases[char],
+                      let targetChar = targetMap[baseKey] {
+                result.append(targetChar)
+            } else if let optionKey = reverseSourceOption[char] {
+                if let targetOptionChar = targetOptionMap[optionKey], targetOptionChar.isLetter {
+                    result.append(targetOptionChar)
+                } else if let targetBaseChar = targetMap[optionKey] {
+                    result.append(targetBaseChar)
+                } else {
+                    result.append(char)
                 }
             } else {
                 // Character not in mapping (e.g., space, numbers that don't change, emoji)

@@ -29,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController?.onConvertAction = { [weak self] in
             self?.performConversion()
         }
+        statusBarController?.onPreviewRecoveryAction = { [weak self] in
+            self?.performRecoveryPreview()
+        }
         statusBarController?.onSwitchLayoutAction = { [weak self] in
             self?.performDirectLayoutSwitch()
         }
@@ -230,17 +233,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// Greedy Line mode: select to line start, find boundary, convert wrong-layout tail
+    /// Greedy Line mode: select to line start, find boundary, convert wrong-layout tail.
+    /// If Thought Recovery is enabled, span-level reconstruction runs first.
     private func performGreedyLineConversion() {
+        if settingsManager.thoughtRecoveryPreview, settingsManager.thoughtRecoveryEnabled {
+            performRecoveryPreview()
+            return
+        }
+
         var capturedInput: String?
         var capturedOutput: String?
         var capturedTargetLayout: String?
+        var usedRecovery = false
         let success = accessibilityService.selectLineAndReplace { [weak self] (lineText: String) -> String? in
             guard let self = self else { return nil }
             NSLog("[LangSwitcher] greedyLine got line: '\(lineText)' (len=\(lineText.count))")
             
             capturedInput = lineText
-            // Use convertLineGreedyWithInfo to capture target layout
+
+            // Thought Recovery (span level) runs first
+            if let recovered = self.textConverter.recoverLine(lineText) {
+                capturedOutput = recovered.text
+                capturedTargetLayout = recovered.targetLayoutID
+                usedRecovery = true
+                return recovered.text
+            }
+
+            // Fall back to boundary heuristic
             let result = self.textConverter.convertLineGreedyWithInfo(lineText)
             capturedOutput = result?.text
             capturedTargetLayout = result?.targetLayoutID
@@ -249,11 +268,151 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         
         if success {
             settingsManager.incrementConversionCount()
-            logConversion(input: capturedInput, output: capturedOutput, mode: "greedyLine")
+            if usedRecovery {
+                settingsManager.incrementRecoveryCount()
+            }
+            logConversion(
+                input: capturedInput,
+                output: capturedOutput,
+                mode: usedRecovery ? "thoughtRecovery" : "greedyLine"
+            )
             switchLayoutIfNeeded(targetLayoutID: capturedTargetLayout, conversionOccurred: true)
             playFeedback()
             showConversionNotification(input: capturedInput, output: capturedOutput)
         }
+    }
+
+    // MARK: - Thought Recovery Preview
+
+    private var recoveryPreviewWindow: NSWindow?
+    private var recoveryTargetApp: NSRunningApplication?
+    private var recoveryOriginalText: String?
+    private var recoveryPlan: ThoughtRecovery.Plan?
+
+    /// Select the line but keep the selection active, decode it and show the
+    /// reconstruction with its alternatives. The app the line came from gets the
+    /// paste back (or its selection collapsed) once the user decides.
+    func performRecoveryPreview() {
+        guard recoveryPreviewWindow == nil else { return }
+        recoveryTargetApp = NSWorkspace.shared.frontmostApplication
+
+        guard let line = accessibilityService.selectLineKeepingSelection() else {
+            resetRecoveryState()
+            return
+        }
+        guard let plan = textConverter.recoveryPlan(for: line) else {
+            restorationAfterRecovery(action: .collapse)
+            resetRecoveryState()
+            return
+        }
+
+        recoveryOriginalText = line
+        recoveryPlan = plan
+        showRecoveryPreview(plan: plan)
+    }
+
+    private func showRecoveryPreview(plan: ThoughtRecovery.Plan) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let view = RecoveryPreviewView(
+            plan: plan,
+            onApply: { [weak self] text in
+                self?.applyRecovery(text)
+            },
+            onCopy: { [weak self] text in
+                guard let self = self else { return }
+                self.accessibilityService.copyToPasteboard(text)
+                self.closeRecoveryPreview()
+                self.restorationAfterRecovery(action: .collapse)
+                self.resetRecoveryState()
+            },
+            onRevert: { [weak self] in
+                self?.revertRecovery()
+            },
+            onCancel: { [weak self] in
+                guard let self = self else { return }
+                self.closeRecoveryPreview()
+                self.restorationAfterRecovery(action: .collapse)
+                self.resetRecoveryState()
+            }
+        )
+        .environmentObject(l10n)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 360),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = l10n.t("recovery.title")
+        window.center()
+        window.contentView = NSHostingView(rootView: view)
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.makeKeyAndOrderFront(nil)
+        recoveryPreviewWindow = window
+    }
+
+    /// Paste the chosen reconstruction into the app the line came from.
+    private func applyRecovery(_ text: String) {
+        let original = recoveryOriginalText
+        let target = recoveryPlan?.primaryTargetLayoutID
+        closeRecoveryPreview()
+        restorationAfterRecovery(action: .paste(text))
+
+        settingsManager.incrementConversionCount()
+        settingsManager.incrementRecoveryCount()
+        logConversion(input: original, output: text, mode: "thoughtRecovery")
+        switchLayoutIfNeeded(targetLayoutID: target, conversionOccurred: true)
+        playFeedback()
+        showConversionNotification(input: original, output: text)
+        resetRecoveryState()
+    }
+
+    /// Undo: keep the original text and teach the personal dictionary so it is
+    /// never rewritten again.
+    private func revertRecovery() {
+        let original = recoveryOriginalText
+        closeRecoveryPreview()
+        restorationAfterRecovery(action: .collapse)
+
+        if let original = original {
+            let learned = UserDictionary.shared.learnWords(in: original)
+            NSLog("[LangSwitcher] revertRecovery: learned words=\(learned)")
+        }
+        settingsManager.incrementRecoveryRevertCount()
+        resetRecoveryState()
+    }
+
+    private enum RecoveryRestoration {
+        case paste(String)
+        case collapse
+    }
+
+    /// Put the target app back in front and finish the interaction there.
+    private func restorationAfterRecovery(action: RecoveryRestoration) {
+        guard let target = recoveryTargetApp else { return }
+        target.activate(options: [.activateIgnoringOtherApps])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self = self else { return }
+            switch action {
+            case .paste(let text):
+                self.accessibilityService.pasteReplacingSelection(text)
+            case .collapse:
+                self.accessibilityService.collapseSelection()
+            }
+        }
+    }
+
+    private func closeRecoveryPreview() {
+        recoveryPreviewWindow?.orderOut(nil)
+        recoveryPreviewWindow = nil
+    }
+
+    private func resetRecoveryState() {
+        recoveryTargetApp = nil
+        recoveryOriginalText = nil
+        recoveryPlan = nil
     }
 
 

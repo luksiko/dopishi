@@ -17,27 +17,43 @@ final class HotkeyManager {
     private var flagsLocalMonitor: Any?
     
     // Double-tap detection state
-    private var lastShiftPressTime: TimeInterval = 0
-    private var lastShiftWasRight: Bool? = nil
-    private var shiftWasAloneDown: Bool = false
+    private var doubleTapDetector = DoubleTapDetector()
     
     // Configuration
-    private(set) var isDoubleShiftMode: Bool = false
-    private let doubleTapInterval: TimeInterval = 0.4 // 400ms between two Shift presses
+    private(set) var isDoubleTapMode: Bool = false
+    private(set) var doubleTapModifier: DoubleTapModifier = .shift
+
+    /// Backwards compatibility property
+    var isDoubleShiftMode: Bool {
+        isDoubleTapMode && doubleTapModifier == .shift
+    }
+    
+    /// Plain Space keycode on Apple keyboards
+    static let spaceKeyCode: UInt16 = 0x31
     
     deinit {
         unregister()
     }
     
-    // MARK: - Double Shift Registration
+    // MARK: - Double-Tap Registration
     
-    /// Register double-shift as the hotkey trigger
+    /// Register double-shift as the hotkey trigger (convenience)
     func registerDoubleShift(action: @escaping HotkeyAction) {
+        registerDoubleTap(modifier: .shift, action: action)
+    }
+
+    /// Register double-tap of a modifier key (Shift ⇧⇧ or Option ⌥⌥) as the hotkey trigger
+    func registerDoubleTap(
+        modifier: DoubleTapModifier,
+        action: @escaping HotkeyAction
+    ) {
         unregister()
         self.action = action
-        self.isDoubleShiftMode = true
+        self.isDoubleTapMode = true
+        self.doubleTapModifier = modifier
+        doubleTapDetector = DoubleTapDetector()
         
-        // Monitor flagsChanged events for Shift key detection
+        // Monitor flagsChanged events for modifier key detection
         flagsGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
@@ -47,43 +63,38 @@ final class HotkeyManager {
             return event
         }
         
-        // We also need to reset shift-alone tracking when any key is pressed
+        // We also need to cancel a pending double-tap when any key is pressed
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
-            self?.shiftWasAloneDown = false
+            self?.doubleTapDetector.handleOtherKeyDown(
+                at: ProcessInfo.processInfo.systemUptime)
         }
         
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.shiftWasAloneDown = false
+            self?.doubleTapDetector.handleOtherKeyDown(
+                at: ProcessInfo.processInfo.systemUptime)
             return event
         }
     }
     
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let shiftDown = flags.contains(.shift)
-        // Only Shift pressed, no other modifiers
-        let onlyShift = shiftDown && !flags.contains(.command) && !flags.contains(.option) && !flags.contains(.control)
         
-        if onlyShift && !shiftWasAloneDown {
-            // Shift just pressed down (alone)
-            shiftWasAloneDown = true
-        } else if !shiftDown && shiftWasAloneDown {
-            // Shift just released, and it was a "clean" press (no other keys pressed during)
-            shiftWasAloneDown = false
-            
+        // Only the tracked modifier pressed, no other modifiers.
+        // Command/Control always disqualify; the other tracked modifier
+        // (Shift vs Option) also disqualifies — that's a combo, not a tap.
+        let otherModifiers = flags.subtracting(.capsLock)
+        let onlyTrackedModifier = otherModifiers == doubleTapModifier.eventFlag
+        
+        if onlyTrackedModifier {
+            // Tracked modifier just pressed down (possibly with Caps Lock on)
             let now = ProcessInfo.processInfo.systemUptime
-            let elapsed = now - lastShiftPressTime
-            
-            if elapsed < doubleTapInterval && lastShiftPressTime > 0 {
-                // Double Shift detected!
-                lastShiftPressTime = 0
+            if doubleTapDetector.handleModifierDown(doubleTapModifier, at: now) {
+                // Double tap detected!
                 action?()
-            } else {
-                lastShiftPressTime = now
             }
-        } else if !onlyShift {
-            // Some other modifier involved — reset
-            shiftWasAloneDown = false
+        } else if !flags.isEmpty {
+            // Some other modifier involved — cancel any pending pair
+            doubleTapDetector.reset()
         }
     }
     
@@ -97,7 +108,7 @@ final class HotkeyManager {
     ) {
         unregister()
         self.action = action
-        self.isDoubleShiftMode = false
+        self.isDoubleTapMode = false
         
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
@@ -129,9 +140,24 @@ final class HotkeyManager {
         if let m = flagsGlobalMonitor { NSEvent.removeMonitor(m); flagsGlobalMonitor = nil }
         if let m = flagsLocalMonitor { NSEvent.removeMonitor(m); flagsLocalMonitor = nil }
         action = nil
-        isDoubleShiftMode = false
-        lastShiftPressTime = 0
-        shiftWasAloneDown = false
+        isDoubleTapMode = false
+        doubleTapDetector.reset()
+    }
+    
+    // MARK: - Space Detection Helper
+    
+    /// Pure predicate: is this key event a plain word-separating Space?
+    /// Excludes modified Spaces (⌘Space = Spotlight, ⌥Space = non-breaking
+    /// space, ⌃Space = input switcher) and key-repeat events from held Space.
+    /// Shift+Space still counts — it inserts a word separator in most apps.
+    static func isPlainSpaceEvent(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags,
+        isRepeat: Bool
+    ) -> Bool {
+        guard keyCode == spaceKeyCode, !isRepeat else { return false }
+        let mods = modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return mods.intersection([.command, .option, .control]).isEmpty
     }
     
     // MARK: - Display Helpers

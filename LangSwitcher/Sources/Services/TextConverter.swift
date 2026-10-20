@@ -69,6 +69,58 @@ final class TextConverter {
     func convertText(_ text: String, from sourceID: String, to targetID: String) -> String? {
         return LayoutMapper.convert(text: text, from: sourceID, to: targetID)
     }
+
+    /// Decide whether a word needs automatic correction.
+    /// Returns the conversion if and only if the text looks like it was
+    /// typed in the wrong layout; otherwise returns nil (abstain).
+    func convertIfWrongLayout(_ text: String) -> ConversionResult? {
+        guard looksLikeWrongLayout(text) else {
+            NSLog("[LangSwitcher] convertIfWrongLayout: abstaining for '\(text)'")
+            return nil
+        }
+        return convertSelectedTextWithInfo(text)
+    }
+
+    /// Minimum letters for automatic correction.
+    static let autoCorrectMinLetters = 2
+
+    /// Whether a word is eligible for automatic correction.
+    func shouldAutoCorrect(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let letters = trimmed.filter(\.isLetter)
+        guard letters.count >= Self.autoCorrectMinLetters else { return false }
+        guard !trimmed.contains(where: \.isNumber) else { return false }
+
+        let layouts = settingsManager.enabledLayouts
+        guard layouts.count >= 2 else { return false }
+        guard let sourceID = LayoutMapper.detectSourceLayout(
+            text: trimmed,
+            candidateLayouts: layouts.map(\.id)
+        ) else { return false }
+        guard let sourceMap = LayoutCharacterMap.characterMap(for: sourceID) else {
+            return false
+        }
+        let alphabet = Set(sourceMap.values)
+        let isPolishSource = sourceID.lowercased().contains("polish")
+        let sourceOptionChars = LayoutCharacterMap.optionCharacterMap(for: sourceID).map { Set($0.values) }
+        for letter in letters {
+            if alphabet.contains(letter) { continue }
+            if isPolishSource, LayoutCharacterMap.polishDiacriticBases[letter] != nil { continue }
+            if let sourceOptionChars, sourceOptionChars.contains(letter) { continue }
+            return false
+        }
+        return true
+    }
+
+    /// Automatic-correction decision: boundary rules first,
+    /// then the wrong-layout check. Returns nil whenever the flow abstains.
+    func autoCorrectWord(_ text: String) -> ConversionResult? {
+        guard shouldAutoCorrect(text) else {
+            NSLog("[LangSwitcher] autoCorrectWord: abstaining for '\(text)'")
+            return nil
+        }
+        return convertIfWrongLayout(text)
+    }
     
     /// Check if text looks like it was typed in the wrong keyboard layout.
     /// For example, "ghbdtn" typed on QWERTY when meaning "привет" on Russian layout.
@@ -99,25 +151,59 @@ final class TextConverter {
         
         NSLog("[LangSwitcher] looksLikeWrongLayout: detected source='\(detectedSourceID)' for '\(trimmed)'")
         
+        // Dictionary veto (embedded PL/UA/EN/RU frequency lists): if the text is
+        // already correct language, converting it would garble real words — refuse.
+        if LanguageWordlists.shouldVeto(text: trimmed) {
+            NSLog("[LangSwitcher] looksLikeWrongLayout: vetoed — text is already valid language")
+            return false
+        }
+
+        // Personal dictionary: words the user taught us by reverting a
+        // Thought Recovery are intentional by definition.
+        if UserDictionary.shared.containsAny(in: trimmed) {
+            NSLog("[LangSwitcher] looksLikeWrongLayout: vetoed — user dictionary word")
+            return false
+        }
+        
         // Try converting to each other layout and see if it "makes more sense"
         for layout in layouts where layout.id != detectedSourceID {
             if let converted = LayoutMapper.convert(text: trimmed, from: detectedSourceID, to: layout.id) {
                 NSLog("[LangSwitcher] looksLikeWrongLayout: converted to '\(converted)' via layout '\(layout.id)'")
                 
-                let sourceHasLatinOnly = trimmed.allSatisfy { $0.isASCII || !$0.isLetter }
-                let convertedHasNonLatin = converted.contains { !$0.isASCII && $0.isLetter }
+                // Script classification must use Unicode script, not isASCII:
+                // Polish diacritics (ś ć ą …) and accented Latin letters (é ñ ü)
+                // are Latin-script letters but NOT ASCII.
+                func isLatinScript(_ c: Character) -> Bool {
+                    guard c.isLetter else { return false }
+                    return c.unicodeScalars.allSatisfy { scalar in
+                        switch scalar.value {
+                        case 0x300...0x36F: return true   // combining marks (decomposed forms)
+                        case 0x41...0x5A, 0x61...0x7A: return true   // A–Z a–z
+                        case 0xC0...0xFF: return true     // Latin-1 Supplement (À–ÿ, ü é ñ ó)
+                        case 0x100...0x24F: return true   // Latin Extended-A/B (ą ć ś ł Ő …)
+                        case 0x1E00...0x1EFF: return true // Latin Extended Additional
+                        default: return false
+                        }
+                    }
+                }
+                func hasNonLatinLetter(_ s: String) -> Bool {
+                    s.contains { $0.isLetter && !isLatinScript($0) }
+                }
                 
-                let sourceHasNonLatin = trimmed.contains { !$0.isASCII && $0.isLetter }
-                let convertedHasLatinOnly = converted.allSatisfy { $0.isASCII || !$0.isLetter }
+                let sourceHasLatinOnly = !hasNonLatinLetter(trimmed)
+                let convertedHasNonLatin = hasNonLatinLetter(converted)
+                
+                let sourceHasNonLatin = hasNonLatinLetter(trimmed)
+                let convertedHasLatinOnly = !hasNonLatinLetter(converted)
                 
                 NSLog("[LangSwitcher] looksLikeWrongLayout: srcLatinOnly=\(sourceHasLatinOnly) convNonLatin=\(convertedHasNonLatin) srcNonLatin=\(sourceHasNonLatin) convLatinOnly=\(convertedHasLatinOnly)")
                 
-                // Case 1: "ghbdtn" (all ASCII) -> "привет" (non-ASCII) = wrong layout
+                // Case 1: "ghbdtn" (all Latin) -> "привет" (non-Latin) = wrong layout
                 if sourceHasLatinOnly && convertedHasNonLatin {
                     return true
                 }
                 
-                // Case 2: "руддщ" (non-ASCII) -> "hello" (all ASCII) = wrong layout
+                // Case 2: "руддщ" (non-Latin) -> "hello" (all Latin) = wrong layout
                 if sourceHasNonLatin && convertedHasLatinOnly {
                     return true
                 }
@@ -230,6 +316,45 @@ final class TextConverter {
         return (keep: keep, convert: convert)
     }
     
+    // MARK: - Thought Recovery
+
+    /// Span-level reconstruction of a whole line (see ThoughtRecovery).
+    /// Unlike the boundary search below, this keeps correct words, code, links and
+    /// intentional foreign words in place and rewrites only the spans with decisive evidence.
+    /// Returns nil when nothing should change (or the feature is off), so the
+    /// caller can fall back to the boundary heuristic.
+    func recoverLine(_ text: String) -> ConversionResult? {
+        guard settingsManager.thoughtRecoveryEnabled else { return nil }
+        let layouts = settingsManager.enabledLayouts
+        guard layouts.count >= 2 else { return nil }
+
+        let plan = ThoughtRecovery.decode(
+            text,
+            layoutIDs: layouts.map(\.id),
+            learnedWords: UserDictionary.shared.words
+        )
+        guard plan.isChanged else {
+            NSLog("[LangSwitcher] recoverLine: nothing to change in '\(text)'")
+            return nil
+        }
+
+        NSLog("[LangSwitcher] recoverLine: '\(text)' -> '\(plan.reconstructed)' (confidence=\(plan.confidence), target=\(plan.primaryTargetLayoutID ?? "nil"))")
+        return ConversionResult(text: plan.reconstructed, targetLayoutID: plan.primaryTargetLayoutID ?? "")
+    }
+
+    /// Full plan for the preview window: original, reconstruction, per-span
+    /// kinds and the runner-up reconstructions.
+    func recoveryPlan(for text: String) -> ThoughtRecovery.Plan? {
+        guard settingsManager.thoughtRecoveryEnabled else { return nil }
+        let layouts = settingsManager.enabledLayouts
+        guard layouts.count >= 2 else { return nil }
+        return ThoughtRecovery.decode(
+            text,
+            layoutIDs: layouts.map(\.id),
+            learnedWords: UserDictionary.shared.words
+        )
+    }
+
     /// Convert only the wrong-layout portion of a line.
     /// Returns the full replacement text (keep + converted) or nil if nothing to convert.
     func convertLineGreedy(_ text: String) -> String? {

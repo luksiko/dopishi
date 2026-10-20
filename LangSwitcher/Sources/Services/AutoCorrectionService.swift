@@ -228,6 +228,20 @@ final class AutoCorrectionService {
         // Need at least 2 characters to make a meaningful correction
         guard word.count >= 2 else { return }
 
+        // Never touch our own windows (Settings search etc.)
+        guard !NSApp.isActive else { return }
+
+        // Check AutoCorrectionGate: secure fields, non-text controls, and excluded apps (Terminal, iTerm)
+        let focus = accessibilityService.focusedFieldRole()
+        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard AutoCorrectionGate.allowsAutoCorrection(
+            role: focus?.role,
+            subrole: focus?.subrole,
+            bundleID: frontmostBundleID
+        ) else {
+            NSLog("[LangSwitcher] AutoCorrection: vetoed by AutoCorrectionGate (role=\(focus?.role ?? "nil"), subrole=\(focus?.subrole ?? "nil"), bundleID=\(frontmostBundleID ?? "nil"))")
+            return
+        }
 
         NSLog("[LangSwitcher] AutoCorrection: checking word '\(word)' (trigger='\(triggerChar)')")
 

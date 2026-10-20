@@ -94,6 +94,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var aboutWindow: NSWindow?
     
     var onConvertAction: (() -> Void)?
+    var onPreviewRecoveryAction: (() -> Void)?
     var onSwitchLayoutAction: (() -> Void)?
     
     private var l10n: LocalizationManager { LocalizationManager.shared }
@@ -215,6 +216,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         convertItem.target = self
         menu.addItem(convertItem)
 
+        // Thought Recovery preview
+        let previewItem = NSMenuItem(
+            title: l10n.t("menu.previewRecovery"),
+            action: #selector(previewRecoveryAction),
+            keyEquivalent: ""
+        )
+        previewItem.target = self
+        previewItem.isEnabled = settingsManager.thoughtRecoveryEnabled
+        menu.addItem(previewItem)
+
         // Direct switch layout action
         let switchKeyTitle: String
         if settingsManager.layoutSwitchKey != .disabled {
@@ -297,6 +308,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     
     @objc private func convertAction() {
         onConvertAction?()
+    }
+
+    @objc private func previewRecoveryAction() {
+        onPreviewRecoveryAction?()
     }
 
     @objc private func switchLayoutAction() {

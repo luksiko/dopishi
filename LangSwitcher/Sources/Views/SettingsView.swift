@@ -115,6 +115,27 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             }
+            
+            Section(l10n.t("general.thoughtRecovery")) {
+                Toggle(l10n.t("general.thoughtRecoveryEnabled"), isOn: $settingsManager.thoughtRecoveryEnabled)
+                Toggle(l10n.t("general.thoughtRecoveryPreview"), isOn: $settingsManager.thoughtRecoveryPreview)
+                    .disabled(!settingsManager.thoughtRecoveryEnabled)
+
+                Text(l10n.t("general.thoughtRecoveryHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if settingsManager.recoveryCount > 0 {
+                    HStack {
+                        Text(l10n.t("general.recoveryStats"))
+                            .font(.caption)
+                        Spacer()
+                        Text("\(settingsManager.recoveryCount) · \(l10n.t("general.recoveryRevertRate")) \(Int(settingsManager.recoveryRevertRate * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             Section(l10n.t("general.layoutSwitch")) {
                 Picker(l10n.t("general.mode"), selection: $settingsManager.layoutSwitchMode) {

@@ -181,7 +181,35 @@ final class SettingsManager: ObservableObject {
         }
     }
 
+    /// Thought Recovery: reconstruct a whole line span by span instead of
+    /// converting one wrong-layout tail. Default: ON.
+    @Published var thoughtRecoveryEnabled: Bool {
+        didSet { defaults.set(thoughtRecoveryEnabled, forKey: Keys.thoughtRecoveryEnabled) }
+    }
+
+    /// Show the reconstruction (with alternatives) before applying it, instead
+    /// of pasting straight into the app. Default: OFF.
+    @Published var thoughtRecoveryPreview: Bool {
+        didSet { defaults.set(thoughtRecoveryPreview, forKey: Keys.thoughtRecoveryPreview) }
+    }
+
+    /// How many lines Thought Recovery rewrote.
+    @Published var recoveryCount: Int {
+        didSet { defaults.set(recoveryCount, forKey: Keys.recoveryCount) }
+    }
+
+    /// How many recoveries the user reverted.
+    @Published var recoveryRevertCount: Int {
+        didSet { defaults.set(recoveryRevertCount, forKey: Keys.recoveryRevertCount) }
+    }
+
     // MARK: - Computed
+    
+    /// Share of recoveries the user reverted.
+    var recoveryRevertRate: Double {
+        guard recoveryCount > 0 else { return 0 }
+        return Double(recoveryRevertCount) / Double(recoveryCount)
+    }
     
     var hotkeyModifierFlags: NSEvent.ModifierFlags {
         get { NSEvent.ModifierFlags(rawValue: hotkeyModifiers) }
@@ -217,6 +245,10 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
         static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
         static let statusBarIconStyle = "statusBarIconStyle"
+        static let thoughtRecoveryEnabled = "thoughtRecoveryEnabled"
+        static let thoughtRecoveryPreview = "thoughtRecoveryPreview"
+        static let recoveryCount = "recoveryCount"
+        static let recoveryRevertCount = "recoveryRevertCount"
     }
     
     // MARK: - Init
@@ -252,6 +284,11 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
         self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
         
+        self.thoughtRecoveryEnabled = defaults.object(forKey: Keys.thoughtRecoveryEnabled) as? Bool ?? true  // Default: ON
+        self.thoughtRecoveryPreview = defaults.object(forKey: Keys.thoughtRecoveryPreview) as? Bool ?? false // Default: OFF
+        self.recoveryCount = defaults.integer(forKey: Keys.recoveryCount)
+        self.recoveryRevertCount = defaults.integer(forKey: Keys.recoveryRevertCount)
+        
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge
         
@@ -284,6 +321,14 @@ final class SettingsManager: ObservableObject {
     
     func incrementConversionCount() {
         conversionCount += 1
+    }
+
+    func incrementRecoveryCount() {
+        recoveryCount += 1
+    }
+
+    func incrementRecoveryRevertCount() {
+        recoveryRevertCount += 1
     }
     
     private func saveLayouts() {

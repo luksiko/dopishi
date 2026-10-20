@@ -143,7 +143,7 @@ enum Strings_en {
         // ── About Window ────────────────────────────────────────────
         "about.windowTitle":             "About LangSwitcher",
         "about.appName":                 "LangSwitcher",
-        "about.version":                 "Version 1.2.1",
+        "about.version":                 "Version 1.3.0",
         "about.tagline":                 "Open-source keyboard layout text converter for macOS",
         "about.howToUse":                "How to use:",
         "about.step1":                   "Select text typed in wrong layout",

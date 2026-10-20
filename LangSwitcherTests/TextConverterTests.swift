@@ -74,15 +74,12 @@ final class TextConverterTests: XCTestCase {
     }
     
     func testLooksLikeWrongLayout_CorrectLatin() {
-        // "hello" is correct English — converting to Russian gives Cyrillic gibberish "руддщ"
-        // BUT "hello" itself is Latin, and "руддщ" is non-Latin, so it would look like wrong layout.
-        // Actually, looksLikeWrongLayout checks if converting SWITCHES script.
-        // "hello" → RU → "руддщ" → sourceHasLatinOnly && convertedHasNonLatin → true
-        // This is expected: without a dictionary, the algorithm can't tell "hello" from "ghbdtn"
-        // Both are Latin text that produce Cyrillic when converted.
-        // The algorithm relies on context (user pressed the hotkey = they want conversion).
+        // "hello" is correct English — dictionary veto protects it from being flagged as wrong layout.
+        // Manual conversion (convertSelectedText) deliberately bypasses the veto and still converts.
         let result = converter.looksLikeWrongLayout("hello")
-        XCTAssertTrue(result, "Any Latin text looks like wrong layout when RU is available (script switches)")
+        XCTAssertFalse(result, "Dictionary words are protected from auto-conversion")
+        XCTAssertEqual(converter.convertSelectedText("hello"), "руддщ",
+                       "Manual hotkey conversion stays permissive")
     }
     
     func testLooksLikeWrongLayout_EmptyString() {
@@ -117,18 +114,21 @@ final class TextConverterTests: XCTestCase {
     }
     
     func testFindBoundary_MixedLine_CyrillicThenLatin() {
-        // "Привет ghbdtn" — both words trigger looksLikeWrongLayout (both scripts switch
-        // when converted). Without a dictionary, the algorithm can't distinguish "correct
-        // Cyrillic" from "wrong-layout Cyrillic". Pass 1 sees ALL words as wrong → converts entire line.
+        // "Привет ghbdtn" — "Привет" is a valid Russian dictionary word, so
+        // the dictionary veto now stops looksLikeWrongLayout from flagging it.
+        // Pass 1 (all-wrong) therefore fails, and Pass 2 keeps "Привет " and
+        // converts only the trailing wrong-layout "ghbdtn".
         let boundary = converter.findWrongLayoutBoundary(in: "Привет ghbdtn")
         XCTAssertNotNil(boundary)
-        XCTAssertEqual(boundary?.keep, "")
-        XCTAssertEqual(boundary?.convert, "Привет ghbdtn")
+        XCTAssertEqual(boundary?.keep, "Привет ")
+        XCTAssertEqual(boundary?.convert, "ghbdtn")
     }
     
     func testFindBoundary_MixedLine_MultipleCyrillicThenLatin() {
-        // Same reasoning: all words (Cyrillic and Latin) switch script when converted,
-        // so Pass 1 fires and converts the entire line.
+        // All words switch script when converted, so Pass 1 fires and
+        // converts the entire line. "мир" is a real Ukrainian/Russian dictionary
+        // word, but it has only 3 letters — the single-word veto requires
+        // ≥4 — so it still registers as wrong-layout here.
         let boundary = converter.findWrongLayoutBoundary(in: "Привет мир ghbdtn rfr")
         XCTAssertNotNil(boundary)
         XCTAssertEqual(boundary?.keep, "")

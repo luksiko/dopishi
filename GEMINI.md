@@ -7,6 +7,7 @@
 - **Platform**: macOS 13.0+ (Ventura or newer)
 - **Frameworks**: SwiftUI, AppKit, Carbon (`TIS`, `CGEvent`, Carbon HotKey APIs), ApplicationServices (`AXUIElement`), `NSSpellChecker`, direct C `sqlite3` API.
 - **Dependencies**: Zero external package dependencies. Pure native Swift & macOS system libraries.
+- **Detailed History & Knowledge Base**: For comprehensive session-by-session history, platform traps, and deep subsystem breakdowns, see [`PROJECT_KNOWLEDGE.md`](file:///Users/alexeyvassilyev/Sites/langSwitcher/PROJECT_KNOWLEDGE.md).
 
 ---
 
@@ -32,34 +33,49 @@ langSwitcher/
 │       │   └── ConversionLog.swift     # SQLite log entry record & export structure
 │       ├── Services/
 │       │   ├── AccessibilityService.swift # AXUIElement text inspection & synthetic key event emission
+│       │   ├── AutoCorrectionGate.swift   # Password/secure field and sensitive app filter
 │       │   ├── AutoCorrectionService.swift# Real-time background typing monitor & inline corrector
 │       │   ├── ConversionLogStore.swift   # Direct C SQLite3 store for conversion history
+│       │   ├── DoubleTapDetector.swift    # Generic modifier double-tap detection
 │       │   ├── HotkeyManager.swift        # Global hotkey registration & Double-Shift tap detection
 │       │   ├── KeyboardLayoutDetector.swift# Carbon TIS API wrapper for active/installed layouts
+│       │   ├── LanguageWordlists.swift    # Offline word frequency lists for fast validation
 │       │   ├── LayoutMapper.swift         # Character mapping matrix based on physical key positions
 │       │   ├── SettingsManager.swift      # @MainActor ObservableObject wrapping UserDefaults
 │       │   ├── SingleKeyLayoutSwitcher.swift # Dedicated single-key layout switching detector
 │       │   ├── SpellCheckService.swift    # NSSpellChecker validation to minimize false positives
-│       │   └── TextConverter.swift        # Main conversion engine, wrong layout boundary heuristics
+│       │   ├── TextConverter.swift        # Main conversion engine, wrong layout boundary heuristics
+│       │   ├── ThoughtRecovery.swift      # Thought recovery buffer & post-switch candidate generator
+│       │   ├── UserDictionary.swift       # User-defined dictionary words persistence
+│       │   └── WordlistData.swift         # Compact embedded wordlist frequency data
 │       ├── Views/
 │       │   ├── AboutView.swift            # About dialog view (app info, links, donations)
 │       │   ├── ConversionLogView.swift    # SQLite history browser, rating, and JSON export view
 │       │   ├── HotkeyRecorderView.swift   # Interactive key recording UI for custom shortcuts
 │       │   ├── PermissionsView.swift      # Accessibility permission tutorial & status view
+│       │   ├── RecoveryPreviewView.swift  # Floating non-activating candidate HUD preview
 │       │   └── SettingsView.swift         # Multi-tab settings UI (General, Smart Mode, Keys, etc.)
 │       └── Localization/
 │           ├── LocalizationManager.swift  # Dynamic runtime string localization engine
 │           ├── Strings_en.swift           # English translation catalog
 │           └── Strings_ru.swift           # Russian translation catalog
 ├── LangSwitcherTests/
+│   ├── AutoCorrectionGateTests.swift      # Password/app exclusion unit tests
+│   ├── AutoCorrectionTests.swift          # End-to-end auto-correction tests
+│   ├── HotkeyManagerTests.swift           # Shortcut and modifier timing tests
 │   ├── KeyboardLayoutDetectorTests.swift  # Layout detection & parsing tests
+│   ├── LanguageWordlistTests.swift        # Wordlist frequency and lookup tests
 │   ├── LayoutMapperTests.swift            # Bidirectional character mapping tests across layouts
-│   ├── SingleKeyLayoutSwitcherTests.swift  # Modifier tap timing & combo-suppression unit tests
-│   └── TextConverterTests.swift           # Greedy line boundary & gibberish detection tests
+│   ├── SingleKeyLayoutSwitcherTests.swift # Modifier tap timing & combo-suppression unit tests
+│   ├── SpellCheckServiceTests.swift       # NSSpellChecker & script isolation unit tests
+│   ├── TextConverterTests.swift           # Greedy line boundary & gibberish detection tests
+│   └── ThoughtRecoveryTests.swift         # Thought recovery candidates & candidate HUD tests
 ├── docs/                                  # Nuxt Content documentation site
 ├── scripts/
-│   └── grant-accessibility.sh             # Helper script to grant TCC permissions in local dev
+│   ├── grant-accessibility.sh             # Helper script to grant TCC permissions in local dev
+│   └── verify-pbxproj.py                  # Xcode project PBX ID format verification script
 ├── AGENTS.md                              # Mandatory rules for AI agents and test requirements
+├── PROJECT_KNOWLEDGE.md                   # Comprehensive knowledge base across all dev chats
 └── README.md / README.ru.md               # User-facing documentation
 ```
 
