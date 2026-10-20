@@ -5,7 +5,12 @@
 set -euo pipefail
 
 APP_PATH="${1:?Usage: bash scripts/sign-app.sh /path/to/LangSwitcher.app}"
-SIGNING_IDENTITY="${LANGSWITCHER_SIGNING_IDENTITY:--}"
+SIGNING_IDENTITY="${LANGSWITCHER_SIGNING_IDENTITY:-}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+    echo "Set LANGSWITCHER_SIGNING_IDENTITY to the same signing certificate for every update." >&2
+    echo "Use '-' explicitly only for disposable builds; ad-hoc updates can lose Accessibility consent." >&2
+    exit 1
+fi
 BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")
 if [[ "$BUNDLE_ID" != "com.langswitcher.app" ]]; then
     echo "Refusing to sign unexpected bundle identifier: $BUNDLE_ID" >&2

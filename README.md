@@ -111,6 +111,30 @@ Extra `xcodebuild` options can be passed after `bash scripts/test.sh`.
 
 Or open `LangSwitcher.xcodeproj` in Xcode and press `⌘R`.
 
+### Updating the local installation
+
+Use the same certificate for every local update. List available certificates with
+`security find-identity -v -p codesigning`, then set its name or SHA-1 identity:
+
+```bash
+export LANGSWITCHER_SIGNING_IDENTITY="Apple Development: your-account (TEAMID)"
+bash scripts/install-local.sh build/Build/Products/Release/LangSwitcher.app
+```
+
+The installer stages and signs the complete bundle, verifies that it satisfies the
+installed certificate-signed app's designated requirement, stops the installed copy,
+and replaces `/Applications/LangSwitcher.app`. Recoverable ZIP backups are kept in
+`~/Library/Application Support/LangSwitcher/Backups`, so they do not appear as extra
+launchable copies. If replacement fails after moving the old app, it is restored.
+The installer refuses ad-hoc signing. `scripts/sign-app.sh` also requires an explicit
+identity; temporary builds may explicitly use `LANGSWITCHER_SIGNING_IDENTITY=-`.
+
+Migrating from an ad-hoc build can require renewing Accessibility consent once.
+Consistent signing reduces subsequent permission resets, but macOS still controls
+consent. Keep the same bundle identifier, installation path, and signing identity.
+For distributed releases, use the same Developer ID identity; a local Apple
+Development certificate is suitable for development on your own Mac.
+
 ## Usage
 
 ### Basic Workflow
