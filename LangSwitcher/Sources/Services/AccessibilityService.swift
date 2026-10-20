@@ -2,10 +2,24 @@ import Foundation
 import AppKit
 import ApplicationServices
 
+// MARK: - Caret Context
+// Represents the surrounding text and cursor state in the active text field.
+
+struct CaretContext: Equatable {
+    let fieldIdentifier: String
+    let textBeforeCaret: String
+    let textAfterCaret: String
+    let selectedText: String
+    let caretLocation: Int
+    let fullTextLength: Int
+}
+
 // MARK: - Accessibility Service
 // Handles getting and replacing selected text via macOS Accessibility API & pasteboard
 
 final class AccessibilityService {
+    private var preparedElectronPID: pid_t?
+
     
     /// Check if the app has accessibility permissions
     static var hasAccessibilityPermission: Bool {
@@ -294,18 +308,10 @@ final class AccessibilityService {
     /// Thin AX glue — policy lives in AutoCorrectionGate; callers fail
     /// closed on nil.
     func focusedFieldRole() -> (role: String?, subrole: String?)? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focused
-        ) == .success, let element = focused else {
-            NSLog("[LangSwitcher] focusedFieldRole: no focused element (AX permission?)")
+        guard let axElement = focusedTextElement() else {
+            NSLog("[LangSwitcher] focusedFieldRole: no confirmed text editor")
             return nil
         }
-        
-        let axElement = element as! AXUIElement
         var roleValue: CFTypeRef?
         AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
         var subroleValue: CFTypeRef?
@@ -317,73 +323,412 @@ final class AccessibilityService {
         return (role, subrole)
     }
     
-    // MARK: - Caret Positioning
+    // MARK: - Caret Context Inspection
     
-    /// Returns the screen rectangle (in AppKit bottom-left origin coordinate space)
-    /// of the active text caret or cursor. Falls back to element bounds or mouse location.
-    func caretScreenRect() -> CGRect? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedElement
-        ) == .success, let element = focusedElement else {
-            let mouse = NSEvent.mouseLocation
-            return CGRect(x: mouse.x, y: mouse.y, width: 2, height: 18)
+    /// Captures the surrounding text before/after caret and identifies the focused field.
+    func captureCaretContext(maxSurroundingLength: Int = 200) -> CaretContext? {
+        guard let element = focusedTextElement(),
+              let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        
+        let bundleID = app.bundleIdentifier ?? "unknown"
+        let pid = app.processIdentifier
+        let elementHash = CFHash(element)
+        let fieldID = "\(bundleID):\(pid):\(elementHash)"
+        
+        var rangeRef: CFTypeRef?
+        var selectedRange = CFRange(location: 0, length: 0)
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
+           let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID() {
+            _ = AXValueGetValue(rangeValue as! AXValue, .cfRange, &selectedRange)
         }
         
-        let axElement = element as! AXUIElement
-        let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 1080
-        
-        // 1. Try to get caret bounds via kAXBoundsForRangeParameterizedAttribute
-        var selectedRangeValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextRangeAttribute as CFString, &selectedRangeValue) == .success,
-           let selectedRangeValue = selectedRangeValue,
-           CFGetTypeID(selectedRangeValue) == AXValueGetTypeID() {
-            let axValue = selectedRangeValue as! AXValue
-            var range = CFRange()
-            if AXValueGetValue(axValue, .cfRange, &range) {
-                var searchRange = CFRange(location: max(0, range.location > 0 ? range.location - 1 : 0), length: max(1, range.length))
-                if let rangeAXValue = AXValueCreate(.cfRange, &searchRange) {
-                    var boundsValue: CFTypeRef?
-                    if AXUIElementCopyParameterizedAttributeValue(
-                        axElement,
-                        kAXBoundsForRangeParameterizedAttribute as CFString,
-                        rangeAXValue,
-                        &boundsValue
-                    ) == .success, let boundsVal = boundsValue, CFGetTypeID(boundsVal) == AXValueGetTypeID() {
-                        var rect = CGRect.zero
-                        if AXValueGetValue(boundsVal as! AXValue, .cgRect, &rect), rect.width > 0 || rect.height > 0 {
-                            let cocoaY = mainScreenHeight - rect.origin.y - rect.height
-                            return CGRect(x: rect.origin.x, y: cocoaY, width: rect.width, height: rect.height)
-                        }
-                    }
-                }
-            }
+        var selectedTextRef: CFTypeRef?
+        var selectedText = ""
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selectedTextRef) == .success,
+           let str = selectedTextRef as? String {
+            selectedText = str
         }
         
-        // 2. Fallback: try element position and size
-        var posVal: CFTypeRef?
-        var sizeVal: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXPositionAttribute as CFString, &posVal) == .success,
-           AXUIElementCopyAttributeValue(axElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
-           let posVal = posVal, let sizeVal = sizeVal,
-           CFGetTypeID(posVal) == AXValueGetTypeID(), CFGetTypeID(sizeVal) == AXValueGetTypeID() {
-            var point = CGPoint.zero
-            var size = CGSize.zero
-            if AXValueGetValue(posVal as! AXValue, .cgPoint, &point),
-               AXValueGetValue(sizeVal as! AXValue, .cgSize, &size) {
-                let cocoaY = mainScreenHeight - point.y - size.height
-                return CGRect(x: point.x, y: cocoaY, width: size.width, height: size.height)
-            }
+        var valueRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
+           let fullText = valueRef as? String {
+            let caretLoc = max(0, min(selectedRange.location, fullText.count))
+            let selEnd = max(caretLoc, min(selectedRange.location + selectedRange.length, fullText.count))
+            
+            let beforeStart = max(0, caretLoc - maxSurroundingLength)
+            let beforeIdxStart = fullText.index(fullText.startIndex, offsetBy: beforeStart, limitedBy: fullText.endIndex) ?? fullText.startIndex
+            let beforeIdxEnd = fullText.index(fullText.startIndex, offsetBy: caretLoc, limitedBy: fullText.endIndex) ?? fullText.endIndex
+            let textBefore = String(fullText[beforeIdxStart..<beforeIdxEnd])
+            
+            let afterEnd = min(fullText.count, selEnd + maxSurroundingLength)
+            let afterIdxStart = fullText.index(fullText.startIndex, offsetBy: selEnd, limitedBy: fullText.endIndex) ?? fullText.endIndex
+            let afterIdxEnd = fullText.index(fullText.startIndex, offsetBy: afterEnd, limitedBy: fullText.endIndex) ?? fullText.endIndex
+            let textAfter = String(fullText[afterIdxStart..<afterIdxEnd])
+            
+            return CaretContext(
+                fieldIdentifier: fieldID,
+                textBeforeCaret: textBefore,
+                textAfterCaret: textAfter,
+                selectedText: selectedText,
+                caretLocation: caretLoc,
+                fullTextLength: fullText.count
+            )
         }
         
-        // 3. Fallback: mouse location
-        let mouse = NSEvent.mouseLocation
-        return CGRect(x: mouse.x, y: mouse.y, width: 2, height: 18)
+        return CaretContext(
+            fieldIdentifier: fieldID,
+            textBeforeCaret: "",
+            textAfterCaret: "",
+            selectedText: selectedText,
+            caretLocation: selectedRange.location,
+            fullTextLength: 0
+        )
     }
     
+    // MARK: - Caret Positioning
+    
+    /// Only return measured insertion bounds. Field bounds and mouse location
+    /// are not cursor positions and must never anchor inline suggestions.
+    func caretScreenRect() -> CGRect? {
+        guard let element = focusedTextElement(), let primaryScreen = NSScreen.screens.first else { return nil }
+        var selectedValue: CFTypeRef?
+        var selectedRange: CFRange?
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString,
+                                         &selectedValue) == .success,
+           let value = selectedValue, CFGetTypeID(value) == AXValueGetTypeID() {
+            var range = CFRange()
+            if AXValueGetValue(value as! AXValue, .cfRange, &range) { selectedRange = range }
+        }
+        let caret = Self.resolveCaretBounds(selectedRange: selectedRange,
+            primaryScreenMaxY: primaryScreen.frame.maxY,
+            rangeBounds: { query in
+                var query = query
+                guard let value = AXValueCreate(.cfRange, &query) else { return nil }
+                return self.parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String,
+                                              parameter: value)
+            }, markerBounds: { self.selectedMarkerCaretBounds(element) })
+        guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else { return nil }
+        return caret
+    }
+
+    /// Popup fallback only. This is deliberately never used for inline text.
+    func focusedFieldScreenRect() -> CGRect? {
+        guard let element = focusedTextElement(), let screen = NSScreen.screens.first else { return nil }
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let position = positionValue, let size = sizeValue,
+              CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
+        var point = CGPoint.zero
+        var dimensions = CGSize.zero
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &point),
+              AXValueGetValue(size as! AXValue, .cgSize, &dimensions),
+              point.x.isFinite, point.y.isFinite, dimensions.width.isFinite, dimensions.height.isFinite,
+              dimensions.width > 0, dimensions.height > 0 else { return nil }
+        let rect = CGRect(x: point.x, y: screen.frame.maxY - point.y - dimensions.height,
+                          width: dimensions.width, height: dimensions.height)
+        guard let visible = NSScreen.screens.first(where: { $0.visibleFrame.intersects(rect) })?.visibleFrame else { return nil }
+        return rect.intersection(visible)
+    }
+
+    private func focusedTextElement() -> AXUIElement? {
+        prepareBrowserAccessibility()
+        let system = AXUIElementCreateSystemWide()
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &value) != .success,
+           let app = NSWorkspace.shared.frontmostApplication {
+            AXUIElementCopyAttributeValue(AXUIElementCreateApplication(app.processIdentifier),
+                                          kAXFocusedUIElementAttribute as CFString, &value)
+        }
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        let root = value as! AXUIElement
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.04
+        return Self.resolveFocusedTextNode(root: root, attributes: { element in
+            var role: CFTypeRef?
+            var subrole: CFTypeRef?
+            var focused: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
+            AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
+            AXUIElementCopyAttributeValue(element, kAXFocusedAttribute as CFString, &focused)
+            return (role as? String, subrole as? String, (focused as? Bool) == true)
+        }, focusedChild: { element in
+            var child: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXFocusedUIElementAttribute as CFString,
+                                                &child) == .success,
+                  let child, CFGetTypeID(child) == AXUIElementGetTypeID() else { return nil }
+            return child as! AXUIElement
+        }, children: { element in
+            var children: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
+            return children as? [AXUIElement] ?? []
+        }, shouldContinue: { ProcessInfo.processInfo.systemUptime < deadline })
+    }
+
+    /// Follow confirmed focus, including nested web editors, never a merely
+    /// editable descendant. Bound the traversal and reject ambiguous focus.
+    static func resolveFocusedTextNode<Node: Hashable>(
+        root: Node, attributes: (Node) -> (role: String?, subrole: String?, focused: Bool),
+        focusedChild: (Node) -> Node?, children: (Node) -> [Node],
+        limit: Int = 128, shouldContinue: () -> Bool = { true }
+    ) -> Node? {
+        var pending: [(Node, Bool)] = [(root, true)]
+        var visited: Set<Node> = []
+        var result: Node?
+        while !pending.isEmpty {
+            guard visited.count < limit, shouldContinue() else { return nil }
+            let (node, linkedFocus) = pending.removeLast()
+            guard visited.insert(node).inserted else { continue }
+            let info = attributes(node)
+            let confirmed = linkedFocus || info.focused
+            if AutoCorrectionGate.isSecureField(role: info.role, subrole: info.subrole) {
+                if confirmed { return nil }
+                continue
+            }
+            if AutoCorrectionGate.textInputRoles.contains(info.role ?? "") {
+                if confirmed {
+                    guard result == nil || result == node else { return nil }
+                    result = node
+                }
+                continue
+            }
+            if let child = focusedChild(node), child != node {
+                pending.append((child, true))
+                continue
+            }
+            if ["AXGroup", "AXWebArea", "AXScrollArea", "AXSplitGroup"].contains(info.role ?? "") {
+                pending.append(contentsOf: children(node).reversed().map { ($0, false) })
+            }
+        }
+        // Incomplete traversal could conceal a second focused editor.
+        guard pending.isEmpty else { return nil }
+        return result
+    }
+
+    /// Electron documents this attribute for third-party assistive applications.
+    /// Request once per active process, not on every keystroke. No permission is granted here.
+    private func prepareBrowserAccessibility() {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              preparedElectronPID != app.processIdentifier,
+              let bundle = app.bundleURL,
+              FileManager.default.fileExists(atPath: bundle.appendingPathComponent(
+                "Contents/Frameworks/Electron Framework.framework").path), AXIsProcessTrusted() else { return }
+        preparedElectronPID = app.processIdentifier
+        AXUIElementSetAttributeValue(AXUIElementCreateApplication(app.processIdentifier),
+                                     "AXManualAccessibility" as CFString, kCFBooleanTrue)
+    }
+
+    private func parameterizedRect(_ element: AXUIElement, attribute: String, parameter: CFTypeRef) -> CGRect? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, attribute as CFString, parameter, &value) == .success,
+              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        var rect = CGRect.zero
+        return AXValueGetValue(value as! AXValue, .cgRect, &rect) ? rect : nil
+    }
+
+    private func selectedMarkerCaretBounds(_ element: AXUIElement) -> CGRect? {
+        var markerRange: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString,
+                                           &markerRange) == .success, let markerRange else { return nil }
+        // A selected span is not an insertion point. Require an empty marker string.
+        var selectedText: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString,
+            markerRange, &selectedText) == .success, let text = selectedText as? String, text.isEmpty else { return nil }
+        return parameterizedRect(element, attribute: "AXBoundsForTextMarkerRange", parameter: markerRange)
+    }
+
+    static func resolveCaretBounds(selectedRange: CFRange?, primaryScreenMaxY: CGFloat,
+                                   rangeBounds: (CFRange) -> CGRect?, markerBounds: () -> CGRect?) -> CGRect? {
+        if let range = selectedRange {
+            guard range.location >= 0, range.length == 0 else { return nil }
+            var queries = [range]
+            if range.location > 0 { queries.append(CFRange(location: range.location - 1, length: 1)) }
+            for query in queries {
+                if let bounds = rangeBounds(query),
+                   let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
+                                                     precedingCharacter: query.length == 1) { return caret }
+            }
+        }
+        guard let bounds = markerBounds(), bounds.width <= 2 else { return nil }
+        return normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false)
+    }
+
+    static func normalizedCaretBounds(_ rect: CGRect, primaryScreenMaxY: CGFloat,
+                                      precedingCharacter: Bool) -> CGRect? {
+        guard rect.origin.x.isFinite, rect.origin.y.isFinite,
+              rect.width.isFinite, rect.height.isFinite,
+              rect.width >= 0, rect.width <= 100, rect.height > 0, rect.height <= 80 else { return nil }
+        return CGRect(x: precedingCharacter ? rect.maxX : rect.minX,
+                      y: primaryScreenMaxY - rect.maxY, width: 1, height: rect.height)
+    }
+
+    struct ReplacementTarget {
+        let element: AXUIElement
+        let processID: pid_t
+    }
+
+    func captureReplacementTarget() -> ReplacementTarget? {
+        guard let element = focusedTextElement(), let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        for attribute in [kAXSelectedTextAttribute, kAXSelectedTextRangeAttribute] {
+            var settable = DarwinBoolean(false)
+            guard AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) == .success,
+                  settable.boolValue else { return nil }
+        }
+        return ReplacementTarget(element: element, processID: app.processIdentifier)
+    }
+
+    func isCurrentReplacementTarget(_ target: ReplacementTarget) -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processID,
+              let element = focusedTextElement() else { return false }
+        return CFEqual(element, target.element)
+    }
+
+    /// Direct AX replacement is synchronous and must be confirmed by reading
+    /// the resulting text. An acknowledged setter may still be a no-op.
+    func replaceVerifiedSuffix(_ expected: String, with replacement: String, target: ReplacementTarget) -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processID,
+              let focused = focusedTextElement(), CFEqual(focused, target.element) else { return false }
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString,
+                                            &settable) == .success, settable.boolValue else { return false }
+        var value: CFTypeRef?
+        var selectionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(focused, kAXValueAttribute as CFString, &value) == .success,
+              let text = value as? String,
+              AXUIElementCopyAttributeValue(focused, kAXSelectedTextRangeAttribute as CFString,
+                                            &selectionValue) == .success,
+              let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { return false }
+        var selection = CFRange()
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection),
+              let plan = Self.verifiedSuffixRange(text: text, selection: selection, expected: expected)
+        else { return false }
+        var range = CFRange(location: plan.location, length: plan.length)
+        guard let rangeValue = AXValueCreate(.cfRange, &range),
+              AXUIElementSetAttributeValue(focused, kAXSelectedTextRangeAttribute as CFString,
+                                            rangeValue) == .success else { return false }
+        // Recheck the editor's actual selection before replacing any content.
+        var actual: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &actual) == .success,
+              actual as? String == expected else {
+            restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
+            return false
+        }
+        AXUIElementSetAttributeValue(focused, kAXSelectedTextAttribute as CFString, replacement as CFString)
+        var updated: CFTypeRef?
+        AXUIElementCopyAttributeValue(focused, kAXValueAttribute as CFString, &updated)
+        guard Self.replacementWasApplied(original: text, range: plan, replacement: replacement,
+                                         observed: updated as? String) else {
+            // Never leave a word highlighted after an ignored/failed setter.
+            if updated as? String == text {
+                restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
+            }
+            return false
+        }
+        return true
+    }
+
+    /// Fallback for automatic word correction in editors with ignored AX setters.
+    /// Re-read the text and focus before selecting anything; never send backspaces.
+    func pasteVerifiedSuffix(_ expected: String, with replacement: String, target: ReplacementTarget,
+                             completion: @escaping (Bool) -> Void) {
+        guard isCurrentReplacementTarget(target) else { completion(false); return }
+        let element = target.element
+        var value: CFTypeRef?
+        var selectionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success,
+              let text = value as? String,
+              AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString,
+                                            &selectionValue) == .success,
+              let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { completion(false); return }
+        var original = CFRange()
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &original),
+              let plan = Self.verifiedSuffixRange(text: text, selection: original, expected: expected) else {
+            completion(false); return
+        }
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
+            completion(false); return
+        }
+        var range = CFRange(location: plan.location, length: plan.length)
+        guard let rangeValue = AXValueCreate(.cfRange, &range),
+              AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, rangeValue) == .success else {
+            completion(false); return
+        }
+        var selected: CFTypeRef?
+        guard isCurrentReplacementTarget(target),
+              AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selected) == .success,
+              selected as? String == expected else {
+            restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+            completion(false); return
+        }
+        let pasteboard = NSPasteboard.general
+        let saved = savePasteboard()
+        pasteboard.clearContents()
+        guard pasteboard.setString(replacement, forType: .string) else {
+            restorePasteboard(saved)
+            restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+            completion(false); return
+        }
+        pasteboard.setString("", forType: .init("org.nspasteboard.TransientType"))
+        pasteboard.setString("", forType: .init("org.nspasteboard.AutoGeneratedType"))
+        let pasteboardRevision = pasteboard.changeCount
+        for event in [down, up] {
+            event.flags = .maskCommand
+            event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+            event.post(tap: .cgAnnotatedSessionEventTap)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            var observed: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed)
+            let applied = Self.replacementWasApplied(original: text, range: plan,
+                                                     replacement: replacement, observed: observed as? String)
+            if !applied, observed as? String == text, self.isCurrentReplacementTarget(target) {
+                self.restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+            }
+            // A newer user copy owns the clipboard and must never be overwritten.
+            if pasteboard.changeCount == pasteboardRevision {
+                if saved.isEmpty { pasteboard.clearContents() } else { self.restorePasteboard(saved) }
+            }
+            completion(applied)
+        }
+    }
+
+    static func replacementWasApplied(original: String, range: NSRange,
+                                      replacement: String, observed: String?) -> Bool {
+        guard range.location != NSNotFound, range.location >= 0, range.length >= 0,
+              range.location <= original.utf16.count,
+              range.length <= original.utf16.count - range.location else { return false }
+        return observed == (original as NSString).replacingCharacters(in: range, with: replacement)
+    }
+
+    private func restoreSelectionIfUnchanged(_ element: AXUIElement, selectedRange: CFRange, original: CFRange) {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return }
+        var current = CFRange()
+        guard AXValueGetValue(value as! AXValue, .cfRange, &current),
+              current.location == selectedRange.location, current.length == selectedRange.length else { return }
+        var original = original
+        if let range = AXValueCreate(.cfRange, &original) {
+            AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, range)
+        }
+    }
+
+    static func verifiedSuffixRange(text: String, selection: CFRange, expected: String) -> NSRange? {
+        let string = text as NSString
+        let count = expected.utf16.count
+        guard count > 0, selection.length == 0, selection.location >= count,
+              selection.location <= string.length else { return nil }
+        let range = NSRange(location: selection.location - count, length: count)
+        guard string.substring(with: range) == expected else { return nil }
+        // A stale buffer must not match the tail of a larger word.
+        if range.location > 0,
+           let preceding = (string.substring(to: range.location)).last,
+           preceding.isLetter || preceding.isNumber { return nil }
+        return range
+    }
+
     // MARK: - Pasteboard Save/Restore
     
     private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {

@@ -13,7 +13,7 @@ import Carbon
 //      a. Check if the buffered word looks like wrong layout
 //      b. Convert the word using LayoutMapper
 //      c. Optionally validate the converted word via NSSpellChecker
-//      d. Replace the word using backspace + clipboard paste
+//      d. Replace the exact verified range via Accessibility
 //   4. Buffer is cleared and the cycle restarts
 
 @MainActor
@@ -37,7 +37,14 @@ final class AutoCorrectionService {
 
     private var wordBuffer: String = ""
     private var previousWord: String?
-    private var isProcessingCorrection = false
+    private var suggestionTarget: AccessibilityService.ReplacementTarget?
+    private var lastCaretContext: CaretContext?
+    private var snoozeUntil: Date?
+    private var snoozeFieldIdentifier: String?
+    private let completionRefresh: AutocompletionRefresh
+    private var physicalInputRevision = 0
+    private var replacementSession = ReplacementSession()
+    private var isProcessingCorrection: Bool { replacementSession.isBusy }
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
@@ -56,7 +63,9 @@ final class AutoCorrectionService {
          autocompletionEngine: AutocompletionEngine? = nil,
          overlayController: AutocompletionOverlayController? = nil,
          ghostTextController: GhostTextOverlayController? = nil,
-         adaptiveStore: AutocompletionAdaptiveStore? = nil) {
+         adaptiveStore: AutocompletionAdaptiveStore? = nil,
+         completionRefresh: AutocompletionRefresh? = nil) {
+        self.completionRefresh = completionRefresh ?? AutocompletionRefresh()
         self.settingsManager = settingsManager
         self.textConverter = textConverter
         self.accessibilityService = accessibilityService
@@ -168,6 +177,9 @@ final class AutoCorrectionService {
 
     /// Stop monitoring keystrokes.
     func stop() {
+        completionRefresh.cancel()
+        physicalInputRevision &+= 1
+        replacementSession.cancel()
         overlayController.hide()
         ghostTextController.hide()
         if let tap = eventTap {
@@ -198,30 +210,39 @@ final class AutoCorrectionService {
 
     /// Reset word buffer when user clicks with mouse outside the autocompletion popup
     func handleMouseDown() {
+        physicalInputRevision &+= 1
         if overlayController.isVisible && overlayController.containsPoint(NSEvent.mouseLocation) {
             return
         }
         wordBuffer = ""
         previousWord = nil
-        overlayController.hide()
-        ghostTextController.hide()
+        snoozeUntil = nil
+        snoozeFieldIdentifier = nil
+        dismissAutocompletion()
     }
 
     /// Check if the key should be intercepted synchronously by the autocompletion overlay.
     /// Returns true if consumed (tap callback returns nil).
     func interceptKeyIfOverlayVisible(event: CGEvent) -> Bool {
+        physicalInputRevision &+= 1
+        guard !isProcessingCorrection else { return false }
         let isOverlayActive = overlayController.isVisible || ghostTextController.isVisible
-        guard isOverlayActive else { return false }
+        guard isOverlayActive else {
+            dismissAutocompletion()
+            return false
+        }
         
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
         let noModifierFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
         
-        // 1. Escape: dismiss overlay & ghost text
+        // 1. Escape: dismiss overlay & ghost text, snooze suggestions for 5s in this field.
+        // A subsequent Escape when overlay is hidden passes through to the active application.
         if keyCode == 0x35 && nonModFlags.isEmpty {
-            overlayController.hide()
-            ghostTextController.hide()
+            snoozeUntil = Date().addingTimeInterval(5.0)
+            snoozeFieldIdentifier = accessibilityService.captureCaretContext()?.fieldIdentifier
+            dismissAutocompletion()
             return true
         }
         
@@ -248,23 +269,34 @@ final class AutoCorrectionService {
             ]
             if let index = numberKeyCodes[keyCode], index < overlayController.candidates.count {
                 let candidate = overlayController.candidates[index]
-                acceptCandidate(candidate, appendSpace: false)
-                return true
+                return acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
             }
         }
         
-        // 5. Configured Accept key
+        // 5. Configured Accept ALL Key (e.g. Shift+Tab, Option+Tab, Cmd+Return)
+        if settingsManager.isAutocompletionAcceptAllKey(keyCode: keyCode, flags: flags) {
+            let candidate = overlayController.selectedCandidate
+                ?? overlayController.candidates.first
+                ?? ghostTextController.currentCandidate
+            if let candidate = candidate {
+                return acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
+            }
+        }
+
+        // 6. Configured Accept next word Key (e.g. Tab, Space, Enter)
         if settingsManager.isAutocompletionAcceptKey(keyCode: keyCode, flags: flags) {
             let candidate = overlayController.selectedCandidate
                 ?? overlayController.candidates.first
                 ?? ghostTextController.currentCandidate
             if let candidate = candidate {
                 let appendSpace = (settingsManager.autoCompletionAcceptKey == .space)
-                acceptCandidate(candidate, appendSpace: appendSpace)
-                return true
+                return acceptCandidate(candidate, appendSpace: appendSpace, entirePhrase: false)
             }
         }
         
+        // Invalidate candidates before the physical key reaches the editor,
+        // including when processing of that key is still queued on the main thread.
+        dismissAutocompletion()
         return false
     }
 
@@ -300,7 +332,7 @@ final class AutoCorrectionService {
             } else if !wordBuffer.isEmpty {
                 wordBuffer.removeLast()
             }
-            updateAutocompletion()
+            scheduleAutocompletion()
             return
 
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
@@ -355,7 +387,7 @@ final class AutoCorrectionService {
         let char = chars.first!
 
         // Check if it's a word boundary (punctuation)
-        if !char.isLetter && !char.isNumber {
+        if !char.isLetter && !char.isNumber && !isAlternativeLetterKey(char) {
             overlayController.hide()
             ghostTextController.hide()
             if settingsManager.autoCorrectionEnabled {
@@ -371,16 +403,52 @@ final class AutoCorrectionService {
 
         // Accumulate character in word buffer
         wordBuffer.append(char)
-        updateAutocompletion()
+        scheduleAutocompletion()
+    }
+
+    private func isAlternativeLetterKey(_ char: Character) -> Bool {
+        guard let source = KeyboardLayoutDetector.getCurrentLayout()?.id else { return false }
+        return CorrectionToken.isAlternativeLetter(char, source: source,
+                                                   targets: settingsManager.enabledLayouts.map(\.id))
     }
 
     // MARK: - Autocompletion Logic
 
+    private func dismissAutocompletion() {
+        completionRefresh.cancel()
+        suggestionTarget = nil
+        lastCaretContext = nil
+        overlayController.hide()
+        ghostTextController.hide()
+    }
+
+    private func scheduleAutocompletion() {
+        dismissAutocompletion()
+        // Measure after the editor receives the physical key, coalescing fast typing.
+        completionRefresh.schedule { [weak self] in
+            self?.updateAutocompletion()
+        }
+    }
+
     private func updateAutocompletion() {
         guard settingsManager.autoCompletionEnabled else {
-            overlayController.hide()
-            ghostTextController.hide()
+            dismissAutocompletion()
             return
+        }
+
+        let currentContext = accessibilityService.captureCaretContext()
+        if let snooze = snoozeUntil {
+            if let currentField = currentContext?.fieldIdentifier, currentField != snoozeFieldIdentifier {
+                snoozeUntil = nil
+                snoozeFieldIdentifier = nil
+            } else if Date() < snooze {
+                overlayController.hide()
+                ghostTextController.hide()
+                return
+            } else {
+                snoozeUntil = nil
+                snoozeFieldIdentifier = nil
+            }
         }
 
         // Check gate: do not show completions in secure fields or excluded apps
@@ -393,21 +461,18 @@ final class AutoCorrectionService {
                 bundleID: frontmostBundleID,
                 excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
             ) else {
-                overlayController.hide()
-                ghostTextController.hide()
+                dismissAutocompletion()
                 return
             }
         }
 
         guard wordBuffer.count >= settingsManager.autoCompletionMinPrefixLength else {
-            overlayController.hide()
-            ghostTextController.hide()
+            dismissAutocompletion()
             return
         }
 
         guard !NSApp.isActive else {
-            overlayController.hide()
-            ghostTextController.hide()
+            dismissAutocompletion()
             return
         }
 
@@ -422,11 +487,12 @@ final class AutoCorrectionService {
         )
 
         guard !candidates.isEmpty else {
-            overlayController.hide()
-            ghostTextController.hide()
+            dismissAutocompletion()
             return
         }
 
+        suggestionTarget = accessibilityService.captureReplacementTarget()
+        lastCaretContext = currentContext ?? accessibilityService.captureCaretContext()
         let caretRect = accessibilityService.caretScreenRect()
         let displayMode = settingsManager.autoCompletionDisplayMode
 
@@ -453,10 +519,10 @@ final class AutoCorrectionService {
             )
             overlayController.show(
                 candidates: candidates,
-                caretRect: caretRect,
+                caretRect: caretRect ?? accessibilityService.focusedFieldScreenRect(),
                 acceptKeyHint: hint,
                 onSelect: { [weak self] candidate in
-                    self?.acceptCandidate(candidate, appendSpace: false)
+                    self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
             )
         } else {
@@ -465,109 +531,110 @@ final class AutoCorrectionService {
     }
 
     /// Accept and insert the candidate completion.
-    func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool) {
+    /// If entirePhrase is false and candidate has multiple words, only the first word is inserted
+    /// and the remaining words stay in ghost text.
+    @discardableResult
+    func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool, entirePhrase: Bool = true) -> Bool {
+        guard !isProcessingCorrection, !wordBuffer.isEmpty,
+              let target = suggestionTarget, accessibilityService.isCurrentReplacementTarget(target) else {
+            dismissAutocompletion()
+            return false
+        }
+        
+        // Stale check via CaretContext: verify field hasn't changed and caret hasn't jumped backwards
+        if let lastCtx = lastCaretContext, let currentCtx = accessibilityService.captureCaretContext() {
+            guard currentCtx.fieldIdentifier == lastCtx.fieldIdentifier,
+                  currentCtx.selectedText.isEmpty,
+                  currentCtx.caretLocation >= lastCtx.caretLocation else {
+                dismissAutocompletion()
+                return false
+            }
+        }
+        
+        let words = candidate.word.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let isMultiWord = words.count > 1
+        
+        let insertionText: String
+        let remainingPhrase: String?
+        
+        if !entirePhrase && isMultiWord {
+            insertionText = words[0] + " "
+            remainingPhrase = words.dropFirst().joined(separator: " ")
+        } else {
+            insertionText = candidate.word + (appendSpace ? " " : "")
+            remainingPhrase = nil
+        }
+        
         let originalWord = wordBuffer
         let precedingWord = previousWord
+        let accessibility = accessibilityService
+        
+        // The prefix is already in the editor. Commit before consuming the accept
+        // key, so later typing cannot cancel an edit whose key was swallowed.
+        let replaced = replacementSession.performImmediately {
+            accessibility.replaceVerifiedSuffix(originalWord,
+                with: insertionText, target: target)
+        }
+        guard replaced else {
+            dismissAutocompletion()
+            return false
+        }
+        
         wordBuffer = ""
-        overlayController.hide()
-        ghostTextController.hide()
-
-        guard !originalWord.isEmpty else { return }
-
-        // Adaptive learning: record word usage and bigram transition
-        adaptiveStore.recordWordUsage(word: candidate.word, after: precedingWord)
-        previousWord = candidate.word.lowercased()
-
-        isProcessingCorrection = true
-
-        let deleteCount = originalWord.count
-        let replacementText = candidate.word + (appendSpace ? " " : "")
-
-        let pasteboard = NSPasteboard.general
-        let savedContents = savePasteboard()
-
-        pasteboard.clearContents()
-        pasteboard.setString(replacementText, forType: .string)
-
-        let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
-        let autoGeneratedType = NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType")
-        pasteboard.setString("", forType: transientType)
-        pasteboard.setString("", forType: autoGeneratedType)
-
-        let source = CGEventSource(stateID: .hidSystemState)
-        for _ in 0..<deleteCount {
-            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
-               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
-                downEvent.flags = []
-                upEvent.flags = []
-                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                downEvent.post(tap: .cgAnnotatedSessionEventTap)
-                upEvent.post(tap: .cgAnnotatedSessionEventTap)
-            }
+        let acceptedWord = (!entirePhrase && isMultiWord) ? words[0] : candidate.word
+        adaptiveStore.recordWordUsage(word: acceptedWord, after: precedingWord)
+        previousWord = acceptedWord.lowercased()
+        if candidate.isCrossLayout { KeyboardLayoutDetector.switchToLayout(candidate.targetLayoutID) }
+        playCorrectionFeedback()
+        
+        if let remaining = remainingPhrase, !remaining.isEmpty {
+            let remainingCandidate = AutocompletionCandidate(
+                word: remaining,
+                targetLayoutID: candidate.targetLayoutID,
+                isCrossLayout: false,
+                score: candidate.score
+            )
+            suggestionTarget = accessibilityService.captureReplacementTarget()
+            lastCaretContext = accessibilityService.captureCaretContext()
+            overlayController.hide()
+            let caretRect = accessibilityService.caretScreenRect()
+            ghostTextController.show(candidate: remainingCandidate, suffix: remaining, caretRect: caretRect)
+        } else {
+            dismissAutocompletion()
         }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
-            guard let self = self else { return }
-
-            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
-               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
-                downEvent.flags = .maskCommand
-                upEvent.flags = .maskCommand
-                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                downEvent.post(tap: .cgAnnotatedSessionEventTap)
-                upEvent.post(tap: .cgAnnotatedSessionEventTap)
-            }
-
-            if candidate.isCrossLayout {
-                KeyboardLayoutDetector.switchToLayout(candidate.targetLayoutID)
-            }
-
-            if self.settingsManager.playSounds {
-                NSSound(named: .init("Tink"))?.play()
-            }
-
-            self.settingsManager.incrementConversionCount()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                self?.restorePasteboard(savedContents)
-                self?.isProcessingCorrection = false
-            }
-        }
+        return true
     }
 
     // MARK: - Auto-Correction Logic
 
     /// Check the buffered word and correct it if it looks like wrong layout.
     private func triggerCheckAndCorrect(triggerChar: Character) {
-        let word = wordBuffer
+        let bufferedWord = wordBuffer
         wordBuffer = ""
-        if !word.isEmpty {
-            previousWord = word.lowercased()
-        }
+        guard !isProcessingCorrection, !NSApp.isActive else { return }
 
-        // Skip triggering a new correction if one is already in flight
-        guard !isProcessingCorrection else { return }
-
-        // Need at least 2 characters to make a meaningful correction
-        guard word.count >= 2 else { return }
-
-        // Never touch our own windows (Settings search etc.)
-        guard !NSApp.isActive else { return }
-
-        // Check AutoCorrectionGate: secure fields, non-text controls, and excluded apps
         let focus = accessibilityService.focusedFieldRole()
-        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        guard AutoCorrectionGate.allowsAutoCorrection(
+        let allowed = AutoCorrectionGate.allowsAutoCorrection(
             role: focus?.role,
             subrole: focus?.subrole,
-            bundleID: frontmostBundleID,
+            bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
             excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
-        ) else {
-            NSLog("[LangSwitcher] AutoCorrection: vetoed by AutoCorrectionGate (role=\(focus?.role ?? "nil"), subrole=\(focus?.subrole ?? "nil"), bundleID=\(frontmostBundleID ?? "nil"))")
+        )
+        // Conversion and spell checking log text. The gate must run before either
+        // the ambiguous-key classifier or dictionary validation can inspect it.
+        guard let token = CorrectionToken.analyze(bufferedWord, whenAllowed: allowed,
+            ambiguous: isAlternativeLetterKey, validConversion: { candidate in
+                guard let info = self.textConverter.convertSelectedTextWithInfo(candidate),
+                      let lang = self.settingsManager.enabledLayouts.first(where: { $0.id == info.targetLayoutID })?.languageCode
+                else { return false }
+                return self.spellCheckService.isValidWord(info.text, language: lang)
+            }) else {
+            previousWord = nil
             return
         }
+        let word = token.word
+        if !word.isEmpty { previousWord = word.lowercased() }
+        guard word.count >= 2 else { return }
 
         NSLog("[LangSwitcher] AutoCorrection: checking word '\(word)' (trigger='\(triggerChar)')")
 
@@ -607,82 +674,54 @@ final class AutoCorrectionService {
             }
         }
 
-        // Step 4: Perform the replacement
-        NSLog("[LangSwitcher] AutoCorrection: replacing '\(word)' with '\(convertedWord)'")
-        previousWord = convertedWord.lowercased()
-        performReplacement(originalWord: word, correctedWord: convertedWord, triggerChar: triggerChar)
-
-        // Step 5: Switch layout if needed
-        if settingsManager.autoCorrectionSwitchLayout {
-            KeyboardLayoutDetector.switchToLayout(result.targetLayoutID)
+        performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                  replacement: token.prefix + convertedWord + token.punctuation + String(triggerChar)) { [weak self] in
+            guard let self else { return }
+            self.previousWord = convertedWord.lowercased()
+            if self.settingsManager.autoCorrectionSwitchLayout {
+                KeyboardLayoutDetector.switchToLayout(result.targetLayoutID)
+            }
+            self.playCorrectionFeedback()
         }
+    }
 
-        // Step 6: Play feedback
-        if settingsManager.playSounds {
-            NSSound(named: .init("Tink"))?.play()
-        }
-
-        // Step 7: Increment conversion counter
+    private func playCorrectionFeedback() {
+        if settingsManager.playSounds { NSSound(named: .init("Tink"))?.play() }
         settingsManager.incrementConversionCount()
     }
 
-    /// Replace the last typed word with the corrected version.
-    /// Strategy: send marked backspaces to delete word + trigger char, then paste marked corrected text + trigger.
-    private func performReplacement(originalWord: String, correctedWord: String, triggerChar: Character) {
-        isProcessingCorrection = true
-
-        // Number of characters to delete: the word + the trigger character that was already typed
-        let deleteCount = originalWord.count + 1
-
-        // Set up the corrected text on clipboard
-        let pasteboard = NSPasteboard.general
-        let savedContents = savePasteboard()
-
-        let replacementText = correctedWord + String(triggerChar)
-        pasteboard.clearContents()
-        pasteboard.setString(replacementText, forType: .string)
-
-        // Mark pasteboard items as transient/auto-generated so clipboard managers (Raycast, Alfred, Maccy) ignore them
-        let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
-        let autoGeneratedType = NSPasteboard.PasteboardType("org.nspasteboard.AutoGeneratedType")
-        pasteboard.setString("", forType: transientType)
-        pasteboard.setString("", forType: autoGeneratedType)
-
-        // Send backspaces with synthetic event marker
-        let source = CGEventSource(stateID: .hidSystemState)
-        for _ in 0..<deleteCount {
-            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
-               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
-                downEvent.flags = []
-                upEvent.flags = []
-                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                downEvent.post(tap: .cgAnnotatedSessionEventTap)
-                upEvent.post(tap: .cgAnnotatedSessionEventTap)
+    @discardableResult
+    private func performCheckedReplacement(expected: String, replacement: String, target existingTarget: AccessibilityService.ReplacementTarget? = nil, onSuccess: @escaping () -> Void) -> Bool {
+        guard let target = existingTarget ?? accessibilityService.captureReplacementTarget(),
+              let operation = replacementSession.begin() else { return false }
+        completionRefresh.cancel()
+        let revision = physicalInputRevision
+        let layout = KeyboardLayoutDetector.getCurrentLayout()?.id
+        // The delimiter may not have reached the editor yet. During this delay
+        // all physical input passes through, and any further key cancels the edit.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
+            guard let self else { return }
+            guard self.replacementSession.isCurrent(operation) else { return }
+            guard revision == self.physicalInputRevision,
+                  layout == KeyboardLayoutDetector.getCurrentLayout()?.id else {
+                self.replacementSession.finish(operation)
+                return
+            }
+            if self.accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target) {
+                self.replacementSession.finish(operation)
+                onSuccess()
+            } else {
+                // Some web editors expose a writable AXSelectedText but ignore
+                // its setter. Paste only into a freshly verified selection.
+                self.accessibilityService.pasteVerifiedSuffix(expected, with: replacement, target: target) { [weak self] applied in
+                    guard let self, self.replacementSession.isCurrent(operation) else { return }
+                    self.replacementSession.finish(operation)
+                    if applied, revision == self.physicalInputRevision,
+                       layout == KeyboardLayoutDetector.getCurrentLayout()?.id { onSuccess() }
+                }
             }
         }
-
-        // Small non-blocking delay for backspaces to process in target app, then paste
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
-            guard let self = self else { return }
-
-            // Paste: Cmd+V with synthetic event marker
-            if let downEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
-               let upEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
-                downEvent.flags = .maskCommand
-                upEvent.flags = .maskCommand
-                downEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                upEvent.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                downEvent.post(tap: .cgAnnotatedSessionEventTap)
-                upEvent.post(tap: .cgAnnotatedSessionEventTap)
-            }
-
-            // Restore clipboard and reset state after target app has read from pasteboard
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                self?.restorePasteboard(savedContents)
-                self?.isProcessingCorrection = false
-            }
-        }
+        return true
     }
 
     // MARK: - Character Extraction
@@ -698,29 +737,7 @@ final class AutoCorrectionService {
         return String(utf16CodeUnits: buffer, count: length)
     }
 
-    // MARK: - Pasteboard Helpers
 
-    private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {
-        let pasteboard = NSPasteboard.general
-        return pasteboard.pasteboardItems?.map { item in
-            item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            }
-        } ?? []
-    }
-
-    private func restorePasteboard(_ items: [[(NSPasteboard.PasteboardType, Data)]]) {
-        guard !items.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        for itemData in items {
-            let item = NSPasteboardItem()
-            for (type, data) in itemData {
-                item.setData(data, forType: type)
-            }
-            pasteboard.writeObjects([item])
-        }
-    }
 }
 
 // MARK: - CGEvent Tap Callback
@@ -801,5 +818,126 @@ enum ServiceRecovery {
         guard trusted else { return .waitForPermission }
         guard valid else { return .start }
         return running ? .none : .enable
+    }
+}
+
+
+/// Ambiguous physical keys (e.g. semicolon → ж) belong inside a word. At the
+/// end, keep punctuation literal unless the complete converted word is valid.
+enum CorrectionToken {
+    static func isAlternativeLetter(_ char: Character, source: String, targets: [String]) -> Bool {
+        guard !char.isWhitespace, !char.isLetter, !char.isNumber else { return false }
+        return targets.contains { target in
+            guard target != source,
+                  let mapped = LayoutMapper.convert(text: String(char), from: source, to: target) else { return false }
+            return mapped.count == 1 && mapped.first?.isLetter == true
+        }
+    }
+
+    struct Parts {
+        let prefix: String
+        let word: String
+        let punctuation: String
+    }
+
+    /// Keep text-processing closures lazy: protected/excluded fields must never
+    /// reach converters or spell checkers that can log the supplied text.
+    static func analyze(_ buffer: String, whenAllowed allowed: Bool,
+                        ambiguous: (Character) -> Bool,
+                        validConversion: (String) -> Bool) -> Parts? {
+        guard allowed else { return nil }
+        return split(buffer, ambiguous: ambiguous, validConversion: validConversion)
+    }
+
+    static func split(_ buffer: String, ambiguous: (Character) -> Bool,
+                      validConversion: (String) -> Bool) -> Parts {
+        let isQuote: (Character) -> Bool = { $0 == "\"" || $0 == "'" }
+        let hasLeadingQuote = buffer.first.map(isQuote) ?? false
+        let hasAmbiguousEnd = buffer.last.map(ambiguous) ?? false
+        guard hasLeadingQuote || hasAmbiguousEnd, !validConversion(buffer) else {
+            return Parts(prefix: "", word: buffer, punctuation: "")
+        }
+        // Try trimming sentence punctuation while retaining the initial key.
+        // "njn. must become Этот., not a literal quote followed by тот.
+        var unquotedWord = buffer
+        var sentencePunctuation = ""
+        while let last = unquotedWord.last, ambiguous(last) {
+            sentencePunctuation.insert(unquotedWord.removeLast(), at: sentencePunctuation.startIndex)
+            if !unquotedWord.isEmpty, validConversion(unquotedWord) {
+                return Parts(prefix: "", word: unquotedWord, punctuation: sentencePunctuation)
+            }
+        }
+        var core = buffer
+        var prefix = ""
+        // A recognized conversion such as "nj → Это was retained above.
+        // Otherwise preserve opening quotation marks literally.
+        while let first = core.first, isQuote(first) {
+            prefix.append(core.removeFirst())
+        }
+        guard !core.isEmpty else { return Parts(prefix: "", word: buffer, punctuation: "") }
+        if !prefix.isEmpty, validConversion(core) {
+            return Parts(prefix: prefix, word: core, punctuation: "")
+        }
+        var punctuation = ""
+        while let last = core.last, ambiguous(last) {
+            punctuation.insert(core.removeLast(), at: punctuation.startIndex)
+            // Keep the longest recognized word: yj;. is нож. rather than но;.
+            if !core.isEmpty, validConversion(core) {
+                return Parts(prefix: prefix, word: core, punctuation: punctuation)
+            }
+        }
+        // Unknown words still retain literal trailing punctuation, including
+        // when dictionary validation of corrections is disabled.
+        return core.isEmpty ? Parts(prefix: "", word: buffer, punctuation: "")
+            : Parts(prefix: prefix, word: core, punctuation: punctuation)
+    }
+}
+
+
+/// Serializes edits, including stop/restart while a delayed edit is pending.
+struct ReplacementSession {
+    private var generation = 0
+    private(set) var isBusy = false
+    mutating func begin() -> Int? {
+        guard !isBusy else { return nil }
+        generation &+= 1
+        isBusy = true
+        return generation
+    }
+    /// Acceptance has no pending delimiter to wait for. Only a committed edit
+    /// may consume the key; failures leave it available to the editor.
+    mutating func performImmediately(_ edit: () -> Bool) -> Bool {
+        guard let operation = begin() else { return false }
+        defer { finish(operation) }
+        return edit()
+    }
+
+    func isCurrent(_ operation: Int) -> Bool { isBusy && operation == generation }
+    mutating func finish(_ operation: Int) {
+        if isCurrent(operation) { isBusy = false }
+    }
+    mutating func cancel() {
+        generation &+= 1
+        isBusy = false
+    }
+}
+
+
+/// Coalesces caret refreshes and makes dismissal cancel pending work.
+@MainActor
+final class AutocompletionRefresh {
+    private var revision = 0
+
+    func cancel() {
+        revision &+= 1
+    }
+
+    func schedule(_ refresh: @escaping @MainActor () -> Void) {
+        cancel()
+        let scheduledRevision = revision
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
+            guard let self, self.revision == scheduledRevision else { return }
+            refresh()
+        }
     }
 }

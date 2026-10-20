@@ -73,4 +73,58 @@ final class AutoCorrectionGateTests: XCTestCase {
         XCTAssertFalse(AutoCorrectionGate.isSecureField(role: "AXTextField", subrole: nil))
         XCTAssertFalse(AutoCorrectionGate.isSecureField(role: nil, subrole: nil))
     }
+    func testNestedEditorRequiresExplicitFocus() {
+        let result = AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 0 ? "AXGroup" : "AXTextArea", nil, node == 2)
+        }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1, 2] : [] })
+        XCTAssertEqual(result, 2)
+        XCTAssertNil(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 0 ? "AXGroup" : "AXTextArea", nil, false)
+        }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1] : [] }))
+    }
+
+    func testNestedSecureOrAmbiguousEditorIsRejected() {
+        XCTAssertNil(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 0 ? "AXGroup" : "AXTextArea", node == 2 ? "AXSecureTextField" : nil, node != 0)
+        }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1, 2] : [] }))
+        XCTAssertNil(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 0 ? "AXGroup" : "AXTextArea", nil, node != 0)
+        }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1, 2] : [] }))
+    }
+
+    func testFocusLinkCyclesAndTraversalBudget() {
+        XCTAssertEqual(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 1 ? "AXTextArea" : "AXGroup", nil, false)
+        }, focusedChild: { $0 == 0 ? 1 : 0 }, children: { _ in [] }), 1)
+        XCTAssertNil(AccessibilityService.resolveFocusedTextNode(root: 0,
+            attributes: { _ in ("AXGroup", nil, false) }, focusedChild: { _ in nil },
+            children: { [$0 + 1] }, limit: 5))
+    }
+
+    func testExplicitFocusLinkAvoidsScanningPublicationContent() {
+        XCTAssertEqual(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 1 ? "AXTextArea" : "AXGroup", nil, false)
+        }, focusedChild: { $0 == 0 ? 1 : nil }, children: { _ in Array(2..<1000) }, limit: 3), 1)
+    }
+
+}
+
+
+extension AutoCorrectionGateTests {
+    @MainActor
+    func testRemovingDefaultExclusionsAllowsTerminalEditors() {
+        let settings = SettingsManager.shared
+        let saved = settings.excludedAppBundleIDs
+        defer { settings.excludedAppBundleIDs = saved }
+        for bundleID in AutoCorrectionGate.defaultExcludedBundleIDs {
+            settings.addExcludedApp(bundleID: bundleID)
+            XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(role: "AXTextArea", subrole: nil,
+                bundleID: bundleID, excludedBundleIDs: Set(settings.excludedAppBundleIDs)))
+            settings.removeExcludedApp(bundleID: bundleID)
+            XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(role: "AXTextArea", subrole: nil,
+                bundleID: bundleID, excludedBundleIDs: Set(settings.excludedAppBundleIDs)))
+            XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(role: "AXTextField", subrole: "AXSecureTextField",
+                bundleID: bundleID, excludedBundleIDs: Set(settings.excludedAppBundleIDs)))
+        }
+    }
 }

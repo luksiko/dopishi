@@ -65,3 +65,39 @@ enum AutocompletionAcceptKey: String, CaseIterable, Identifiable, Codable {
         }
     }
 }
+
+// MARK: - Autocompletion Accept All Key
+
+enum AutocompletionAcceptAllKey: String, CaseIterable, Identifiable, Codable {
+    case shiftTab = "shiftTab"
+    case cmdReturn = "cmdReturn"
+    case optionTab = "optionTab"
+    case custom = "custom"
+    
+    var id: String { rawValue }
+    
+    var defaultKeyCode: UInt16 {
+        switch self {
+        case .shiftTab, .optionTab, .custom: return 0x30 // Tab
+        case .cmdReturn: return 0x24                     // Return
+        }
+    }
+    
+    @MainActor
+    var displayName: String {
+        LocalizationManager.shared.t("autocompletion.acceptAllKey.\(rawValue)")
+    }
+    
+    @MainActor
+    func shortcutHint(customKeyCode: UInt16 = 0x30, customModifiers: UInt = 0) -> String {
+        switch self {
+        case .shiftTab: return "⇧⇥"
+        case .cmdReturn: return "⌘↩"
+        case .optionTab: return "⌥⇥"
+        case .custom:
+            let mods = HotkeyManager.modifierFlagsToString(NSEvent.ModifierFlags(rawValue: customModifiers).intersection(.deviceIndependentFlagsMask))
+            let key = HotkeyManager.keyCodeToString(customKeyCode)
+            return "\(mods)\(key)"
+        }
+    }
+}

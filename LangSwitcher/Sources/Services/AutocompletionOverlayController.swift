@@ -42,7 +42,7 @@ final class AutocompletionOverlayController: NSObject {
         acceptKeyHint: String,
         onSelect: @escaping (AutocompletionCandidate) -> Void
     ) {
-        guard !candidates.isEmpty else {
+        guard !candidates.isEmpty, caretRect != nil else {
             hide()
             return
         }
@@ -108,6 +108,9 @@ final class AutocompletionOverlayController: NSObject {
             hosting.rootView = AnyView(view)
         } else {
             let hosting = NSHostingView(rootView: AnyView(view))
+            // Preserve fittingSize measurement without automatic min/max window
+            // constraints, which otherwise feed back into manual panel resizing.
+            hosting.sizingOptions = [.intrinsicContentSize]
             panel?.contentView = hosting
             hostingView = hosting
         }
@@ -115,9 +118,11 @@ final class AutocompletionOverlayController: NSObject {
         // Resize panel to fit content
         if let p = panel, let hosting = hostingView {
             let fittingSize = hosting.fittingSize
-            var frame = p.frame
-            frame.size = fittingSize
-            p.setFrame(frame, display: true)
+            if p.frame.size != fittingSize {
+                var frame = p.frame
+                frame.size = fittingSize
+                p.setFrame(frame, display: true)
+            }
         }
     }
     

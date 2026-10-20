@@ -49,6 +49,10 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
+# LLM Models
+models/
+*.gguf
+
 # IDEs
 .idea/
 *.profraw

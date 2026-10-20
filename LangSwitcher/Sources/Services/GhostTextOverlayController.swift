@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import SwiftUI
 
 // MARK: - Ghost Text Overlay Controller
 // Manages the floating transparent panel that renders inline ghost text at the caret.
@@ -9,7 +8,7 @@ import SwiftUI
 final class GhostTextOverlayController: NSObject {
     
     private var panel: NSPanel?
-    private var hostingView: NSHostingView<AnyView>?
+    private var textView: GhostTextView?
     private(set) var currentSuffix: String = ""
     private(set) var currentCandidate: AutocompletionCandidate?
     
@@ -31,20 +30,15 @@ final class GhostTextOverlayController: NSObject {
         self.currentSuffix = suffix
         let p = getOrCreatePanel()
         
-        let view = GhostTextPreviewView(text: suffix)
-        if let hosting = hostingView {
-            hosting.rootView = AnyView(view)
-        } else {
-            let hosting = NSHostingView(rootView: AnyView(view))
-            p.contentView = hosting
-            hostingView = hosting
+        if textView == nil {
+            let v = GhostTextView()
+            p.contentView = v
+            textView = v
         }
         
-        // Resize panel
-        let fittingSize = hostingView?.fittingSize ?? CGSize(width: 80, height: 20)
-        var frame = p.frame
-        frame.size = fittingSize
-        p.setFrame(frame, display: true)
+        guard let tv = textView else { return }
+        tv.text = suffix
+        let fittingSize = tv.idealSize()
         
         // Position directly at the right edge of caret
         var origin = CGPoint(x: caret.maxX + 1, y: caret.minY)
@@ -55,17 +49,18 @@ final class GhostTextOverlayController: NSObject {
         } ?? NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
         
         let vf = screen.visibleFrame
-        if origin.x + frame.width > vf.maxX {
-            origin.x = vf.maxX - frame.width - 2
+        if origin.x + fittingSize.width > vf.maxX {
+            origin.x = vf.maxX - fittingSize.width - 2
         }
         if origin.y < vf.minY {
             origin.y = vf.minY + 2
         }
-        if origin.y + frame.height > vf.maxY {
-            origin.y = vf.maxY - frame.height - 2
+        if origin.y + fittingSize.height > vf.maxY {
+            origin.y = vf.maxY - fittingSize.height - 2
         }
         
-        p.setFrameOrigin(origin)
+        let newFrame = NSRect(origin: origin, size: fittingSize)
+        p.setFrame(newFrame, display: true)
         p.orderFrontRegardless()
     }
     
@@ -95,5 +90,48 @@ final class GhostTextOverlayController: NSObject {
         
         self.panel = p
         return p
+    }
+}
+
+// MARK: - Native AppKit Ghost Text View
+// Ultra-lightweight native view: 0 SwiftUI constraints, 0 recursion, zero overhead.
+private final class GhostTextView: NSView {
+    var text: String = "" {
+        didSet {
+            needsDisplay = true
+        }
+    }
+    
+    private let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard !text.isEmpty else { return }
+        
+        let bgPath = NSBezierPath(roundedRect: bounds, xRadius: 3, yRadius: 3)
+        NSColor.labelColor.withAlphaComponent(0.04).setFill()
+        bgPath.fill()
+        
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.65)
+        ]
+        
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let textRect = NSRect(
+            x: 4,
+            y: (bounds.height - textSize.height) / 2,
+            width: bounds.width - 8,
+            height: textSize.height
+        )
+        (text as NSString).draw(in: textRect, withAttributes: attrs)
+    }
+    
+    func idealSize() -> CGSize {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font
+        ]
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        return CGSize(width: ceil(textSize.width) + 8, height: max(18, ceil(textSize.height) + 2))
     }
 }

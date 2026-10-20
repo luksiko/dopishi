@@ -203,6 +203,19 @@ struct GeneralSettingsTab: View {
                             modifiers: $settingsManager.autoCompletionCustomModifiers
                         )
                     }
+
+                    Picker(l10n.t("autocompletion.acceptAllKey"), selection: $settingsManager.autoCompletionAcceptAllKey) {
+                        ForEach(AutocompletionAcceptAllKey.allCases) { key in
+                            Text(key.displayName).tag(key)
+                        }
+                    }
+                    
+                    if settingsManager.autoCompletionAcceptAllKey == .custom {
+                        AutocompletionKeyRecorderView(
+                            keyCode: $settingsManager.autoCompletionCustomAcceptAllKeyCode,
+                            modifiers: $settingsManager.autoCompletionCustomAcceptAllModifiers
+                        )
+                    }
                     
                     Toggle(l10n.t("autocompletion.useNumberShortcuts"), isOn: $settingsManager.autoCompletionUseNumberShortcuts)
                     

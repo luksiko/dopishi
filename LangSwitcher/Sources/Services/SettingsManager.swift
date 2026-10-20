@@ -205,6 +205,30 @@ final class SettingsManager: ObservableObject {
         }
     }
 
+    /// Key for accepting the entire completion phrase. Default: .shiftTab.
+    @Published var autoCompletionAcceptAllKey: AutocompletionAcceptAllKey {
+        didSet {
+            defaults.set(autoCompletionAcceptAllKey.rawValue, forKey: Keys.autoCompletionAcceptAllKey)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Custom key code when acceptAllKey is .custom. Default: 0x30 (Tab).
+    @Published var autoCompletionCustomAcceptAllKeyCode: UInt16 {
+        didSet {
+            defaults.set(Int(autoCompletionCustomAcceptAllKeyCode), forKey: Keys.autoCompletionCustomAcceptAllKeyCode)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
+    /// Custom modifiers when acceptAllKey is .custom. Default: Shift.
+    @Published var autoCompletionCustomAcceptAllModifiers: UInt {
+        didSet {
+            defaults.set(autoCompletionCustomAcceptAllModifiers, forKey: Keys.autoCompletionCustomAcceptAllModifiers)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
     /// Max autocompletion suggestions to show (1...6). Default: 4.
     @Published var autoCompletionMaxSuggestions: Int {
         didSet { defaults.set(autoCompletionMaxSuggestions, forKey: Keys.autoCompletionMaxSuggestions) }
@@ -293,12 +317,13 @@ final class SettingsManager: ObservableObject {
         return "\(mods)\(key)"
     }
     
-    /// Determines whether the given event matches the configured autocompletion accept key
+    /// Determines whether the given event matches the configured autocompletion accept key (next word)
     func isAutocompletionAcceptKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
         let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
         switch autoCompletionAcceptKey {
         case .tab:
-            return keyCode == 0x30 && nonModFlags.isEmpty
+            let hasShift = flags.contains(.maskShift)
+            return keyCode == 0x30 && nonModFlags.isEmpty && !hasShift
         case .space:
             return keyCode == 0x31 && nonModFlags.isEmpty
         case .enter:
@@ -310,6 +335,31 @@ final class SettingsManager: ObservableObject {
             let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
             let actualMods = UInt(flags.rawValue & relevantMask)
             let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: autoCompletionCustomModifiers).intersection(.deviceIndependentFlagsMask)
+            let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
+            return actualNSEventMods == expectedNSEventMods
+        }
+    }
+
+    /// Determines whether the given event matches the configured accept all key (entire phrase)
+    func isAutocompletionAcceptAllKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
+        switch autoCompletionAcceptAllKey {
+        case .shiftTab:
+            let hasShift = flags.contains(.maskShift)
+            return keyCode == 0x30 && hasShift && nonModFlags.isEmpty
+        case .cmdReturn:
+            let hasCmd = flags.contains(.maskCommand)
+            let otherMods = flags.intersection([.maskAlternate, .maskControl, .maskShift])
+            return keyCode == 0x24 && hasCmd && otherMods.isEmpty
+        case .optionTab:
+            let hasOpt = flags.contains(.maskAlternate)
+            let otherMods = flags.intersection([.maskCommand, .maskControl, .maskShift])
+            return keyCode == 0x30 && hasOpt && otherMods.isEmpty
+        case .custom:
+            if keyCode != autoCompletionCustomAcceptAllKeyCode { return false }
+            let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
+            let actualMods = UInt(flags.rawValue & relevantMask)
+            let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: autoCompletionCustomAcceptAllModifiers).intersection(.deviceIndependentFlagsMask)
             let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
             return actualNSEventMods == expectedNSEventMods
         }
@@ -354,6 +404,9 @@ final class SettingsManager: ObservableObject {
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
         static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
         static let autoCompletionCustomModifiers = "autoCompletionCustomModifiers"
+        static let autoCompletionAcceptAllKey = "autoCompletionAcceptAllKey"
+        static let autoCompletionCustomAcceptAllKeyCode = "autoCompletionCustomAcceptAllKeyCode"
+        static let autoCompletionCustomAcceptAllModifiers = "autoCompletionCustomAcceptAllModifiers"
         static let autoCompletionMaxSuggestions = "autoCompletionMaxSuggestions"
         static let autoCompletionMinPrefixLength = "autoCompletionMinPrefixLength"
         static let autoCompletionUseNumberShortcuts = "autoCompletionUseNumberShortcuts"
@@ -406,6 +459,11 @@ final class SettingsManager: ObservableObject {
         let savedCustomCode = defaults.object(forKey: Keys.autoCompletionCustomKeyCode) as? Int
         self.autoCompletionCustomKeyCode = UInt16(savedCustomCode ?? 0x30)
         self.autoCompletionCustomModifiers = defaults.object(forKey: Keys.autoCompletionCustomModifiers) as? UInt ?? 0
+        let savedAcceptAllKey = defaults.string(forKey: Keys.autoCompletionAcceptAllKey)
+        self.autoCompletionAcceptAllKey = savedAcceptAllKey.flatMap { AutocompletionAcceptAllKey(rawValue: $0) } ?? .shiftTab
+        let savedCustomAllCode = defaults.object(forKey: Keys.autoCompletionCustomAcceptAllKeyCode) as? Int
+        self.autoCompletionCustomAcceptAllKeyCode = UInt16(savedCustomAllCode ?? 0x30)
+        self.autoCompletionCustomAcceptAllModifiers = defaults.object(forKey: Keys.autoCompletionCustomAcceptAllModifiers) as? UInt ?? NSEvent.ModifierFlags.shift.rawValue
         self.autoCompletionMaxSuggestions = defaults.object(forKey: Keys.autoCompletionMaxSuggestions) as? Int ?? 4
         self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
         self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true

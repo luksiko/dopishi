@@ -71,3 +71,12 @@ LangSwitcher/Sources/Localization/
 ├── Strings_en.swift            # English strings (~113 keys)
 └── Strings_ru.swift            # Russian translations
 ```
+
+
+## Local Installation and Signing
+
+- Never update `/Applications/LangSwitcher.app` by replacing only `Contents/MacOS/LangSwitcher` or copying a bare linker-signed executable. This repeatedly broke Accessibility and both keyboard event taps during local development.
+- Build and stage the complete app bundle, then run `bash scripts/sign-app.sh /path/to/staged/LangSwitcher.app` before replacing the installed bundle. Stop the running app before replacement; preserve a recoverable backup. Install to `/Applications/LangSwitcher.app`, then relaunch that exact path.
+- The signing script must pass. `codesign --verify` alone is insufficient: a bare linker signature can verify while reporting `Info.plist=not bound`, `Sealed Resources=none`, or the wrong signing identifier (`LangSwitcher` instead of `com.langswitcher.app`).
+- Prefer the same Developer ID identity across releases (`LANGSWITCHER_SIGNING_IDENTITY`). Ad-hoc signatures do not guarantee permission persistence across rebuilds. If trust is lost, restore the existing app's Accessibility entry through System Settings and verify actual service startup; never edit the TCC database directly.
+- Do not report working auto-correction from the Accessibility toggle alone. Verify the active process and enabled keyboard taps; a real typing test is required to establish end-to-end correction.
