@@ -87,13 +87,7 @@ git clone https://github.com/reg2005/langSwitcher.git
 cd langSwitcher
 
 # Run tests
-xcodebuild test \
-  -project LangSwitcher.xcodeproj \
-  -scheme LangSwitcher \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO
+bash scripts/test.sh
 
 # Build (universal binary)
 xcodebuild -project LangSwitcher.xcodeproj \
@@ -109,6 +103,11 @@ xcodebuild -project LangSwitcher.xcodeproj \
 
 # The app is at build/Build/Products/Release/LangSwitcher.app
 ```
+
+The test script builds an ad-hoc-signed host with the separate bundle identifier
+`com.langswitcher.testhost`. This lets tests run while the installed LangSwitcher
+is open and avoids LaunchServices launch errors from unsigned test bundles.
+Extra `xcodebuild` options can be passed after `bash scripts/test.sh`.
 
 Or open `LangSwitcher.xcodeproj` in Xcode and press `⌘R`.
 
@@ -401,13 +400,7 @@ git clone https://github.com/reg2005/langSwitcher.git
 cd langSwitcher
 
 # Run tests (required after every code change)
-xcodebuild test \
-  -project LangSwitcher.xcodeproj \
-  -scheme LangSwitcher \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO
+bash scripts/test.sh
 
 # Open in Xcode
 open LangSwitcher.xcodeproj

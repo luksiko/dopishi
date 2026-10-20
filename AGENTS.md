@@ -7,14 +7,15 @@
 ### Running Tests Locally
 
 ```bash
-xcodebuild test \
-  -project LangSwitcher.xcodeproj \
-  -scheme LangSwitcher \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO
+bash scripts/test.sh
 ```
+
+The script uses a complete ad-hoc signature and the separate
+`com.langswitcher.testhost` identifier, so the installed app can remain running.
+Do not disable code signing for the test host: LaunchServices can reject the
+resulting bundle before XCTest starts. The production app has
+`LSMultipleInstancesProhibited=true`, so using its identifier for tests also
+conflicts with an already running installed copy.
 
 ### Rules
 

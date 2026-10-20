@@ -36,6 +36,7 @@ jobs:
             - '**/*.entitlements'
             - '**/*.xcconfig'
             - '.github/workflows/build.yml'
+            - 'scripts/test.sh'
 
   test:
     name: Run Tests
@@ -51,13 +52,7 @@ jobs:
 
     - name: Run Tests
       run: |
-        xcodebuild test \
-          -project LangSwitcher.xcodeproj \
-          -scheme LangSwitcher \
-          -destination 'platform=macOS' \
-          CODE_SIGN_IDENTITY="-" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+        bash scripts/test.sh
 
   build-arm64:
     name: Build (Apple Silicon)
