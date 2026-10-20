@@ -739,3 +739,44 @@ final class CaretContextUTF16Tests: XCTestCase {
         XCTAssertEqual(start.textAfterCaret, "")
     }
 }
+
+
+extension VerifiedPasteAndContinuationTests {
+    func testDelayedSelectionDoesNotPasteUntilAcknowledged() {
+        var acknowledged = false
+        var receipts: [Bool] = []
+        let selection = PasteConfirmation(applied: { acknowledged }, finish: { receipts.append($0) })
+        selection.check()
+        selection.check()
+        XCTAssertTrue(receipts.isEmpty)
+        acknowledged = true
+        selection.check()
+        selection.check(final: true)
+        XCTAssertEqual(receipts, [true])
+    }
+
+    func testPhysicalInputCancelsSelectionEvenIfItHasBecomeReady() {
+        var ready = false
+        var receipts: [Bool] = []
+        let selection = PasteConfirmation(applied: { ready }, finish: { receipts.append($0) })
+        selection.check()
+        ready = true
+        selection.cancel()
+        selection.check(final: true)
+        XCTAssertEqual(receipts, [false])
+    }
+}
+
+extension AutoCorrectionTests {
+    func testApplicationVocabularySurvivesSystemDictionaryOmissions() throws {
+        for (input, expected) in [("hfcrkflrb", "раскладки"), ("rkfdbfnehs", "клавиатуры")] {
+            let result = try XCTUnwrap(textConverter.convertSelectedTextWithInfo(input))
+            XCTAssertEqual(result.text, expected)
+            XCTAssertTrue(spellCheckService.isValidWord(result.text, language: "ru"))
+            XCTAssertFalse(spellCheckService.isValidWord(input, language: "en"))
+        }
+        XCTAssertTrue(spellCheckService.isValidWord("РАСКЛАДКИ", language: "ru-RU"))
+        XCTAssertFalse(spellCheckService.isValidWord("раскладкыыы", language: "ru"))
+        XCTAssertFalse(spellCheckService.isValidWord("раскладки", language: "en"))
+    }
+}

@@ -182,6 +182,7 @@ final class AutoCorrectionService {
         phraseContinuationAnchor = nil
         physicalInputRevision &+= 1
         replacementSession.cancel()
+        accessibilityService.cancelPendingReplacement()
         overlayController.hide()
         ghostTextController.hide()
         if let tap = eventTap {
@@ -729,7 +730,8 @@ final class AutoCorrectionService {
                 self.replacementSession.finish(operation)
                 return
             }
-            if self.accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target) {
+            if self.accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target,
+                                                              preferPasteInWebEditors: true) {
                 self.replacementSession.finish(operation)
                 onSuccess(true)
             } else {

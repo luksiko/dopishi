@@ -24,6 +24,15 @@ final class SpellCheckService {
         "es": "es",
     ]
 
+    // NSSpellChecker omits some ordinary application terminology and its
+    // inflections. Keep the fallback finite: an arbitrary Cyrillic string is
+    // never sufficient evidence for automatic replacement.
+    private static let russianApplicationWords: Set<String> = Set("""
+        раскладка раскладки раскладке раскладку раскладкой раскладок раскладкам раскладками раскладках
+        автозамена автозамены автозамене автозамену автозаменой
+        автодополнение автодополнения автодополнению автодополнением автодополнении
+        """.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+
     private init() {}
 
     /// Normalize language codes (e.g., "en-US", "en_GB", "ru-RU") to base language codes
@@ -82,6 +91,7 @@ final class SpellCheckService {
 
         // If range.location == NSNotFound, no misspelling was found → word is valid
         let valid = range.location == NSNotFound
+            || (lang == "ru" && Self.russianApplicationWords.contains(trimmed.lowercased()))
         NSLog("[LangSwitcher] SpellCheckService.isValidWord('\(trimmed)', lang='\(lang)') = \(valid)")
         return valid
     }
