@@ -54,8 +54,8 @@ final class SingleKeyDetector {
         // Target modifier key changed
         if keyCode == targetKeyCode {
             let isDown: Bool
-            if let mask = targetKey.deviceMask {
-                isDown = (UInt32(flagsRaw) & mask) != 0
+            if let mask = targetKey.deviceMask, (UInt32(flagsRaw) & mask) != 0 {
+                isDown = true
             } else {
                 isDown = isModifierDownFallback(flagsRaw: flagsRaw)
             }

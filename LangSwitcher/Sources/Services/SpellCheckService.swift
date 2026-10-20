@@ -113,7 +113,7 @@ final class SpellCheckService {
                         inSpellDocumentWithTag: 0,
                         wordCount: nil
                     )
-                    if remRange.location == NSNotFound || Self.russianApplicationWords.contains(remainder) {
+                    if remRange.location == NSNotFound || (lang == "ru" && Self.russianApplicationWords.contains(remainder)) {
                         return true
                     }
                 }

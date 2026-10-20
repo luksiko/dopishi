@@ -678,6 +678,7 @@ final class AccessibilityService {
         guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &original) else {
             completion(false); return
         }
+        let fallbackCaret = original.length == 0 ? original : CFRange(location: original.location + original.length, length: 0)
 
         let plan: NSRange
         if original.length == 0 {
@@ -731,7 +732,7 @@ final class AccessibilityService {
             pendingSelection = nil
             guard ready else {
                 if isCurrentReplacementTarget(target) {
-                    restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+                    restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
                 }
                 completion(false)
                 return
@@ -741,7 +742,7 @@ final class AccessibilityService {
             pasteboard.clearContents()
             guard pasteboard.setString(replacement, forType: .string) else {
                 restorePasteboard(saved)
-                restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+                restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
                 completion(false); return
             }
             pasteboard.setString("", forType: .init("org.nspasteboard.TransientType"))
@@ -762,8 +763,11 @@ final class AccessibilityService {
                 for event in [down, up] {
                     event.flags = .maskCommand
                     event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                    event.postToPid(processID)
-                    event.post(tap: .cgAnnotatedSessionEventTap)
+                    if processID > 0 {
+                        event.postToPid(processID)
+                    } else {
+                        event.post(tap: .cgAnnotatedSessionEventTap)
+                    }
                 }
             })
             guard sent else {
@@ -771,7 +775,7 @@ final class AccessibilityService {
                     if saved.isEmpty { pasteboard.clearContents() } else { restorePasteboard(saved) }
                 }
                 if isCurrentReplacementTarget(target) {
-                    restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+                    restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
                 }
                 completion(false)
                 return
@@ -787,7 +791,7 @@ final class AccessibilityService {
                 var observed: CFTypeRef?
                 AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed)
                 if !applied, observed as? String == text, self.isCurrentReplacementTarget(target) {
-                    self.restoreSelectionIfUnchanged(element, selectedRange: range, original: original)
+                    self.restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
                 }
                 // Restore only our clipboard contents; preserve any subsequent user copy.
                 if pasteboard.changeCount == pasteboardRevision {

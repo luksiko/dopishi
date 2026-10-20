@@ -138,6 +138,29 @@ final class SingleKeyLayoutSwitcherTests: XCTestCase {
         XCTAssertTrue(trigger, "Fn clean tap should trigger")
     }
     
+    func testLeftControlTapWithoutDeviceMask() {
+        let detector = SingleKeyDetector()
+        detector.targetKey = .leftControl
+        
+        // Left Control down with standard Carbon/CGEventFlags maskControl (0x40000) without low device bits
+        let downTrigger = detector.handleModifierChange(
+            keyCode: 59,
+            flagsRaw: UInt(NSEvent.ModifierFlags.control.rawValue),
+            timestamp: 450.0
+        )
+        XCTAssertFalse(downTrigger)
+        XCTAssertTrue(detector.isKeyDown)
+        
+        // Left Control up
+        let upTrigger = detector.handleModifierChange(
+            keyCode: 59,
+            flagsRaw: 0,
+            timestamp: 450.08
+        )
+        XCTAssertTrue(upTrigger, "Clean Left Control tap with high modifier flags only should trigger")
+        XCTAssertFalse(detector.isKeyDown)
+    }
+
     func testMouseClickCancelsModifierTap() {
         let detector = SingleKeyDetector()
         detector.targetKey = .rightOption
