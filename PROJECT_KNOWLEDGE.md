@@ -189,3 +189,21 @@
   - Interactive key recorder captures any single key or key+modifier combo.
   - Number keys `1`–`5` directly insert candidate without extra navigation.
   - Dedicated event interception in `AutoCorrectionService` event tap guarantees keys are swallowed (`return nil`) without leaking to the host app.
+
+### Autocompletion Enhancements (Bigrams, Adaptive Store, Ghost Text, Excluded Apps)
+- **Contextual Bigrams & N-Grams**:
+  - `AutocompletionAdaptiveStore` provides built-in high-frequency bigram pairs for Russian and English (e.g., `добрый` -> `день`/`вечер`, `pull` -> `request`, `git` -> `status`).
+  - Preceding word tracking (`previousWord`) in `AutoCorrectionService` allows `AutocompletionEngine` to boost scores (+800 bonus) and suggest likely next words on prefix match.
+- **Adaptive Personal Frequency**:
+  - Automatically records word usage count and bigram transitions when candidates are accepted.
+  - Frequently selected words receive an adaptive frequency boost up to +1500 points, naturally prioritizing them to position #1.
+  - Added "Reset Learned Vocabulary" button in Settings for user privacy control.
+- **Inline Ghost Text**:
+  - `GhostTextOverlayController` and `GhostTextPreviewView` display a semi-transparent text continuation directly adjacent to the caret.
+  - `ignoresMouseEvents = true` enables seamless clicking through the ghost text into the active document.
+  - Configurable `AutocompletionDisplayMode` (`.popup`, `.ghostText`, `.both`).
+  - Pressing the configured Accept key (Tab, Space, Enter, etc.) inserts the ghost text candidate even when the popup HUD is not active.
+- **Application Exclusion List**:
+  - `ExcludedAppsSettingsView` allows users to disable autocompletion and auto-correction in sensitive or developer applications (Terminal, iTerm, Figma, games, etc.).
+  - Supports quick addition from running applications menu or selecting an `.app` from disk.
+  - Enforced via `AutoCorrectionGate.allowsAutoCorrection(role:subrole:bundleID:excludedBundleIDs:)`.
