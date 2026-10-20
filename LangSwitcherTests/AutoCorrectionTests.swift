@@ -125,3 +125,44 @@ final class AutoCorrectionTests: XCTestCase {
         }
     }
 }
+
+final class ServiceRecoveryTests: XCTestCase {
+    func testDisabledNeverStartsEvenWithoutPermission() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: false, trusted: false, valid: true, running: true), .disable)
+    }
+    func testRevokedPermissionStopsExistingTap() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: true, trusted: false, valid: true, running: true), .waitForPermission)
+    }
+    func testGrantingPermissionStartsMissingTap() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: true, trusted: true, valid: false, running: false), .start)
+    }
+    func testInvalidPortIsRecreatedEvenIfReportedEnabled() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: true, trusted: true, valid: false, running: true), .start)
+    }
+    func testSystemDisabledTapIsReenabled() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: true, trusted: true, valid: true, running: false), .enable)
+    }
+    func testHealthyTapIsNotRestarted() {
+        XCTAssertEqual(ServiceRecovery.action(enabled: true, trusted: true, valid: true, running: true), .none)
+    }
+    func testInstanceLockExcludesSecondAndReleasesAfterExit() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var first: AppInstanceLock? = try AppInstanceLock(url: url)
+        XCTAssertTrue(first!.acquired)
+        let second = try AppInstanceLock(url: url)
+        XCTAssertFalse(second.acquired)
+        first = nil
+        let third = try AppInstanceLock(url: url)
+        XCTAssertTrue(third.acquired)
+        withExtendedLifetime(second) {}
+    }
+    @MainActor func testCopyDiscoveryDeduplicatesAndDropsMissingPaths() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alias = root.appendingPathComponent("alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        XCTAssertEqual(ServiceStatus.uniqueCopies([root, alias, root.appendingPathComponent("missing")]), [root.resolvingSymlinksInPath()])
+    }
+}

@@ -223,6 +223,20 @@ LangSwitcher нуждается в разрешении универсально
         "general.autoCorrectionSpellCheck":      "Проверять системным словарём",
         "general.autoCorrectionSpellCheckDesc":  "Автоисправление только когда преобразованное слово распознаётся проверкой правописания macOS. Уменьшает ложные срабатывания, но может пропускать некоторые слова.",
         "general.autoCorrectionSwitchLayout":    "Переключать раскладку после автоисправления",
+        "permissions.serviceTitle": "Служба автоисправления",
+        "permissions.service.disabled": "Отключена в настройках",
+        "permissions.service.permissionRequired": "Требуется доступ Accessibility",
+        "permissions.service.running": "Перехват клавиш активен",
+        "permissions.service.failed": "Не удалось запустить перехват; повторяем автоматически",
+        "permissions.serviceDetail": "Проверяем разрешение и перехват каждые 5 секунд и после пробуждения. Активный перехват не означает исправление каждого слова.",
+        "permissions.restartService": "Перезапустить службу",
+        "permissions.copiesTitle": "Копии приложения",
+        "permissions.copiesDetail": "Ниже — копии, известные macOS. Одновременно может работать одна копия на пользователя. Статус Accessibility относится к текущей копии; доступ других копий здесь проверить нельзя. Храните установленное приложение в /Applications, ненужные копии удаляйте через Finder.",
+        "permissions.currentCopy": "Текущая копия",
+        "permissions.otherCopy": "Другая копия",
+        "permissions.revealCopy": "Показать в Finder",
+        "permissions.instanceError": "Не удалось защититься от повторного запуска",
+        "permissions.instanceErrorDetail": "LangSwitcher завершится, чтобы не запускать несколько обработчиков клавиш. Проверьте доступ к папке приложения в Application Support.",
     ]
 
     @MainActor static func register() {

@@ -38,7 +38,8 @@ final class AutoCorrectionService {
 
     /// True if the event tap is currently running
     var isRunning: Bool {
-        eventTap != nil
+        guard let tap = eventTap else { return false }
+        return CFMachPortIsValid(tap) && CGEvent.tapIsEnabled(tap: tap)
     }
 
     // MARK: - Init
@@ -68,6 +69,14 @@ final class AutoCorrectionService {
     /// Start monitoring keystrokes for auto-correction.
     /// Requires Accessibility permissions (same as existing hotkey functionality).
     func start() {
+        guard settingsManager.autoCorrectionEnabled else {
+            ServiceStatus.shared.state = .disabled
+            return
+        }
+        guard AccessibilityService.hasAccessibilityPermission else {
+            ServiceStatus.shared.state = .permissionRequired
+            return
+        }
         guard eventTap == nil else {
             NSLog("[LangSwitcher] AutoCorrectionService: already started")
             return
@@ -91,6 +100,7 @@ final class AutoCorrectionService {
             callback: autoCorrectionEventCallback,
             userInfo: selfPtr
         ) else {
+            ServiceStatus.shared.state = .failed
             NSLog("[LangSwitcher] AutoCorrectionService: failed to create CGEvent tap. Check Accessibility permissions.")
             return
         }
@@ -102,15 +112,43 @@ final class AutoCorrectionService {
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
+        ServiceStatus.shared.state = isRunning ? .running : .failed
         NSLog("[LangSwitcher] AutoCorrectionService: started keystroke monitoring")
     }
 
-    /// Re-enable the event tap if disabled by system
-    func reEnableEventTap() {
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: true)
-            NSLog("[LangSwitcher] AutoCorrectionService: re-enabled event tap after system disable")
+    /// Reconcile real tap state, including permission changes and invalid ports.
+    func checkHealth() {
+        let action = ServiceRecovery.action(
+            enabled: settingsManager.autoCorrectionEnabled,
+            trusted: AccessibilityService.hasAccessibilityPermission,
+            valid: eventTap.map { CFMachPortIsValid($0) } ?? false,
+            running: isRunning
+        )
+        switch action {
+        case .disable:
+            if eventTap != nil { stop() }
+            ServiceStatus.shared.state = .disabled
+        case .waitForPermission:
+            if eventTap != nil { stop() }
+            ServiceStatus.shared.state = .permissionRequired
+        case .start:
+            stop()
+            start()
+        case .enable:
+            wordBuffer = ""
+            if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+            if isRunning {
+                ServiceStatus.shared.state = .running
+            } else {
+                restart()
+            }
+        case .none:
+            ServiceStatus.shared.state = .running
         }
+    }
+
+    func reEnableEventTap() {
+        checkHealth()
     }
 
     /// Stop monitoring keystrokes.
@@ -126,6 +164,7 @@ final class AutoCorrectionService {
             runLoopSource = nil
         }
         wordBuffer = ""
+        ServiceStatus.shared.state = .disabled
         NSLog("[LangSwitcher] AutoCorrectionService: stopped")
     }
 
@@ -446,4 +485,17 @@ private func autoCorrectionEventCallback(
 
     // Always pass the event through (defaultTap mode)
     return Unmanaged.passUnretained(event)
+}
+
+// A policy shared by the watchdog and tests. No inactivity timeout: a user may
+// simply not be typing, and that must never cause repeated tap recreation.
+enum ServiceRecovery {
+    enum Action: Equatable { case disable, waitForPermission, start, enable, none }
+
+    static func action(enabled: Bool, trusted: Bool, valid: Bool, running: Bool) -> Action {
+        guard enabled else { return .disable }
+        guard trusted else { return .waitForPermission }
+        guard valid else { return .start }
+        return running ? .none : .enable
+    }
 }

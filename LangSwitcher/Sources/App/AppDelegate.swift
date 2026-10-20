@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import UserNotifications
+import Darwin
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -17,9 +18,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         textConverter: textConverter
     )
     
+    private var healthTimer: Timer?
+    private var instanceLock: AppInstanceLock?
+    private var ownsInstance = false
+
     private var l10n: LocalizationManager { LocalizationManager.shared }
     
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // The test host must not compete with the installed app or start monitors.
+        guard NSClassFromString("XCTestCase") == nil else { return }
+        let identifier = Bundle.main.bundleIdentifier ?? "com.langswitcher.app"
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+            .filter {
+                $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                    && $0.isFinishedLaunching && !$0.isTerminated
+            }
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("LangSwitcher", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let lock = try AppInstanceLock(url: directory.appendingPathComponent("instance.lock"))
+            guard others.isEmpty, lock.acquired else {
+                others.first?.activate(options: [.activateIgnoringOtherApps])
+                NSApp.terminate(nil)
+                return
+            }
+            instanceLock = lock
+            ownsInstance = true
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = l10n.t("permissions.instanceError")
+            alert.informativeText = l10n.t("permissions.instanceErrorDetail")
+            alert.runModal()
+            NSApp.terminate(nil)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ownsInstance else { return }
         NSLog("[LangSwitcher] App launched. Bundle: \(Bundle.main.bundlePath)")
         NSLog("[LangSwitcher] Executable: \(Bundle.main.executablePath ?? "unknown")")
         NSLog("[LangSwitcher] PID: \(ProcessInfo.processInfo.processIdentifier)")
@@ -71,18 +107,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
         
-        // Start auto-correction if enabled
-        if settingsManager.autoCorrectionEnabled {
-            autoCorrectionService.start()
+        ServiceStatus.shared.onRestart = { [weak self] in
+            self?.autoCorrectionService.restart()
+            self?.autoCorrectionService.checkHealth()
         }
+        autoCorrectionService.checkHealth()
+        healthTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.autoCorrectionService.checkHealth() }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil
+        )
+    }
+
+    @objc private func systemDidWake() {
+        guard ownsInstance else { return }
+        autoCorrectionService.checkHealth()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        if settingsManager.autoCorrectionEnabled && !autoCorrectionService.isRunning {
-            autoCorrectionService.start()
-        }
+        guard ownsInstance else { return }
+        autoCorrectionService.checkHealth()
     }
-    
+
+    func applicationWillTerminate(_ notification: Notification) {
+        healthTimer?.invalidate()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        if ownsInstance { autoCorrectionService.stop() }
+        ServiceStatus.shared.onRestart = nil
+        instanceLock = nil
+    }
+
     // MARK: - Hotkey Registration
     
     func registerHotkey() {
@@ -543,4 +598,19 @@ extension Notification.Name {
     static let autoCorrectionSettingsChanged = Notification.Name("autoCorrectionSettingsChanged")
     static let statusBarIconStyleChanged = Notification.Name("statusBarIconStyleChanged")
     static let keyboardLayoutSelectionChanged = Notification.Name("keyboardLayoutSelectionChanged")
+}
+
+/// Kernel lock survives simultaneous launches and is released automatically on
+/// crash. Keep the lock file: unlinking it can let two processes lock different inodes.
+final class AppInstanceLock {
+    private let descriptor: Int32
+    let acquired: Bool
+
+    init(url: URL) throws {
+        descriptor = open(url.path, O_CREAT | O_RDWR | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0 else { throw POSIXError(.EACCES) }
+        acquired = flock(descriptor, LOCK_EX | LOCK_NB) == 0
+    }
+
+    deinit { close(descriptor) }
 }

@@ -224,6 +224,20 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "general.autoCorrectionSpellCheck":      "Validate with system spell checker",
         "general.autoCorrectionSpellCheckDesc":  "Only auto-correct when the converted word is recognized by macOS spell checker. Reduces false positives but may miss some valid words.",
         "general.autoCorrectionSwitchLayout":    "Switch layout after auto-correction",
+        "permissions.serviceTitle": "Auto-correction service",
+        "permissions.service.disabled": "Disabled in settings",
+        "permissions.service.permissionRequired": "Accessibility permission required",
+        "permissions.service.running": "Keyboard monitoring is active",
+        "permissions.service.failed": "Could not start monitoring; retrying automatically",
+        "permissions.serviceDetail": "Checks permission and monitoring every 5 seconds and after wake. Active monitoring does not mean every word will be corrected.",
+        "permissions.restartService": "Restart service",
+        "permissions.copiesTitle": "Application copies",
+        "permissions.copiesDetail": "Copies known to macOS are listed below. Only one copy can run per user. Accessibility applies to the current copy; macOS does not expose other copies’ permission status here. Keep the installed app in /Applications; remove unwanted copies using Finder.",
+        "permissions.currentCopy": "Current copy",
+        "permissions.otherCopy": "Other copy",
+        "permissions.revealCopy": "Show in Finder",
+        "permissions.instanceError": "Could not protect against duplicate launch",
+        "permissions.instanceErrorDetail": "LangSwitcher will quit to avoid running multiple keyboard monitors. Check access to its Application Support folder.",
     ]
 
     @MainActor static func register() {
