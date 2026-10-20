@@ -38,6 +38,7 @@ final class AutoCorrectionService {
     private var wordBuffer: String = ""
     private var previousWord: String?
     private var suggestionTarget: AccessibilityService.ReplacementTarget?
+    private var phraseContinuationAnchor: String?
     private var lastCaretContext: CaretContext?
     private var snoozeUntil: Date?
     private var snoozeFieldIdentifier: String?
@@ -178,6 +179,7 @@ final class AutoCorrectionService {
     /// Stop monitoring keystrokes.
     func stop() {
         completionRefresh.cancel()
+        phraseContinuationAnchor = nil
         physicalInputRevision &+= 1
         replacementSession.cancel()
         overlayController.hide()
@@ -210,6 +212,7 @@ final class AutoCorrectionService {
 
     /// Reset word buffer when user clicks with mouse outside the autocompletion popup
     func handleMouseDown() {
+        accessibilityService.confirmPendingPasteBeforeInput()
         physicalInputRevision &+= 1
         if overlayController.isVisible && overlayController.containsPoint(NSEvent.mouseLocation) {
             return
@@ -224,6 +227,7 @@ final class AutoCorrectionService {
     /// Check if the key should be intercepted synchronously by the autocompletion overlay.
     /// Returns true if consumed (tap callback returns nil).
     func interceptKeyIfOverlayVisible(event: CGEvent) -> Bool {
+        accessibilityService.confirmPendingPasteBeforeInput()
         physicalInputRevision &+= 1
         guard !isProcessingCorrection else { return false }
         let isOverlayActive = overlayController.isVisible || ghostTextController.isVisible
@@ -417,6 +421,7 @@ final class AutoCorrectionService {
     private func dismissAutocompletion() {
         completionRefresh.cancel()
         suggestionTarget = nil
+        phraseContinuationAnchor = nil
         lastCaretContext = nil
         overlayController.hide()
         ghostTextController.hide()
@@ -535,7 +540,7 @@ final class AutoCorrectionService {
     /// and the remaining words stay in ghost text.
     @discardableResult
     func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool, entirePhrase: Bool = true) -> Bool {
-        guard !isProcessingCorrection, !wordBuffer.isEmpty,
+        guard !isProcessingCorrection, !wordBuffer.isEmpty || phraseContinuationAnchor != nil,
               let target = suggestionTarget, accessibilityService.isCurrentReplacementTarget(target) else {
             dismissAutocompletion()
             return false
@@ -565,15 +570,16 @@ final class AutoCorrectionService {
             remainingPhrase = nil
         }
         
-        let originalWord = wordBuffer
+        let acceptance = PhraseAcceptancePlan(buffer: wordBuffer, continuationAnchor: phraseContinuationAnchor,
+                                              insertion: insertionText)
         let precedingWord = previousWord
         let accessibility = accessibilityService
         
         // The prefix is already in the editor. Commit before consuming the accept
         // key, so later typing cannot cancel an edit whose key was swallowed.
         let replaced = replacementSession.performImmediately {
-            accessibility.replaceVerifiedSuffix(originalWord,
-                with: insertionText, target: target)
+            accessibility.replaceVerifiedSuffix(acceptance.expected,
+                with: acceptance.replacement, target: target)
         }
         guard replaced else {
             dismissAutocompletion()
@@ -588,6 +594,7 @@ final class AutoCorrectionService {
         playCorrectionFeedback()
         
         if let remaining = remainingPhrase, !remaining.isEmpty {
+            phraseContinuationAnchor = insertionText
             let remainingCandidate = AutocompletionCandidate(
                 word: remaining,
                 targetLayoutID: candidate.targetLayoutID,
@@ -675,10 +682,10 @@ final class AutoCorrectionService {
         }
 
         performCheckedReplacement(expected: bufferedWord + String(triggerChar),
-                                  replacement: token.prefix + convertedWord + token.punctuation + String(triggerChar)) { [weak self] in
+                                  replacement: token.prefix + convertedWord + token.punctuation + String(triggerChar)) { [weak self] canSwitchLayout in
             guard let self else { return }
-            self.previousWord = convertedWord.lowercased()
-            if self.settingsManager.autoCorrectionSwitchLayout {
+            if canSwitchLayout || self.wordBuffer.isEmpty { self.previousWord = convertedWord.lowercased() }
+            if canSwitchLayout && self.settingsManager.autoCorrectionSwitchLayout {
                 KeyboardLayoutDetector.switchToLayout(result.targetLayoutID)
             }
             self.playCorrectionFeedback()
@@ -691,7 +698,7 @@ final class AutoCorrectionService {
     }
 
     @discardableResult
-    private func performCheckedReplacement(expected: String, replacement: String, target existingTarget: AccessibilityService.ReplacementTarget? = nil, onSuccess: @escaping () -> Void) -> Bool {
+    private func performCheckedReplacement(expected: String, replacement: String, target existingTarget: AccessibilityService.ReplacementTarget? = nil, onSuccess: @escaping (Bool) -> Void) -> Bool {
         guard let target = existingTarget ?? accessibilityService.captureReplacementTarget(),
               let operation = replacementSession.begin() else { return false }
         completionRefresh.cancel()
@@ -709,15 +716,19 @@ final class AutoCorrectionService {
             }
             if self.accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target) {
                 self.replacementSession.finish(operation)
-                onSuccess()
+                onSuccess(true)
             } else {
                 // Some web editors expose a writable AXSelectedText but ignore
                 // its setter. Paste only into a freshly verified selection.
                 self.accessibilityService.pasteVerifiedSuffix(expected, with: replacement, target: target) { [weak self] applied in
                     guard let self, self.replacementSession.isCurrent(operation) else { return }
                     self.replacementSession.finish(operation)
-                    if applied, revision == self.physicalInputRevision,
-                       layout == KeyboardLayoutDetector.getCurrentLayout()?.id { onSuccess() }
+                    if applied {
+                        let canSwitchLayout = revision == self.physicalInputRevision
+                            && layout == KeyboardLayoutDetector.getCurrentLayout()?.id
+                            && self.accessibilityService.isCurrentReplacementTarget(target)
+                        onSuccess(canSwitchLayout)
+                    }
                 }
             }
         }
@@ -938,6 +949,24 @@ final class AutocompletionRefresh {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
             guard let self, self.revision == scheduledRevision else { return }
             refresh()
+        }
+    }
+}
+
+
+/// A continuation replaces the preceding accepted word plus its separator with
+/// that same anchor and the next insertion, preserving all accepted text.
+struct PhraseAcceptancePlan {
+    let expected: String
+    let replacement: String
+
+    init(buffer: String, continuationAnchor: String?, insertion: String) {
+        if buffer.isEmpty, let anchor = continuationAnchor {
+            expected = anchor
+            replacement = anchor + insertion
+        } else {
+            expected = buffer
+            replacement = insertion
         }
     }
 }

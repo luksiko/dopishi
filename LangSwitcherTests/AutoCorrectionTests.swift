@@ -589,3 +589,86 @@ final class Sprint1FeatureTests: XCTestCase {
         XCTAssertEqual(nextRemainder, "you doing")
     }
 }
+
+
+final class VerifiedPasteAndContinuationTests: XCTestCase {
+    func testFocusChangeDuringClipboardPreparationCancelsPaste() {
+        var posted: [pid_t] = []
+        XCTAssertFalse(AccessibilityService.dispatchVerifiedPaste(to: 123,
+            verifySelection: { false }, post: { posted.append($0) }))
+        XCTAssertTrue(posted.isEmpty)
+    }
+
+    func testPasteDeliveryUsesCapturedProcess() {
+        var posted: [pid_t] = []
+        XCTAssertTrue(AccessibilityService.dispatchVerifiedPaste(to: 123,
+            verifySelection: { true }, post: { posted.append($0) }))
+        XCTAssertEqual(posted, [123])
+    }
+
+    func testSuccessfulPasteRemainsSuccessfulWhenTypingContinues() {
+        let range = NSRange(location: 0, length: 3)
+        XCTAssertTrue(AccessibilityService.replacementWasApplied(original: "lf ", range: range,
+            replacement: "да ", observed: "да x", allowFollowingInput: true))
+        XCTAssertFalse(AccessibilityService.replacementWasApplied(original: "lf ", range: range,
+            replacement: "да ", observed: "lf x", allowFollowingInput: true))
+        XCTAssertTrue(AccessibilityService.replacementWasApplied(original: "lf suffix", range: range,
+            replacement: "да ", observed: "да xsuffix", allowFollowingInput: true))
+        XCTAssertFalse(AccessibilityService.replacementWasApplied(original: "lf suffix", range: range,
+            replacement: "да ", observed: "да xchanged", allowFollowingInput: true))
+    }
+
+    func testPasteCanCompleteBeforeNextPhysicalInputAndOnlyOnce() {
+        var applied = false
+        var receipts: [Bool] = []
+        let confirmation = PasteConfirmation(applied: { applied }, finish: { receipts.append($0) })
+        confirmation.check()
+        XCTAssertTrue(receipts.isEmpty)
+        applied = true
+        confirmation.check() // Same check made at the start of the event callback.
+        XCTAssertEqual(receipts, [true])
+        confirmation.check(final: true)
+        XCTAssertEqual(receipts, [true])
+    }
+
+    func testUnappliedPasteTimesOutAsFailure() {
+        var receipts: [Bool] = []
+        let confirmation = PasteConfirmation(applied: { false }, finish: { receipts.append($0) })
+        confirmation.check(final: true)
+        XCTAssertEqual(receipts, [false])
+    }
+
+    func testConsecutivePhraseAcceptsPreserveAlreadyAcceptedWords() throws {
+        var text = "ho"
+        var buffer = "ho"
+        var anchor: String?
+        for insertion in ["how ", "are ", "you"] {
+            let plan = PhraseAcceptancePlan(buffer: buffer, continuationAnchor: anchor, insertion: insertion)
+            let range = try XCTUnwrap(AccessibilityService.verifiedSuffixRange(text: text,
+                selection: CFRange(location: text.utf16.count, length: 0), expected: plan.expected))
+            text = (text as NSString).replacingCharacters(in: range, with: plan.replacement)
+            buffer = ""
+            anchor = insertion
+        }
+        XCTAssertEqual(text, "how are you")
+    }
+
+    func testTypedPrefixTakesPrecedenceOverOldContinuationAnchor() {
+        let plan = PhraseAcceptancePlan(buffer: "ne", continuationAnchor: "old ", insertion: "new")
+        XCTAssertEqual(plan.expected, "ne")
+        XCTAssertEqual(plan.replacement, "new")
+    }
+}
+
+
+extension VerifiedPasteAndContinuationTests {
+    func testRestartFinalizesOldPasteBeforeNewReceipt() {
+        var receipts: [String] = []
+        let old = PasteConfirmation(applied: { false }, finish: { receipts.append("old:\($0)") })
+        old.check(final: true)
+        let current = PasteConfirmation(applied: { true }, finish: { receipts.append("new:\($0)") })
+        current.check()
+        old.check(final: true)
+        XCTAssertEqual(receipts, ["old:false", "new:true"])
+    }
+}
