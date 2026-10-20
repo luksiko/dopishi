@@ -186,8 +186,11 @@ final class AutoCorrectionService {
 
     // MARK: - Event Handling (called from C callback on main thread)
 
-    /// Reset word buffer when user clicks with mouse
+    /// Reset word buffer when user clicks with mouse outside the autocompletion popup
     func handleMouseDown() {
+        if overlayController.isVisible && overlayController.containsPoint(NSEvent.mouseLocation) {
+            return
+        }
         wordBuffer = ""
         overlayController.hide()
     }
@@ -200,6 +203,7 @@ final class AutoCorrectionService {
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
+        let noModifierFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
         
         // 1. Escape: dismiss overlay
         if keyCode == 0x35 && nonModFlags.isEmpty {
@@ -219,8 +223,8 @@ final class AutoCorrectionService {
             return true
         }
         
-        // 4. Number shortcuts 1-5 (if enabled)
-        if settingsManager.autoCompletionUseNumberShortcuts && nonModFlags.isEmpty {
+        // 4. Number shortcuts 1-5 (if enabled, requiring no Shift/Cmd/Opt/Ctrl so !@#$% are not caught)
+        if settingsManager.autoCompletionUseNumberShortcuts && noModifierFlags.isEmpty {
             let numberKeyCodes: [UInt16: Int] = [
                 0x12: 0, // 1
                 0x13: 1, // 2
@@ -273,7 +277,9 @@ final class AutoCorrectionService {
         // Handle special keys
         switch keyCode {
         case 0x33: // Backspace
-            if !wordBuffer.isEmpty {
+            if flags.contains(.maskAlternate) {
+                wordBuffer = ""
+            } else if !wordBuffer.isEmpty {
                 wordBuffer.removeLast()
             }
             updateAutocompletion()

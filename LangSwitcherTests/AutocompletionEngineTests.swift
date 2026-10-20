@@ -147,4 +147,23 @@ final class AutocompletionEngineTests: XCTestCase {
         XCTAssertFalse(settings.isAutocompletionAcceptKey(keyCode: 0x31, flags: []))
         XCTAssertFalse(settings.isAutocompletionAcceptKey(keyCode: 0x30, flags: optFlags))
     }
+    
+    func testOverlayControllerContainsPoint() {
+        let overlay = AutocompletionOverlayController()
+        // When hidden, containsPoint is always false
+        XCTAssertFalse(overlay.containsPoint(NSPoint(x: 100, y: 100)))
+        
+        // Show with test candidates
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        overlay.show(
+            candidates: [candidate],
+            caretRect: CGRect(x: 200, y: 500, width: 2, height: 18),
+            acceptKeyHint: "⇥",
+            onSelect: { _ in }
+        )
+        XCTAssertTrue(overlay.isVisible)
+        
+        overlay.hide()
+        XCTAssertFalse(overlay.isVisible)
+    }
 }

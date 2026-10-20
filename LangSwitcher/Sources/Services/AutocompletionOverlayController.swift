@@ -20,6 +20,11 @@ final class AutocompletionOverlayController: NSObject {
         panel?.isVisible == true
     }
     
+    func containsPoint(_ point: NSPoint) -> Bool {
+        guard let p = panel, p.isVisible else { return false }
+        return p.frame.contains(point)
+    }
+    
     var selectedCandidate: AutocompletionCandidate? {
         guard !candidates.isEmpty, selectedIndex >= 0, selectedIndex < candidates.count else {
             return nil
