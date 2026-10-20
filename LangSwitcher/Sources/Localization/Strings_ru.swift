@@ -25,9 +25,12 @@ enum Strings_ru {
         "settings.tab.hotkey":           "Горячая клавиша",
         "settings.tab.permissions":      "Разрешения",
         "settings.tab.log":              "Журнал",
+        "settings.iconStyle.languageBadge": "Код языка в рамке (RU, EN)",
+        "settings.iconStyle.keyboardIcon":  "Значок клавиатуры",
 
         // ── Вкладка «Основные» ──────────────────────────────────────
         "general.language":              "Язык",
+        "general.statusBarIcon":         "Иконка в строке меню",
         "general.launchAtLogin":         "Запускать при входе в систему",
         "general.playSound":             "Звук при конвертации",
         "general.showNotifications":     "Показывать уведомления",

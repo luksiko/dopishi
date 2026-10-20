@@ -1,5 +1,84 @@
 import Cocoa
 import SwiftUI
+import Carbon
+
+// MARK: - Status Bar Badge Renderer
+
+struct StatusBarBadgeRenderer {
+    
+    /// Resolve 2-letter uppercase badge code (e.g. "RU", "EN", "UK") from a KeyboardLayout
+    static func languageCode(for layout: KeyboardLayout?) -> String {
+        guard let layout = layout else { return "EN" }
+        return languageCode(layoutId: layout.id, languageCode: layout.languageCode, localizedName: layout.localizedName)
+    }
+    
+    /// Pure function mapping layout identifiers, language codes and names to badge text
+    static func languageCode(layoutId: String, languageCode: String, localizedName: String) -> String {
+        // Priority 1: use valid ISO language code if known (e.g. "en", "ru", "it-IT", "uk_UA")
+        var code = languageCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hyphenIndex = code.firstIndex(of: "-") {
+            code = String(code[..<hyphenIndex])
+        }
+        if let underscoreIndex = code.firstIndex(of: "_") {
+            code = String(code[..<underscoreIndex])
+        }
+        if !code.isEmpty && code.lowercased() != "unknown" {
+            return String(code.prefix(2)).uppercased()
+        }
+        
+        // Priority 2: match known layout IDs (ensure "russian" comes before "us")
+        let idLower = layoutId.lowercased()
+        if idLower.contains("russian") { return "RU" }
+        if idLower.contains("ukrainian") { return "UK" }
+        if idLower.contains("german") { return "DE" }
+        if idLower.contains("french") { return "FR" }
+        if idLower.contains("spanish") { return "ES" }
+        if idLower.contains("italian") { return "IT" }
+        if idLower.contains(".us") || idLower.contains("us-") || idLower.contains("us_") || idLower.hasSuffix(".us") || idLower.contains("abc") || idLower.contains("english") {
+            return "EN"
+        }
+        
+        // Priority 3: first 2 characters of localized name
+        let trimmedName = localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.count >= 2 {
+            return String(trimmedName.prefix(2)).uppercased()
+        }
+        
+        return "EN"
+    }
+    
+    /// Renders an NSImage with the language text enclosed in a rounded-corner frame
+    static func renderBadge(text: String) -> NSImage {
+        let font = NSFont.systemFont(ofSize: 9.0, weight: .bold)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.black,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let badgeWidth = max(24.0, ceil(textSize.width) + 8.0)
+        let badgeHeight: CGFloat = 16.0
+        let imageSize = NSSize(width: badgeWidth, height: badgeHeight)
+        
+        let image = NSImage(size: imageSize, flipped: false) { rect in
+            let borderRect = NSRect(x: 1.0, y: 1.0, width: badgeWidth - 2.0, height: badgeHeight - 2.0)
+            let path = NSBezierPath(roundedRect: borderRect, xRadius: 3.5, yRadius: 3.5)
+            path.lineWidth = 1.2
+            NSColor.black.setStroke()
+            path.stroke()
+            
+            let textY = (badgeHeight - font.capHeight) / 2.0 + font.descender
+            let textRect = NSRect(x: 0, y: textY, width: badgeWidth, height: textSize.height)
+            (text as NSString).draw(in: textRect, withAttributes: attrs)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+}
 
 // MARK: - Status Bar Controller
 // Manages the menu bar icon and dropdown menu
@@ -22,7 +101,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     init(settingsManager: SettingsManager) {
         self.settingsManager = settingsManager
         self.statusBar = NSStatusBar.system
-        self.statusItem = statusBar.statusItem(withLength: NSStatusItem.squareLength)
+        self.statusItem = statusBar.statusItem(withLength: NSStatusItem.variableLength)
         self.menu = NSMenu()
         
         super.init()
@@ -30,6 +109,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         setupStatusBarButton()
         setupMenu()
+        setupObservers()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
     }
     
     // MARK: - NSMenuDelegate
@@ -41,14 +126,70 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // MARK: - Setup
     
     private func setupStatusBarButton() {
-        if let button = statusItem.button {
+        updateStatusBarIcon()
+        statusItem.menu = menu
+    }
+    
+    /// Updates status bar icon based on user settings and current layout
+    @objc func updateStatusBarIcon() {
+        guard let button = statusItem.button else { return }
+        
+        switch settingsManager.statusBarIconStyle {
+        case .keyboardIcon:
             let image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "LangSwitcher")
             image?.isTemplate = true
             button.image = image
-            let tooltip = l10n.t("menu.tooltip").replacingOccurrences(of: "%@", with: settingsManager.hotkeyDescription)
-            button.toolTip = tooltip
+        case .languageBadge:
+            let currentLayout = KeyboardLayoutDetector.getCurrentLayout()
+            let badgeText = StatusBarBadgeRenderer.languageCode(for: currentLayout)
+            let image = StatusBarBadgeRenderer.renderBadge(text: badgeText)
+            button.image = image
         }
-        statusItem.menu = menu
+        
+        let tooltip = l10n.t("menu.tooltip").replacingOccurrences(of: "%@", with: settingsManager.hotkeyDescription)
+        button.toolTip = tooltip
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardLayoutDidChange),
+            name: NSTextInputContext.keyboardSelectionDidChangeNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardLayoutDidChange),
+            name: .keyboardLayoutSelectionChanged,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(statusBarIconStyleChanged),
+            name: .statusBarIconStyleChanged,
+            object: nil
+        )
+        
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(keyboardLayoutDidChange),
+            name: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+            object: nil
+        )
+    }
+    
+    @objc private func keyboardLayoutDidChange() {
+        Task { @MainActor in
+            self.updateStatusBarIcon()
+        }
+    }
+    
+    @objc private func statusBarIconStyleChanged() {
+        Task { @MainActor in
+            self.updateStatusBarIcon()
+        }
     }
     
     private func setupMenu() {
@@ -222,5 +363,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Refresh the menu (call after settings change)
     func refreshMenu() {
         setupMenu()
+        updateStatusBarIcon()
     }
 }

@@ -91,6 +91,12 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 
+                Picker(l10n.t("general.statusBarIcon"), selection: $settingsManager.statusBarIconStyle) {
+                    ForEach(StatusBarIconStyle.allCases, id: \.self) { style in
+                        Text(iconStyleDisplayName(style)).tag(style)
+                    }
+                }
+                
                 Toggle(l10n.t("general.launchAtLogin"), isOn: $settingsManager.launchAtLogin)
                 Toggle(l10n.t("general.playSound"), isOn: $settingsManager.playSounds)
                 Toggle(l10n.t("general.showNotifications"), isOn: $settingsManager.showNotifications)
@@ -164,6 +170,13 @@ struct GeneralSettingsTab: View {
     
     // MARK: - Mode Display Helpers
     // Use l10n from @EnvironmentObject so SwiftUI re-renders on language change
+    
+    private func iconStyleDisplayName(_ style: StatusBarIconStyle) -> String {
+        switch style {
+        case .languageBadge: return l10n.t("settings.iconStyle.languageBadge")
+        case .keyboardIcon: return l10n.t("settings.iconStyle.keyboardIcon")
+        }
+    }
     
     private func smartModeDisplayName(_ mode: SmartConversionMode) -> String {
         switch mode {

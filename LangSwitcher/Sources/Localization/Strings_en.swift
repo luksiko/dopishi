@@ -26,9 +26,12 @@ enum Strings_en {
         "settings.tab.hotkey":           "Hotkey",
         "settings.tab.permissions":      "Permissions",
         "settings.tab.log":              "Log",
+        "settings.iconStyle.languageBadge": "Language badge in frame (RU, EN)",
+        "settings.iconStyle.keyboardIcon":  "Keyboard icon",
 
         // ── General Tab ─────────────────────────────────────────────
         "general.language":              "Language",
+        "general.statusBarIcon":         "Menu Bar Icon",
         "general.launchAtLogin":         "Launch at Login",
         "general.playSound":             "Play Sound on Conversion",
         "general.showNotifications":     "Show Notifications",

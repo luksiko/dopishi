@@ -381,4 +381,6 @@ extension Notification.Name {
     static let hotkeySettingsChanged = Notification.Name("hotkeySettingsChanged")
     static let layoutSwitchKeyChanged = Notification.Name("layoutSwitchKeyChanged")
     static let autoCorrectionSettingsChanged = Notification.Name("autoCorrectionSettingsChanged")
+    static let statusBarIconStyleChanged = Notification.Name("statusBarIconStyleChanged")
+    static let keyboardLayoutSelectionChanged = Notification.Name("keyboardLayoutSelectionChanged")
 }

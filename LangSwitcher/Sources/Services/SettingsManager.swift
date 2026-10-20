@@ -55,6 +55,22 @@ enum LayoutSwitchMode: Int, CaseIterable, Codable {
     }
 }
 
+// MARK: - Status Bar Icon Style
+/// Style of the icon displayed in the macOS status bar (menu bar)
+
+enum StatusBarIconStyle: Int, CaseIterable, Codable {
+    case languageBadge = 0 // Language code in a frame (e.g. RU, EN)
+    case keyboardIcon = 1  // System keyboard icon
+    
+    @MainActor var displayName: String {
+        let l10n = LocalizationManager.shared
+        switch self {
+        case .languageBadge: return l10n.t("settings.iconStyle.languageBadge")
+        case .keyboardIcon: return l10n.t("settings.iconStyle.keyboardIcon")
+        }
+    }
+}
+
 // MARK: - Settings Manager
 // Persists user preferences via UserDefaults
 
@@ -157,6 +173,14 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionSwitchLayout, forKey: Keys.autoCorrectionSwitchLayout) }
     }
 
+    /// Style of icon in the macOS menu bar. Default: language badge in a frame (RU, EN).
+    @Published var statusBarIconStyle: StatusBarIconStyle {
+        didSet {
+            defaults.set(statusBarIconStyle.rawValue, forKey: Keys.statusBarIconStyle)
+            NotificationCenter.default.post(name: .statusBarIconStyleChanged, object: nil)
+        }
+    }
+
     // MARK: - Computed
     
     var hotkeyModifierFlags: NSEvent.ModifierFlags {
@@ -192,6 +216,7 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionEnabled = "autoCorrectionEnabled"
         static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
         static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
+        static let statusBarIconStyle = "statusBarIconStyle"
     }
     
     // MARK: - Init
@@ -226,6 +251,9 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionEnabled = defaults.object(forKey: Keys.autoCorrectionEnabled) as? Bool ?? false     // Default: OFF
         self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
         self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
+        
+        let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
+        self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge
         
         // Load layouts: validate against actual system installed layouts
         let systemLayouts = KeyboardLayoutDetector.getInstalledLayouts()

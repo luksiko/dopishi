@@ -93,6 +93,7 @@ final class KeyboardLayoutDetector {
                 let status = TISSelectInputSource(source)
                 if status == noErr {
                     NSLog("[LangSwitcher] switchToLayout: switched to exact '\(targetID)'")
+                    NotificationCenter.default.post(name: .keyboardLayoutSelectionChanged, object: nil)
                 } else {
                     NSLog("[LangSwitcher] switchToLayout: TISSelectInputSource failed with status \(status)")
                 }
@@ -110,7 +111,9 @@ final class KeyboardLayoutDetector {
             var matched = false
             if targetLower.contains("russian") && sourceLower.contains("russian") {
                 matched = true
-            } else if (targetLower.contains("us") || targetLower.contains("abc")) && (sourceLower.contains("us") || sourceLower.contains("abc")) {
+            } else if !targetLower.contains("russian") && !sourceLower.contains("russian") &&
+                      (targetLower.contains("us") || targetLower.contains("abc")) &&
+                      (sourceLower.contains("us") || sourceLower.contains("abc")) {
                 matched = true
             } else if targetLower.contains("ukrainian") && sourceLower.contains("ukrainian") {
                 matched = true
@@ -128,6 +131,7 @@ final class KeyboardLayoutDetector {
                 let status = TISSelectInputSource(source)
                 if status == noErr {
                     NSLog("[LangSwitcher] switchToLayout: switched to family match '\(sourceID)' for '\(targetID)'")
+                    NotificationCenter.default.post(name: .keyboardLayoutSelectionChanged, object: nil)
                 } else {
                     NSLog("[LangSwitcher] switchToLayout: TISSelectInputSource failed with status \(status)")
                 }

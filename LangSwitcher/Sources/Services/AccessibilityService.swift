@@ -224,23 +224,25 @@ final class AccessibilityService {
     
     // MARK: - Pasteboard Save/Restore
     
-    private func savePasteboard() -> [(String, NSPasteboard.PasteboardType)] {
+    private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {
         let pasteboard = NSPasteboard.general
-        return pasteboard.pasteboardItems?.compactMap { item -> (String, NSPasteboard.PasteboardType)? in
-            for type in item.types {
-                if let data = item.string(forType: type) {
-                    return (data, type)
-                }
+        return pasteboard.pasteboardItems?.map { item in
+            item.types.compactMap { type in
+                item.data(forType: type).map { (type, $0) }
             }
-            return nil
         } ?? []
     }
     
-    private func restorePasteboard(_ items: [(String, NSPasteboard.PasteboardType)]) {
+    private func restorePasteboard(_ items: [[(NSPasteboard.PasteboardType, Data)]]) {
+        guard !items.isEmpty else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        for (string, type) in items {
-            pasteboard.setString(string, forType: type)
+        for itemData in items {
+            let item = NSPasteboardItem()
+            for (type, data) in itemData {
+                item.setData(data, forType: type)
+            }
+            pasteboard.writeObjects([item])
         }
     }
 }
