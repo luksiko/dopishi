@@ -168,6 +168,11 @@ struct GeneralSettingsTab: View {
                         .padding(.top, 2)
                     
                     Toggle(l10n.t("general.autoCorrectionSwitchLayout"), isOn: $settingsManager.autoCorrectionSwitchLayout)
+                    
+                    Text(l10n.t("general.autoCorrectionSwitchLayoutDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
             }
             
@@ -299,6 +304,7 @@ struct GeneralSettingsTab: View {
         case .always: return l10n.t("layoutSwitchMode.always.name")
         case .ifLastWordConverted: return l10n.t("layoutSwitchMode.ifLastWord.name")
         case .ifAnyWordConverted: return l10n.t("layoutSwitchMode.ifAnyWord.name")
+        case .never: return l10n.t("layoutSwitchMode.never.name")
         }
     }
     
@@ -307,6 +313,7 @@ struct GeneralSettingsTab: View {
         case .always: return l10n.t("layoutSwitchMode.always.desc")
         case .ifLastWordConverted: return l10n.t("layoutSwitchMode.ifLastWord.desc")
         case .ifAnyWordConverted: return l10n.t("layoutSwitchMode.ifAnyWord.desc")
+        case .never: return l10n.t("layoutSwitchMode.never.desc")
         }
     }
 }

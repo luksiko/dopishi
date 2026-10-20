@@ -35,6 +35,7 @@ enum LayoutSwitchMode: Int, CaseIterable, Codable {
     case always = 0           // Always switch layout when hotkey is pressed
     case ifLastWordConverted = 1  // Switch if the last word was in wrong layout and got reconverted
     case ifAnyWordConverted = 2   // Switch if any word in the converted text needed reconversion
+    case never = 3            // Never switch layout after conversion
     
     @MainActor var displayName: String {
         let l10n = LocalizationManager.shared
@@ -42,6 +43,7 @@ enum LayoutSwitchMode: Int, CaseIterable, Codable {
         case .always: return l10n.t("layoutSwitchMode.always.name")
         case .ifLastWordConverted: return l10n.t("layoutSwitchMode.ifLastWord.name")
         case .ifAnyWordConverted: return l10n.t("layoutSwitchMode.ifAnyWord.name")
+        case .never: return l10n.t("layoutSwitchMode.never.name")
         }
     }
     
@@ -51,6 +53,7 @@ enum LayoutSwitchMode: Int, CaseIterable, Codable {
         case .always: return l10n.t("layoutSwitchMode.always.desc")
         case .ifLastWordConverted: return l10n.t("layoutSwitchMode.ifLastWord.desc")
         case .ifAnyWordConverted: return l10n.t("layoutSwitchMode.ifAnyWord.desc")
+        case .never: return l10n.t("layoutSwitchMode.never.desc")
         }
     }
 }

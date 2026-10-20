@@ -763,7 +763,7 @@ final class AutoCorrectionService {
                     self.replacementSession.finish(operation)
                     if applied {
                         let canSwitchLayout = layout == KeyboardLayoutDetector.getCurrentLayout()?.id
-                            && self.accessibilityService.isCurrentReplacementTarget(target)
+                            && NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processID
                         onSuccess(canSwitchLayout)
                     }
                 }

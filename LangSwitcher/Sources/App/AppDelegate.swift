@@ -509,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Switch system keyboard layout to the target after conversion, based on user's setting.
     private func switchLayoutIfNeeded(targetLayoutID: String?, conversionOccurred: Bool) {
-        guard let targetLayoutID = targetLayoutID else { return }
+        guard let targetLayoutID = targetLayoutID, !targetLayoutID.isEmpty else { return }
         
         switch settingsManager.layoutSwitchMode {
         case .always:
@@ -518,6 +518,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if conversionOccurred {
                 KeyboardLayoutDetector.switchToLayout(targetLayoutID)
             }
+        case .never:
+            break
         }
     }
     

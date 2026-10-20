@@ -135,4 +135,18 @@ final class KeyboardLayoutDetectorTests: XCTestCase {
         XCTAssertFalse(keyboardStyle.displayName.isEmpty)
         XCTAssertNotEqual(badgeStyle.displayName, keyboardStyle.displayName)
     }
+
+    @MainActor
+    func testLayoutSwitchModes() {
+        XCTAssertEqual(LayoutSwitchMode.allCases.count, 4)
+        XCTAssertEqual(LayoutSwitchMode.always.rawValue, 0)
+        XCTAssertEqual(LayoutSwitchMode.ifLastWordConverted.rawValue, 1)
+        XCTAssertEqual(LayoutSwitchMode.ifAnyWordConverted.rawValue, 2)
+        XCTAssertEqual(LayoutSwitchMode.never.rawValue, 3)
+        
+        for mode in LayoutSwitchMode.allCases {
+            XCTAssertFalse(mode.displayName.isEmpty)
+            XCTAssertFalse(mode.description.isEmpty)
+        }
+    }
 }

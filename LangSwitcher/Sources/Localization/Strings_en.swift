@@ -55,9 +55,11 @@ enum Strings_en {
         "layoutSwitchMode.always.name":          "Always switch layout",
         "layoutSwitchMode.ifLastWord.name":      "Switch if last word was converted",
         "layoutSwitchMode.ifAnyWord.name":       "Switch if any word required conversion",
+        "layoutSwitchMode.never.name":           "Do not switch layout",
         "layoutSwitchMode.always.desc":          "Always switch the keyboard layout after pressing the hotkey, regardless of whether text was converted.",
         "layoutSwitchMode.ifLastWord.desc":      "Switch the layout only if the last word before the cursor was typed in the wrong layout and got reconverted.",
         "layoutSwitchMode.ifAnyWord.desc":       "Switch the layout if any word in the converted text needed reconversion to the correct layout.",
+        "layoutSwitchMode.never.desc":           "Convert text without changing the keyboard layout.",
 
         // ── Layouts Tab ─────────────────────────────────────────────
         "layouts.title":                 "Active Keyboard Layouts",
@@ -224,6 +226,7 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "general.autoCorrectionSpellCheck":      "Validate with system spell checker",
         "general.autoCorrectionSpellCheckDesc":  "Only auto-correct when the converted word is recognized by macOS spell checker. Reduces false positives but may miss some valid words.",
         "general.autoCorrectionSwitchLayout":    "Switch layout after auto-correction",
+        "general.autoCorrectionSwitchLayoutDesc": "Automatically switch system keyboard layout to match the corrected text language.",
 
         // ── Autocompletion ──────────────────────────────────────────
         "general.autocompletion":                "Word Autocompletion",
