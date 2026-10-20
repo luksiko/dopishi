@@ -134,8 +134,19 @@ final class AccessibilityService {
         simulateCopy()
         usleep(150_000) // 150ms — give target app time to process ⌘C
         
-        guard let selectedText = pasteboard.string(forType: .string),
-              !selectedText.isEmpty else {
+        var selectedText = pasteboard.string(forType: .string) ?? ""
+        if !selectedText.isEmpty && selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Only whitespace was selected (user had typed a trailing space). Extend selection one more word left!
+            NSLog("[LangSwitcher] selectAndReplaceLastWord: only whitespace selected, extending selection left...")
+            simulateSelectWordLeft()
+            usleep(150_000)
+            pasteboard.clearContents()
+            simulateCopy()
+            usleep(150_000)
+            selectedText = pasteboard.string(forType: .string) ?? ""
+        }
+        
+        guard !selectedText.isEmpty else {
             NSLog("[LangSwitcher] selectAndReplaceLastWord: no text copied after selection+copy, deselecting")
             simulateRightArrow()
             restorePasteboard(savedContents)

@@ -43,6 +43,28 @@ final class SpellCheckServiceTests: XCTestCase {
         XCTAssertTrue(spellChecker.isValidWordInAnyLanguage("hello", languages: ["en", "ru"]))
         XCTAssertTrue(spellChecker.isValidWordInAnyLanguage("привет", languages: ["en", "ru"]))
         XCTAssertFalse(spellChecker.isValidWordInAnyLanguage("ghbdtn123xyz", languages: ["en", "ru"]))
+        // Wrong layout words should NOT be recognized as valid in another script
+        XCTAssertFalse(spellChecker.isValidWordInAnyLanguage("фгещ", languages: ["en", "ru"]))
+        XCTAssertFalse(spellChecker.isValidWordInAnyLanguage("сщккусе", languages: ["en", "ru"]))
+        XCTAssertFalse(spellChecker.isValidWordInAnyLanguage("ghbdtn", languages: ["en", "ru"]))
+    }
+    
+    func testScriptValidation() {
+        // Cyrillic words must NOT be valid in Latin languages even though NSSpellChecker ignores them
+        XCTAssertFalse(spellChecker.isValidWord("фгещ", language: "en"))
+        XCTAssertFalse(spellChecker.isValidWord("привет", language: "en"))
+        XCTAssertFalse(spellChecker.isValidWord("привет", language: "de"))
+        
+        // Latin words must NOT be valid in Cyrillic languages
+        XCTAssertFalse(spellChecker.isValidWord("hello", language: "ru"))
+        XCTAssertFalse(spellChecker.isValidWord("auto", language: "ru"))
+        XCTAssertFalse(spellChecker.isValidWord("auto", language: "uk"))
+        
+        // Correct script checks
+        XCTAssertTrue(spellChecker.matchesExpectedScript(word: "auto", language: "en"))
+        XCTAssertFalse(spellChecker.matchesExpectedScript(word: "auto", language: "ru"))
+        XCTAssertTrue(spellChecker.matchesExpectedScript(word: "авто", language: "ru"))
+        XCTAssertFalse(spellChecker.matchesExpectedScript(word: "авто", language: "en"))
     }
     
     func testCompletionsForPartialWord() {

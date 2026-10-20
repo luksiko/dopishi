@@ -32,6 +32,34 @@ final class SpellCheckService {
         return languageMap[base] ?? language
     }
 
+    /// Verify that the characters in the word belong to the expected script for the language.
+    /// NSSpellChecker returns NSNotFound (no error) when given words in an unrelated script
+    /// (e.g. Cyrillic in English), which falsely marks wrong-layout words as valid.
+    func matchesExpectedScript(word: String, language: String) -> Bool {
+        let letters = word.filter { $0.isLetter }
+        guard !letters.isEmpty else { return false }
+        
+        let lang = normalizeLanguage(language)
+        switch lang {
+        case "ru", "uk", "ua":
+            // Cyrillic script: Unicode ranges U+0400...U+052F
+            return letters.allSatisfy { char in
+                char.unicodeScalars.allSatisfy { scalar in
+                    (0x0400...0x052F).contains(scalar.value)
+                }
+            }
+        default:
+            // Latin script: Unicode ranges basic Latin + Latin Supplement + Extended
+            return letters.allSatisfy { char in
+                char.unicodeScalars.allSatisfy { scalar in
+                    (0x0041...0x005A).contains(scalar.value) ||
+                    (0x0061...0x007A).contains(scalar.value) ||
+                    (0x00C0...0x024F).contains(scalar.value)
+                }
+            }
+        }
+    }
+
     /// Check whether a word is correctly spelled in a given language.
     /// Returns true if the word is recognized (no misspelling found).
     func isValidWord(_ word: String, language: String) -> Bool {
@@ -39,6 +67,10 @@ final class SpellCheckService {
         guard !trimmed.isEmpty else { return false }
 
         let lang = normalizeLanguage(language)
+        guard matchesExpectedScript(word: trimmed, language: lang) else {
+            return false
+        }
+
         let range = checker.checkSpelling(
             of: trimmed,
             startingAt: 0,

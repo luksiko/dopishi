@@ -176,7 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Smart conversion fallback when no text is explicitly selected
-        NSLog("[LangSwitcher] Direct conversion failed/no selection. Trying smart conversion...")
+        NSLog("[LangSwitcher] Direct conversion failed/no selection. Trying smart conversion after short delay...")
+        usleep(50_000) // 50ms — give time for physical modifier release to settle
         performSmartConversion()
     }
     

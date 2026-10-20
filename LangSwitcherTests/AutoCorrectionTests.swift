@@ -63,6 +63,48 @@ final class AutoCorrectionTests: XCTestCase {
         XCTAssertFalse(spellCheckService.isValidWord(input, language: "ru"))
     }
     
+    func testWrongLayoutWordCorrection_FgeshToAuto() {
+        let input = "фгещ"
+        
+        // 1. Should detect wrong layout
+        XCTAssertTrue(textConverter.looksLikeWrongLayout(input))
+        
+        // 2. Should convert correctly to "auto"
+        guard let result = textConverter.convertSelectedTextWithInfo(input) else {
+            XCTFail("Conversion failed")
+            return
+        }
+        XCTAssertEqual(result.text, "auto")
+        
+        // 3. Converted word should be valid English
+        XCTAssertTrue(spellCheckService.isValidWord(result.text, language: "en"))
+        
+        // 4. Original word should NOT be valid in any enabled language (neither en nor ru)
+        let sourceLangs = ["en", "ru"]
+        XCTAssertFalse(spellCheckService.isValidWordInAnyLanguage(input, languages: sourceLangs))
+    }
+    
+    func testWrongLayoutWordCorrection_SqkkuseToCorrect() {
+        let input = "сщккусе"
+        
+        // 1. Should detect wrong layout
+        XCTAssertTrue(textConverter.looksLikeWrongLayout(input))
+        
+        // 2. Should convert correctly to "correct"
+        guard let result = textConverter.convertSelectedTextWithInfo(input) else {
+            XCTFail("Conversion failed")
+            return
+        }
+        XCTAssertEqual(result.text, "correct")
+        
+        // 3. Converted word should be valid English
+        XCTAssertTrue(spellCheckService.isValidWord(result.text, language: "en"))
+        
+        // 4. Original word should NOT be valid in any enabled language
+        let sourceLangs = ["en", "ru"]
+        XCTAssertFalse(spellCheckService.isValidWordInAnyLanguage(input, languages: sourceLangs))
+    }
+    
     func testValidEnglishWordIsNotCorrectedAsWrongLayout() {
         let validEnglishWords = ["apple", "window", "keyboard", "computer"]
         
