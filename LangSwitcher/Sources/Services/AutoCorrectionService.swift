@@ -76,9 +76,17 @@ final class AutoCorrectionService {
         self.autocompletionEngine = autocompletionEngine ?? AutocompletionEngine(spellCheckService: spellCheckService, adaptiveStore: store)
         self.overlayController = overlayController ?? AutocompletionOverlayController()
         self.ghostTextController = ghostTextController ?? GhostTextOverlayController()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleLayoutChanged),
+            name: .keyboardLayoutSelectionChanged,
+            object: nil
+        )
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
@@ -199,6 +207,12 @@ final class AutoCorrectionService {
         previousWord = nil
         ServiceStatus.shared.state = .disabled
         NSLog("[LangSwitcher] AutoCorrectionService: stopped")
+    }
+
+    @objc private func handleLayoutChanged() {
+        wordBuffer = ""
+        previousWord = nil
+        dismissAutocompletion()
     }
 
     /// Restart monitoring (e.g., when settings change).

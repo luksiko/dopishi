@@ -759,15 +759,11 @@ final class AccessibilityService {
                 var currentRange = CFRange()
                 return AXValueGetValue(selectedRangeValue as! AXValue, .cfRange, &currentRange)
                     && currentRange.location == range.location && currentRange.length == range.length
-            }, post: { processID in
+            }, post: { _ in
                 for event in [down, up] {
                     event.flags = .maskCommand
                     event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
-                    if processID > 0 {
-                        event.postToPid(processID)
-                    } else {
-                        event.post(tap: .cgAnnotatedSessionEventTap)
-                    }
+                    event.post(tap: .cgAnnotatedSessionEventTap)
                 }
             })
             guard sent else {
