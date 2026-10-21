@@ -310,4 +310,35 @@ extension AIInferenceTests {
         let chat = await engine.modelUsesChatTemplate(at: path.path)
         XCTAssertEqual(chat, true)
     }
+
+    func testConcurrentModelUsesChatTemplateDeduplication() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: path) }
+        let engine = AIInferenceEngine()
+        defer { engine.stop() }
+        func number(_ value: UInt64, bytes: Int) -> Data {
+            Data((0..<bytes).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) })
+        }
+        func string(_ value: String) -> Data { number(UInt64(value.utf8.count), bytes: 8) + Data(value.utf8) }
+        var data = Data("GGUF".utf8)
+        data += number(3, bytes: 4)
+        data += number(0, bytes: 8)
+        data += number(1, bytes: 8)
+        data += string("tokenizer.chat_template")
+        data += number(8, bytes: 4)
+        data += string("{{ messages }}")
+        try data.write(to: path, options: .atomic)
+
+        // Launch 10 simultaneous tasks awaiting template detection
+        await withTaskGroup(of: Bool?.self) { group in
+            for _ in 0..<10 {
+                group.addTask {
+                    await engine.modelUsesChatTemplate(at: path.path)
+                }
+            }
+            for await res in group {
+                XCTAssertEqual(res, true)
+            }
+        }
+    }
 }

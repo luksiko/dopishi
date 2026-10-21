@@ -346,4 +346,16 @@ final class ScreenContextServiceTests: XCTestCase {
         let regSystem = regularMessages[0]["content"] ?? ""
         XCTAssertFalse(regSystem.contains("Собеседник задал вопрос"))
     }
+
+    func testExtractScreenContextAsyncSecurityExclusion() async {
+        let service = ScreenContextService()
+        // If an app is in excluded bundle IDs, async extraction immediately returns nil
+        let result = await service.extractScreenContextAsync(
+            frontmostApp: nil,
+            focusedElement: nil,
+            excludedBundleIDs: Set(["com.apple.keychainaccess", "com.agilebits.onepassword"])
+        )
+        // With nil frontmostApp / excluded app in test host, safely returns nil
+        XCTAssertNil(result)
+    }
 }

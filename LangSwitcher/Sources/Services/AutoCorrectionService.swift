@@ -736,7 +736,7 @@ final class AutoCorrectionService {
             var screenContextText: String?
             var hasPendingQuestion = false
             if self.settingsManager.aiScreenContextEnabled {
-                if let screenCtx = ScreenContextService.shared.extractScreenContext(
+                if let screenCtx = await ScreenContextService.shared.extractScreenContextAsync(
                     frontmostApp: NSWorkspace.shared.frontmostApplication,
                     focusedElement: self.accessibilityService.focusedTextElement(),
                     excludedBundleIDs: Set(self.settingsManager.excludedAppBundleIDs)

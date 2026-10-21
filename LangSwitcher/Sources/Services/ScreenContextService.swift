@@ -40,14 +40,14 @@ final class ScreenContextService: ObservableObject {
     static let shared = ScreenContextService()
     
     // Bounds and limits
-    static let maxDepth = 12
-    static let maxVisitedElements = 120
-    static let maxTimeBudgetSeconds = 0.035 // 35 ms
-    static let defaultMaxMessages = 8
-    static let defaultMaxCharacters = 1000
+    nonisolated static let maxDepth = 12
+    nonisolated static let maxVisitedElements = 120
+    nonisolated static let maxTimeBudgetSeconds = 0.035 // 35 ms
+    nonisolated static let defaultMaxMessages = 8
+    nonisolated static let defaultMaxCharacters = 1000
     
     // TTL Cache
-    static let cacheTTL: TimeInterval = 1.8 // 1.8 seconds
+    nonisolated static let cacheTTL: TimeInterval = 1.8 // 1.8 seconds
     
     private struct CacheEntry {
         let key: String
@@ -65,7 +65,7 @@ final class ScreenContextService: ObservableObject {
     }
     
     // Roles to completely skip during traversal
-    static let ignoredRoles: Set<String> = [
+    nonisolated static let ignoredRoles: Set<String> = [
         "AXButton",
         "AXPopUpButton",
         "AXMenuButton",
@@ -88,7 +88,7 @@ final class ScreenContextService: ObservableObject {
     ]
     
     // Roles holding readable text
-    static let textRoles: Set<String> = [
+    nonisolated static let textRoles: Set<String> = [
         "AXStaticText",
         "AXTextArea",
         "AXTextField",
@@ -97,7 +97,7 @@ final class ScreenContextService: ObservableObject {
     ]
     
     // Common UI noise labels in chat applications
-    static let noiseLabels: Set<String> = [
+    nonisolated static let noiseLabels: Set<String> = [
         "send", "attach", "search", "close", "minimize", "zoom", "emoji", "stickers",
         "mute", "reply", "forward", "edit", "delete", "copy", "save", "ok", "cancel",
         "pinned message", "members", "read", "delivered", "typing", "online",
@@ -107,7 +107,7 @@ final class ScreenContextService: ObservableObject {
     ]
     
     // Web browser bundle identifiers for AXWebArea fast-path
-    static let browserBundleIDs: Set<String> = [
+    nonisolated static let browserBundleIDs: Set<String> = [
         "com.apple.Safari",
         "com.apple.SafariTechnologyPreview",
         "com.google.Chrome",
@@ -120,12 +120,12 @@ final class ScreenContextService: ObservableObject {
         "org.mozilla.firefox"
     ]
     
-    static func isBrowserApp(bundleID: String) -> Bool {
+    nonisolated static func isBrowserApp(bundleID: String) -> Bool {
         browserBundleIDs.contains(bundleID)
     }
 
     // Chat application bundle identifiers
-    static let chatBundleIDs: Set<String> = [
+    nonisolated static let chatBundleIDs: Set<String> = [
         "ru.keepcoder.Telegram",
         "org.telegram.desktop",
         "com.tinyspeck.slackmacgap",
@@ -137,13 +137,13 @@ final class ScreenContextService: ObservableObject {
         "com.viber.osx"
     ]
 
-    static func isChatApp(bundleID: String) -> Bool {
+    nonisolated static func isChatApp(bundleID: String) -> Bool {
         chatBundleIDs.contains(bundleID)
     }
 
     /// Walk up the parent hierarchy from the focused input field in chat apps
     /// to locate the active conversation column container, completely bypassing the left sidebar.
-    static func findChatColumnAncestor(of element: AXUIElement, focusedRect: CGRect) -> AXUIElement? {
+    nonisolated static func findChatColumnAncestor(of element: AXUIElement, focusedRect: CGRect) -> AXUIElement? {
         var current: AXUIElement = element
         var bestAncestor: AXUIElement?
         for _ in 0..<8 {
@@ -176,7 +176,7 @@ final class ScreenContextService: ObservableObject {
         return bestAncestor
     }
     
-    static func findWebAreaAncestor(of element: AXUIElement) -> AXUIElement? {
+    nonisolated static func findWebAreaAncestor(of element: AXUIElement) -> AXUIElement? {
         var current: AXUIElement = element
         for _ in 0..<12 {
             var parentRef: CFTypeRef?
@@ -195,7 +195,7 @@ final class ScreenContextService: ObservableObject {
         return nil
     }
     
-    static func findWebAreaInWindow(_ window: AXUIElement) -> AXUIElement? {
+    nonisolated static func findWebAreaInWindow(_ window: AXUIElement) -> AXUIElement? {
         var queue: [(element: AXUIElement, depth: Int)] = [(window, 0)]
         var head = 0
         while head < queue.count && head < 60 {
@@ -231,7 +231,8 @@ final class ScreenContextService: ObservableObject {
     private static let timestampRegex = try? NSRegularExpression(pattern: #"^\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?$"#, options: .caseInsensitive)
     private static let dateLabelRegex = try? NSRegularExpression(pattern: #"^(today|yesterday|сегодня|вчера|just now|только что)$"#, options: .caseInsensitive)
     
-    private var preparedElectronPID: pid_t?
+    private var consecutiveFailures = 0
+    private var circuitBreakerUntil: Date?
     
     init() {}
     
@@ -241,7 +242,7 @@ final class ScreenContextService: ObservableObject {
     
     // MARK: - Speaker Attribution Helper
     
-    static func detectSpeaker(elementFrame: CGRect?, columnMinX: CGFloat, columnMaxX: CGFloat) -> Speaker {
+    nonisolated static func detectSpeaker(elementFrame: CGRect?, columnMinX: CGFloat, columnMaxX: CGFloat) -> Speaker {
         guard let frame = elementFrame else { return .neutral }
         let columnWidth = columnMaxX - columnMinX
         guard columnWidth > 150 else { return .neutral }
@@ -266,11 +267,11 @@ final class ScreenContextService: ObservableObject {
     
     // MARK: - Filter & Sanitization Helpers
     
-    static func isIgnoredRole(_ role: String) -> Bool {
+    nonisolated static func isIgnoredRole(_ role: String) -> Bool {
         ignoredRoles.contains(role)
     }
     
-    static func isTimestampOrDate(_ text: String) -> Bool {
+    nonisolated static func isTimestampOrDate(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return true }
         let range = NSRange(location: 0, length: trimmed.utf16.count)
@@ -283,7 +284,7 @@ final class ScreenContextService: ObservableObject {
         return false
     }
     
-    static func isUINoiseText(_ text: String) -> Bool {
+    nonisolated static func isUINoiseText(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return true }
         if noiseLabels.contains(trimmed) { return true }
@@ -295,7 +296,7 @@ final class ScreenContextService: ObservableObject {
         return false
     }
     
-    static func sanitizeMessage(_ text: String) -> String? {
+    nonisolated static func sanitizeMessage(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return nil }
         
@@ -333,7 +334,7 @@ final class ScreenContextService: ObservableObject {
         return sanitized
     }
     
-    static func detectPendingQuestion(messages: [(text: String, speaker: Speaker)]) -> Bool {
+    nonisolated static func detectPendingQuestion(messages: [(text: String, speaker: Speaker)]) -> Bool {
         guard let last = messages.last else { return false }
         // If the user already answered last (You: ...), there is no pending question
         guard last.speaker == .incoming || last.speaker == .neutral else { return false }
@@ -349,7 +350,7 @@ final class ScreenContextService: ObservableObject {
     }
     
     // Backward-compatible overload for 3-tuple (text, y, x)
-    static func filterAndFormat(
+    nonisolated static func filterAndFormat(
         items: [(text: String, y: CGFloat, x: CGFloat)],
         windowTitle: String?,
         appBundleID: String,
@@ -368,7 +369,7 @@ final class ScreenContextService: ObservableObject {
         )
     }
     
-    static func filterAndFormat(
+    nonisolated static func filterAndFormat(
         attributedItems: [(text: String, y: CGFloat, x: CGFloat, speaker: Speaker)],
         windowTitle: String?,
         appBundleID: String,
@@ -435,6 +436,7 @@ final class ScreenContextService: ObservableObject {
     
     // MARK: - Extraction Pipeline
     
+    /// Synchronous extraction method with caching.
     func extractScreenContext(
         frontmostApp: NSRunningApplication? = nil,
         focusedElement: AXUIElement? = nil,
@@ -466,9 +468,104 @@ final class ScreenContextService: ObservableObject {
         }
         
         let appName = app.localizedName ?? bundleID
-        prepareAccessibility(for: app)
+        let cacheKey = "\(app.processIdentifier):\(focusedElement.map { CFHash($0) } ?? 0)"
+        if let entry = cache, entry.key == cacheKey, Date().timeIntervalSince(entry.timestamp) < Self.cacheTTL {
+            return entry.result
+        }
         
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        let result = Self.performExtraction(
+            pid: app.processIdentifier,
+            bundleID: bundleID,
+            appName: appName,
+            focusedElement: focusedElement,
+            maxCharacters: maxCharacters,
+            maxMessages: maxMessages
+        )
+        self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
+        return result
+    }
+
+    /// Asynchronous extraction running off the main thread with an explicit timeout.
+    /// Never blocks the main RunLoop or CGEventTap.
+    func extractScreenContextAsync(
+        frontmostApp: NSRunningApplication? = nil,
+        focusedElement: AXUIElement? = nil,
+        excludedBundleIDs: Set<String> = AutoCorrectionGate.defaultExcludedBundleIDs,
+        maxCharacters: Int = defaultMaxCharacters,
+        maxMessages: Int = defaultMaxMessages
+    ) async -> ScreenContextResult? {
+        guard AXIsProcessTrusted() else { return nil }
+        if let until = circuitBreakerUntil, Date() < until {
+            return nil
+        }
+        guard let app = frontmostApp ?? NSWorkspace.shared.frontmostApplication,
+              let bundleID = app.bundleIdentifier else { return nil }
+        if excludedBundleIDs.contains(bundleID) { return nil }
+        
+        if let focused = focusedElement {
+            var roleRef: CFTypeRef?
+            var subroleRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(focused, kAXRoleAttribute as CFString, &roleRef)
+            AXUIElementCopyAttributeValue(focused, kAXSubroleAttribute as CFString, &subroleRef)
+            if AutoCorrectionGate.isSecureField(role: roleRef as? String, subrole: subroleRef as? String) {
+                return nil
+            }
+        }
+        
+        let pid = app.processIdentifier
+        let appName = app.localizedName ?? bundleID
+        let cacheKey = "\(pid):\(focusedElement.map { CFHash($0) } ?? 0)"
+        if let entry = cache, entry.key == cacheKey, Date().timeIntervalSince(entry.timestamp) < Self.cacheTTL {
+            return entry.result
+        }
+        
+        let timeoutNanos = UInt64((Self.maxTimeBudgetSeconds + 0.03) * 1_000_000_000)
+        let result = await withTaskGroup(of: ScreenContextResult?.self) { group -> ScreenContextResult? in
+            group.addTask(priority: .utility) {
+                Self.performExtraction(
+                    pid: pid,
+                    bundleID: bundleID,
+                    appName: appName,
+                    focusedElement: focusedElement,
+                    maxCharacters: maxCharacters,
+                    maxMessages: maxMessages
+                )
+            }
+            group.addTask(priority: .utility) {
+                try? await Task.sleep(nanoseconds: timeoutNanos)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        
+        self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
+        if result == nil {
+            consecutiveFailures += 1
+            if consecutiveFailures >= 3 {
+                circuitBreakerUntil = Date().addingTimeInterval(15)
+            }
+        } else {
+            consecutiveFailures = 0
+            circuitBreakerUntil = nil
+        }
+        return result
+    }
+    
+    // MARK: - Background Traversal Engine
+    
+    nonisolated static func performExtraction(
+        pid: pid_t,
+        bundleID: String,
+        appName: String,
+        focusedElement: AXUIElement?,
+        maxCharacters: Int = defaultMaxCharacters,
+        maxMessages: Int = defaultMaxMessages
+    ) -> ScreenContextResult? {
+        let appElement = AXUIElementCreateApplication(pid)
+        // Bound individual IPC messages to 50ms so an unresponsive app never hangs LangSwitcher
+        AXUIElementSetMessagingTimeout(appElement, 0.05)
         
         // Locate focused or main window
         var windowRef: CFTypeRef?
@@ -484,6 +581,7 @@ final class ScreenContextService: ObservableObject {
         
         guard let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return nil }
         let window = windowRef as! AXUIElement
+        AXUIElementSetMessagingTimeout(window, 0.05)
         
         // Extract window title
         var titleRef: CFTypeRef?
@@ -493,26 +591,18 @@ final class ScreenContextService: ObservableObject {
             windowTitle = title
         }
         
-        // Check TTL cache
-        let cacheKey = "\(app.processIdentifier):\(windowTitle ?? ""):\(focusedElement.map { CFHash($0) } ?? 0)"
-        if let entry = cache, entry.key == cacheKey, Date().timeIntervalSince(entry.timestamp) < Self.cacheTTL {
-            return entry.result
-        }
-        
         // Determine focused element rect if available
         var focusedRect: CGRect?
         if let focused = focusedElement {
             focusedRect = elementFrame(focused)
         }
         
-        let isChat = Self.isChatApp(bundleID: bundleID)
+        let isChat = isChatApp(bundleID: bundleID)
         if isChat && focusedRect == nil {
-            // In chat applications, abort if the input field cannot be spatially identified,
-            // never falling back to window bounds which would sweep the channels sidebar.
             return nil
         }
         
-        let deadline = ProcessInfo.processInfo.systemUptime + Self.maxTimeBudgetSeconds
+        let deadline = ProcessInfo.processInfo.systemUptime + maxTimeBudgetSeconds
         var visitedCount = 0
         var collectedItems: [(text: String, y: CGFloat, x: CGFloat, speaker: Speaker)] = []
         
@@ -521,7 +611,6 @@ final class ScreenContextService: ObservableObject {
         var columnMaxX: CGFloat = 800
         if let f = focusedRect, f.width > 20 {
             if isChat {
-                // In chat apps, strictly confine to the chat input column (never bleed into left sidebar)
                 columnMinX = f.origin.x - 10
                 columnMaxX = f.origin.x + f.width + 10
             } else {
@@ -535,12 +624,12 @@ final class ScreenContextService: ObservableObject {
         
         // Locate root content node: if web app, prioritize AXWebArea; if chat app, prioritize chat column container
         var traversalRoot: AXUIElement = window
-        if let focused = focusedElement, let webArea = Self.findWebAreaAncestor(of: focused) {
+        if let focused = focusedElement, let webArea = findWebAreaAncestor(of: focused) {
             traversalRoot = webArea
-        } else if Self.isBrowserApp(bundleID: bundleID), let webArea = Self.findWebAreaInWindow(window) {
+        } else if isBrowserApp(bundleID: bundleID), let webArea = findWebAreaInWindow(window) {
             traversalRoot = webArea
         } else if let focused = focusedElement, let f = focusedRect, isChat,
-                  let chatAncestor = Self.findChatColumnAncestor(of: focused, focusedRect: f) {
+                  let chatAncestor = findChatColumnAncestor(of: focused, focusedRect: f) {
             traversalRoot = chatAncestor
         }
         
@@ -557,7 +646,7 @@ final class ScreenContextService: ObservableObject {
         var queue: [(element: AXUIElement, depth: Int)] = [(traversalRoot, 0)]
         var head = 0
         
-        while head < queue.count && visitedCount < Self.maxVisitedElements {
+        while head < queue.count && visitedCount < maxVisitedElements {
             if ProcessInfo.processInfo.systemUptime >= deadline {
                 break
             }
@@ -575,20 +664,17 @@ final class ScreenContextService: ObservableObject {
             AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
             let role = roleRef as? String ?? ""
             
-            // Skip ignored UI controls (buttons, scrollbars, etc.)
-            if Self.isIgnoredRole(role) {
+            if isIgnoredRole(role) {
                 continue
             }
             
-            // In chat apps, skip traversing subtrees that sit entirely inside the left sidebar
             if isChat, let f = focusedRect, let elemFrame = elementFrame(element) {
                 if elemFrame.origin.x + elemFrame.width < f.origin.x - 10 {
                     continue
                 }
             }
             
-            // Extract text from content-bearing nodes
-            if Self.textRoles.contains(role) {
+            if textRoles.contains(role) {
                 var valueRef: CFTypeRef?
                 AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef)
                 var rawText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string
@@ -606,28 +692,22 @@ final class ScreenContextService: ObservableObject {
                 }
                 
                 if let text = rawText,
-                   !Self.isTimestampOrDate(text),
-                   !Self.isUINoiseText(text),
-                   let sanitized = Self.sanitizeMessage(text) {
+                   !isTimestampOrDate(text),
+                   !isUINoiseText(text),
+                   let sanitized = sanitizeMessage(text) {
                     
                     let frame = elementFrame(element)
                     var acceptSpatial = true
                     
                     if let f = focusedRect, f.width > 20, let elemFrame = frame {
-                        // Exclude elements that intersect the focused field itself
                         if f.insetBy(dx: -2, dy: -2).intersects(elemFrame) {
                             acceptSpatial = false
                         } else {
-                            // Check horizontal alignment with chat input column:
-                            // The center of the element must fall within the column bounds,
-                            // and its left edge must not be in the left sidebar.
                             let elementMidX = elemFrame.origin.x + (elemFrame.width / 2.0)
                             let overlapsColumn = (elementMidX >= columnMinX) &&
                                                  (elementMidX <= columnMaxX) &&
                                                  (elemFrame.origin.x >= columnMinX - 15)
-                            // Must be vertically above the input field
                             let isAbove = elemFrame.origin.y < f.origin.y + 4
-                            
                             acceptSpatial = overlapsColumn && isAbove
                         }
                     }
@@ -635,14 +715,13 @@ final class ScreenContextService: ObservableObject {
                     if acceptSpatial {
                         let yPos = frame?.origin.y ?? CGFloat(visitedCount)
                         let xPos = frame?.origin.x ?? 0
-                        let speaker = Self.detectSpeaker(elementFrame: frame, columnMinX: columnMinX, columnMaxX: columnMaxX)
+                        let speaker = detectSpeaker(elementFrame: frame, columnMinX: columnMinX, columnMaxX: columnMaxX)
                         collectedItems.append((text: sanitized, y: yPos, x: xPos, speaker: speaker))
                     }
                 }
             }
             
-            // Enqueue children if within depth bound
-            if depth < Self.maxDepth {
+            if depth < maxDepth {
                 var childrenRef: CFTypeRef?
                 if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
                    let children = childrenRef as? [AXUIElement] {
@@ -653,7 +732,7 @@ final class ScreenContextService: ObservableObject {
             }
         }
         
-        let result = Self.filterAndFormat(
+        return filterAndFormat(
             attributedItems: collectedItems,
             windowTitle: windowTitle,
             appBundleID: bundleID,
@@ -661,14 +740,11 @@ final class ScreenContextService: ObservableObject {
             maxCharacters: maxCharacters,
             maxMessages: maxMessages
         )
-        
-        self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
-        return result
     }
     
     // MARK: - AX Helpers
     
-    private func elementFrame(_ element: AXUIElement) -> CGRect? {
+    nonisolated static func elementFrame(_ element: AXUIElement) -> CGRect? {
         var posRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef)
@@ -688,18 +764,5 @@ final class ScreenContextService: ObservableObject {
         
         guard gotPos && gotSize else { return nil }
         return CGRect(origin: pos, size: size)
-    }
-    
-    private func prepareAccessibility(for app: NSRunningApplication) {
-        let pid = app.processIdentifier
-        if preparedElectronPID != pid {
-            preparedElectronPID = pid
-            let appEl = AXUIElementCreateApplication(pid)
-            AXUIElementSetAttributeValue(appEl, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
-            if let bundle = app.bundleURL,
-               FileManager.default.fileExists(atPath: bundle.appendingPathComponent("Contents/Frameworks/Electron Framework.framework").path) {
-                AXUIElementSetAttributeValue(appEl, "AXManualAccessibility" as CFString, kCFBooleanTrue)
-            }
-        }
     }
 }

@@ -153,6 +153,9 @@ final class AIInferenceEngine: ObservableObject {
                 self.isRunning = true
                 self.currentLoadedModelPath = modelPath
                 NSLog("[LangSwitcher] AIInferenceEngine: started successfully on port %d with %@", port, (modelPath as NSString).lastPathComponent)
+                Task { [weak self] in
+                    _ = await self?.modelUsesChatTemplate(at: modelPath)
+                }
                 return true
             } else {
                 NSLog("[LangSwitcher] AIInferenceEngine: health check failed (running=%@, status=%d)", proc.isRunning.description, proc.isRunning ? -1 : proc.terminationStatus)
@@ -176,6 +179,8 @@ final class AIInferenceEngine: ObservableObject {
         }
         isRunning = false
         currentLoadedModelPath = nil
+        inFlightTemplateTask?.task.cancel()
+        inFlightTemplateTask = nil
         metadataCacheRevision &+= 1
         cachedTemplateModel = nil
         cachedUsesChatTemplate = true
@@ -291,22 +296,32 @@ final class AIInferenceEngine: ObservableObject {
             guard let key = string(read: true), let type = integer(4) else { return nil }
             if key == "tokenizer.chat_template", type == 8 {
                 guard let template = string(read: true) else { return nil }
-                found = !template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                return !template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             } else if !skip(type) { return nil }
         }
-        return found
+        return false
     }
 
     private var cachedTemplateModel: String?
     private var cachedUsesChatTemplate = true
     private var metadataCacheRevision = 0
+    private var inFlightTemplateTask: (path: String, task: Task<Bool?, Never>)?
 
     func modelUsesChatTemplate(at path: String) async -> Bool? {
         if cachedTemplateModel == path { return cachedUsesChatTemplate }
+        if let current = inFlightTemplateTask, current.path == path {
+            return await current.task.value
+        }
         let revision = metadataCacheRevision
-        let detected = await Task.detached(priority: .utility) { Self.embeddedChatTemplate(at: path) }.value
-        // A restart may replace the file at the same path while metadata is read.
-        guard !Task.isCancelled, revision == metadataCacheRevision, let detected else { return nil }
+        let task = Task.detached(priority: .utility) {
+            Self.embeddedChatTemplate(at: path)
+        }
+        inFlightTemplateTask = (path: path, task: task)
+        let detected = await task.value
+        inFlightTemplateTask = nil
+        // Cache detection for this path even if caller task is cancelled,
+        // so rapid typing doesn't repeatedly scan the model file.
+        guard revision == metadataCacheRevision, let detected else { return nil }
         cachedTemplateModel = path
         cachedUsesChatTemplate = detected
         return detected
