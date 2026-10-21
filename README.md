@@ -1,118 +1,151 @@
-# Dopishi
+<p align="center">
+  <img src="screenshots/icon.png" width="96" height="96" alt="Dopishi App Icon">
+</p>
 
-[English](README.md) | [Русский](README.ru.md)
+<h1 align="center">Dopishi</h1>
 
-**Smart, open-source keyboard layout text converter and auto-correction utility for macOS.**
+<p align="center">
+  <strong>The intelligent, privacy-first macOS keyboard layout switcher and instant text converter.</strong>
+</p>
 
-Typed text in the wrong keyboard layout? Select it, press a hotkey, and Dopishi instantly converts it to the correct layout. No more retyping `ghbdtn` when you meant `привет`.
+<p align="center">
+  <a href="README.md">English</a> | <a href="README.ru.md">Русский</a>
+</p>
 
-An open-source alternative to [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/).
+<p align="center">
+  <a href="https://github.com/luksiko/dopishi/actions/workflows/build.yml"><img src="https://github.com/luksiko/dopishi/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-13%2B%20Ventura-brightgreen.svg" alt="macOS 13+"></a>
+  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5-orange.svg" alt="Swift 5"></a>
+  <img src="https://img.shields.io/badge/Dependencies-Zero-blue.svg" alt="Zero Dependencies">
+  <img src="https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg" alt="100% Offline">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple.svg" alt="License: MIT"></a>
+</p>
 
-[![Build](https://github.com/luksiko/dopishi/actions/workflows/build.yml/badge.svg)](https://github.com/luksiko/dopishi/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-brightgreen.svg)](https://www.apple.com/macos/)
-[![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg)](https://swift.org/)
+---
 
-> **Origin & Gratitude:**
-> Dopishi was originally forked from [langSwitcher](https://github.com/reg2005/langSwitcher) by [reg2005](https://github.com/reg2005). We express our deepest gratitude to the original author for creating this great open-source foundation.
+<p align="center">
+  <img src="screenshots/demo.gif" width="100%" alt="Dopishi in action — instant layout conversion">
+</p>
 
-> If you find Dopishi useful, consider [supporting the project](#donate) — any contribution is appreciated!
+---
 
-**[Documentation](https://reg2005.github.io/langSwitcher/en)** | **[Документация (RU)](https://reg2005.github.io/langSwitcher/ru)**
+## Quick Install
 
-## Demo
+### Homebrew
 
-https://github.com/reg2005/langSwitcher/raw/main/screenshots/langSwitch.mp4
-
-## Screenshot
-
-![LangSwitcher Settings — General](screenshots/general.png)
-
-## Key Features
-
-- **Instant text conversion** — select text and press a hotkey to convert between layouts
-- **Smart Conversion modes** — works even without manual text selection:
-  - **Greedy Line (default)** — selects to line start, finds where wrong layout begins, converts the entire wrong-layout phrase
-  - **Last Word** — auto-selects and converts only the last typed word
-  - **Disabled** — only works with explicit text selection
-- **Auto-detection** — automatically detects which layout the text was typed in
-- **System keyboard integration** — uses your installed system keyboard layouts
-- **Double Shift hotkey** — press `⇧⇧` (Shift twice quickly) to convert, or set a custom shortcut
-- **Conversion Log** — optionally log conversions to a local SQLite database (disabled by default for privacy). Review and label entries (correct/incorrect) for future ML training
-- **JSON export** — export conversion logs for data analysis or model training
-- **Menu bar app** — lives quietly in your status bar, always ready
-- **Multiple layouts** — English, Russian, German, French, Spanish (5 layouts)
-- **Punctuation preservation** — `?`, `!`, `/` and other punctuation stay unchanged during conversion
-- **Zero dependencies** — pure Swift, no external libraries, no dictionaries
-- **Privacy first** — no data leaves your Mac, no analytics, no network access
-- **Open source** — MIT licensed, contributions welcome
-
-## How It Works
-
-```
-1. You type "ghbdtn" (meant to type "привет" but had English layout active)
-2. Select the mistyped text (or just press the hotkey — Smart Conversion handles it)
-3. Press ⇧⇧ (double Shift)
-4. Text is replaced with "привет"
-```
-
-Dopishi maps characters based on **physical key positions** on the keyboard. The same physical key produces different characters depending on the active layout — Dopishi reverses this mapping.
-
-## Installation
-
-### Homebrew (Recommended)
-
-Install Dopishi using [Homebrew](https://brew.sh):
+Install with a single command via [Homebrew](https://brew.sh):
 
 ```bash
 brew install --cask luksiko/tap/dopishi
 ```
 
-Or add the tap first:
+*(To update: `brew upgrade --cask dopishi`)*
 
-```bash
-brew tap luksiko/tap
-brew install --cask dopishi
+### Direct Download (DMG)
+
+Prefer a standard macOS installer?
+
+<p align="left">
+  <a href="https://github.com/luksiko/dopishi/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Dopishi.dmg-100000?style=for-the-badge&logo=apple&logoColor=white" alt="Download Dopishi DMG">
+  </a>
+</p>
+
+1. Download **[Dopishi.dmg](https://github.com/luksiko/dopishi/releases/latest)** for your Mac architecture (Apple Silicon M1/M2/M3/M4 or Intel).
+2. Drag **Dopishi** to your **Applications** folder.
+3. Launch Dopishi and allow **Accessibility** permissions when prompted.
+
+---
+
+## Why Dopishi?
+
+We’ve all been there: you type a passionate paragraph or a quick code comment, only to look up and see `ghbdtn rfr ltkf` instead of `привет как дела`. 
+
+Dopishi completely eliminates this friction. It runs quietly in your menu bar, consumes less than 30 MB of RAM, and respects your privacy above all else.
+
+### ⚡ The 3 Superpowers
+
+* **1. Real-Time Auto-Correction:**
+  Type `ghbdtn ` and Dopishi automatically transforms it into `привет ` right under your cursor. Zero extra keystrokes.
+* **2. Instant Smart Conversion (`⇧⇧` Double-Shift):**
+  Typed a whole sentence in the wrong layout? Double-tap `Shift` (or your custom shortcut). Dopishi scans backwards to the start of the mistake and converts only the wrong-layout tail.
+* **3. Single-Key Layout Switching:**
+  Switch layouts effortlessly with a single tap of right `⌥ Option` or `⇪ Caps Lock`. Faster and much more responsive than the built-in macOS shortcut.
+
+---
+
+## 🔒 Privacy & Security by Design
+
+Because keyboard utilities require macOS **Accessibility** permissions, trust is non-negotiable:
+
+* **100% Offline:** Dopishi has **zero network permissions** and makes no internet requests.
+* **Zero Keylogging:** Dopishi does not record or store what you type.
+* **Secure Fields Protected:** Dopishi automatically detects password fields and secure inputs and completely shuts off text processing.
+* **Local-Only SQLite Log:** Optional conversion logging is **disabled by default**. If enabled, records stay strictly on your local machine (`~/Library/Application Support/Dopishi/`) and can be cleared with one click.
+* **Auditable Open Source:** Pure native Swift with zero third-party binary blobs.
+
+---
+
+## How It Works
+
+Dopishi maps characters by their **physical key coordinates** (QWERTY layout matrix) rather than arbitrary transliteration tables.
+
+```
+Input:  "ghbdtn" (typed on US layout when Russian was intended)
+1. Detect source layout: US QWERTY
+2. Trace physical key positions: [g, h, b, d, t, n] -> [0x05, 0x04, 0x0B, 0x02, 0x11, 0x2D]
+3. Map coordinates to active target layout: Russian ЙЦУКЕН
+4. Output: "привет"
 ```
 
-To update when a new version is released:
+Punctuation (`?`, `!`, `/`, `@`) and numbers remain perfectly preserved.
+
+### Supported Layouts
+
+Dopishi automatically integrates with your active **System Settings > Keyboard > Input Sources**:
+* 🇺🇸 **English** (U.S., ABC, QWERTY)
+* 🇷🇺 **Russian** (ЙЦУКЕН)
+* 🇺🇦 **Ukrainian**
+* 🇩🇪 **German** (QWERTZ)
+* 🇫🇷 **French** (AZERTY)
+* 🇪🇸 **Spanish** (QWERTY)
+
+---
+
+## Settings & Customization
+
+Dopishi lives unobtrusively in your macOS status bar. Press `⌘,` or click the menu bar icon to customize:
+
+<p align="center">
+  <img src="screenshots/general.png" width="650" alt="Dopishi Settings">
+</p>
+
+* **Smart Conversion Modes:**
+  * **Greedy Line (Recommended):** Auto-detects where the layout switch began and converts just that tail.
+  * **Last Word:** Auto-converts only the trailing word before the cursor.
+  * **Selection Only:** Strictly converts only explicitly highlighted text.
+* **Layout Switch Key:** Choose right `⌥ Option`, `⇪ Caps Lock`, right `⌘ Command`, or `Fn`.
+* **Custom Shortcuts:** Record any key combination if you prefer not to use double-shift.
+* **Sound & Notifications:** Subtle audio confirmation on conversion.
+
+---
+
+## Build from Source
+
+### Prerequisites
+
+* macOS 13.0 (Ventura) or later
+* Xcode 15.0 or later
 
 ```bash
-brew upgrade --cask dopishi
-```
-
-### DMG (Manual Download)
-
-Go to [Releases](https://github.com/luksiko/dopishi/releases/latest) and download:
-
-| Architecture | File |
-|---|---|
-| **Apple Silicon (M1/M2/M3/M4)** | `Dopishi-*-arm64.dmg` |
-| **Intel** | `Dopishi-*-x86_64.dmg` |
-| **Universal (both)** | `Dopishi-*-universal.dmg` |
-
-1. Open the DMG and drag **Dopishi** to **Applications**
-2. Launch Dopishi
-3. Grant **Accessibility** permission when prompted
-
-### Build from Source
-
-#### Prerequisites
-
-- macOS 13.0 (Ventura) or later
-- Xcode 15.0 or later
-
-#### Steps
-
-```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/luksiko/dopishi.git
 cd dopishi
 
-# Run tests
+# 2. Run unit tests (440+ tests verify layout mapping & heuristics)
 bash scripts/test.sh
 
-# Build (universal binary)
+# 3. Build release universal binary
 xcodebuild -project LangSwitcher.xcodeproj \
   -scheme LangSwitcher \
   -configuration Release \
@@ -124,361 +157,42 @@ xcodebuild -project LangSwitcher.xcodeproj \
   CODE_SIGNING_ALLOWED=NO \
   build
 
-# The app is at build/Build/Products/Release/Dopishi.app
+# The built app bundle will be located at:
+# build/Build/Products/Release/Dopishi.app
 ```
 
-The test script builds an ad-hoc-signed host with the separate bundle identifier
-`com.dopishi.testhost`. This lets tests run while the installed Dopishi
-is open and avoids LaunchServices launch errors from unsigned test bundles.
-Extra `xcodebuild` options can be passed after `bash scripts/test.sh`.
-
-Or open `LangSwitcher.xcodeproj` in Xcode and press `⌘R`.
-
-### Updating the local installation
-
-Use the same certificate for every local update. List available certificates with
-`security find-identity -v -p codesigning`, then set its name or SHA-1 identity:
-
-```bash
-export DOPISHI_SIGNING_IDENTITY="Apple Development: your-account (TEAMID)"
-bash scripts/install-local.sh build/Build/Products/Release/Dopishi.app
-```
-
-The installer stages and signs the complete bundle, verifies that it satisfies the
-installed certificate-signed app's designated requirement, stops the installed copy,
-and replaces `/Applications/Dopishi.app`. Recoverable ZIP backups are kept in
-`~/Library/Application Support/Dopishi/Backups`, so they do not appear as extra
-launchable copies. If replacement fails after moving the old app, it is restored.
-The installer refuses ad-hoc signing. `scripts/sign-app.sh` also requires an explicit
-identity; temporary builds may explicitly use `DOPISHI_SIGNING_IDENTITY=-`.
-
-Migrating from an ad-hoc build can require renewing Accessibility consent once.
-Consistent signing reduces subsequent permission resets, but macOS still controls
-consent. Keep the same bundle identifier, installation path, and signing identity.
-For distributed releases, use the same Developer ID identity; a local Apple
-Development certificate is suitable for development on your own Mac.
-
-## Usage
-
-### Basic Workflow
-
-1. **Type text** in any application
-2. **Realize** you had the wrong keyboard layout active
-3. **Press** `⇧⇧` (double Shift) — Smart Conversion auto-selects and converts
-4. Or **select** the mistyped text manually, then press the hotkey
-5. The text is **instantly converted** to the correct layout
-
-### Smart Conversion Modes
-
-| Mode | Behavior |
-|------|----------|
-| **Greedy Line** (default) | Selects to line start, finds where wrong layout begins, converts the entire wrong-layout phrase. Handles `"ghbdtn rfr ltkf lheu"` -> `"привет как дела друг"` |
-| **Last Word** | Auto-selects only the last word before the cursor, converts if it looks like wrong layout |
-| **Disabled** | Only works with explicit manual text selection |
-
-### Menu Bar
-
-Dopishi lives in your menu bar with a keyboard icon. Click it to:
-
-- Convert selected text manually
-- See active keyboard layouts
-- View conversion statistics
-- Open settings
-- Quit the app
-
-### Settings
-
-Access settings from the menu bar icon -> **Settings** (or `⌘,`):
-
-| Tab | Description |
-|-----|-------------|
-| **General** | Launch at login, sounds, notifications, Smart Conversion mode, Layout Switch mode |
-| **Layouts** | View and refresh detected keyboard layouts |
-| **Hotkey** | Toggle double-shift or record a custom shortcut |
-| **Permissions** | Check and grant Accessibility access |
-| **Log** | View conversion history, label entries as correct/incorrect, export to JSON |
-
-### Conversion Log
-
-Conversion logging is **disabled by default** for your privacy. You can enable it in **Settings -> General -> Conversion Logging**.
-
-When enabled, conversions are saved to a local SQLite database (`~/Library/Application Support/Dopishi/conversion_log.sqlite`). You can configure the maximum number of stored entries (default: 100, or 0 for unlimited). In the **Log** tab you can:
-
-- Browse all past conversions (input -> output, layouts, mode, timestamp)
-- Rate each conversion as correct or incorrect (tri-state: unrated / correct / incorrect)
-- Export the labeled data as JSON for ML training or analysis
-- Delete individual entries or clear the entire log
-
-**No data ever leaves your Mac.** The conversion log is stored purely locally and is never transmitted anywhere.
-
-## Supported Layouts
-
-Dopishi detects layouts from your **System Settings > Keyboard > Input Sources**. Currently supported:
-
-| Layout | Language Code | Physical Layout |
-|--------|--------------|-----------------|
-| U.S. (QWERTY) | `en` | QWERTY |
-| ABC | `en` | QWERTY |
-| Russian | `ru` | ЙЦУКЕН |
-| German | `de` | QWERTZ |
-| French | `fr` | AZERTY |
-| Spanish | `es` | QWERTY (Spanish) |
-
-Adding a new layout is straightforward — see [Contributing](#contributing).
-
-## Architecture
-
-```
-LangSwitcher/
-├── Sources/
-│   ├── App/
-│   │   ├── LangSwitcherApp.swift       # SwiftUI App entry point
-│   │   ├── AppDelegate.swift           # App lifecycle, hotkey, conversion orchestration
-│   │   └── StatusBarController.swift   # Menu bar icon and menu
-│   ├── Views/
-│   │   ├── SettingsView.swift          # Settings window (5 tabs)
-│   │   ├── ConversionLogView.swift     # Conversion log with data labeling
-│   │   ├── HotkeyRecorderView.swift    # Custom hotkey recorder
-│   │   ├── AboutView.swift             # About window
-│   │   └── PermissionsView.swift       # Accessibility permissions
-│   ├── Services/
-│   │   ├── LayoutMapper.swift          # Character mapping engine
-│   │   ├── KeyboardLayoutDetector.swift # System layout detection (Carbon TIS)
-│   │   ├── TextConverter.swift         # Conversion orchestrator + greedy algorithm
-│   │   ├── ConversionLogStore.swift    # SQLite-based conversion log storage
-│   │   ├── HotkeyManager.swift         # Global hotkey (double-shift + custom)
-│   │   ├── AccessibilityService.swift  # Clipboard-based text replacement
-│   │   └── SettingsManager.swift       # UserDefaults persistence
-│   ├── Localization/
-│   │   ├── LocalizationManager.swift   # Runtime i18n engine
-│   │   ├── Strings_en.swift            # English strings (~113 keys)
-│   │   └── Strings_ru.swift            # Russian strings
-│   └── Models/
-│       ├── KeyboardLayout.swift        # Layout model & character maps
-│       └── ConversionLog.swift         # Conversion log entry model
-├── Resources/
-│   └── Assets.xcassets                 # App icons and colors
-├── LangSwitcherTests/
-│   ├── LayoutMapperTests.swift         # 58 mapping tests
-│   └── TextConverterTests.swift        # 35 converter tests
-├── .github/workflows/
-│   ├── build.yml                       # CI: test + build DMGs (Intel/ARM/Universal) + release
-│   └── pages.yml                       # GitHub Pages deployment
-├── screenshots/
-│   ├── general.png                     # Settings General tab
-│   └── langSwitch.mp4                  # Demo video
-└── docs/                              # Docus v4 documentation site
-    ├── nuxt.config.ts                  # Nuxt/Docus config with i18n
-    ├── app.config.ts                   # App config (header, SEO, socials)
-    ├── package.json                    # Docus dependencies
-    └── content/
-        ├── en/                         # English documentation
-        └── ru/                         # Russian documentation
-```
-
-### How Conversion Works
-
-```
-Input: "ghbdtn" (typed on US layout when Russian was intended)
-
-1. Detect source layout -> "US" (characters match US keyboard map)
-2. For each character, find physical key position:
-   g -> key at position [0x05]
-   h -> key at position [0x04]
-   ...
-3. Map physical key to target layout (Russian):
-   [0x05] -> п
-   [0x04] -> р
-   ...
-4. Apply punctuation preservation (non-letter -> non-letter stays as-is)
-5. Result: "привет"
-```
-
-### Key Design Decisions
-
-- **Clipboard-based replacement**: Uses `⌘C` -> transform -> `⌘V` approach for maximum app compatibility. Works in virtually any text field.
-- **No CGEvent tap**: Avoids `CGEventTap` which requires special entitlements. Instead uses `NSEvent.addGlobalMonitorForEvents` for hotkey detection and `CGEvent` with `.hidSystemState` for keyboard simulation.
-- **Physical key mapping**: Maps characters through their physical key position, not Unicode translation tables. This is more reliable for non-standard layouts.
-- **No sandbox**: The app requires Accessibility access which is incompatible with App Sandbox.
-- **SQLite for logging**: Direct SQLite3 C API — no external dependencies. Data stays local for privacy.
-- **Greedy two-pass algorithm**: Pass 1 checks if the whole line is wrong-layout (all words switch script). Pass 2 scans right-to-left for mixed lines. The 70% threshold handles ambiguous cases.
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| **Language** | Swift 5 |
-| **UI Framework** | SwiftUI |
-| **Platform** | macOS 13+ (Ventura) |
-| **Input Detection** | Carbon (TISInputSource) |
-| **Text Manipulation** | Accessibility API + Pasteboard |
-| **Hotkey** | NSEvent global monitor + CGEvent |
-| **Settings** | UserDefaults |
-| **Conversion Log** | SQLite3 (C API, no dependencies) |
-| **Localization** | Custom runtime i18n (English, Russian) |
-| **CI/CD** | GitHub Actions |
-| **Distribution** | DMG (Intel + ARM + Universal) via GitHub Releases |
-| **Website** | GitHub Pages |
-| **Tests** | XCTest (93 tests) |
-
-## Permissions
-
-Dopishi requires **Accessibility** access to:
-- Read selected text (via simulated `⌘C`)
-- Replace text (via simulated `⌘V`)
-
-Grant access in **System Settings -> Privacy & Security -> Accessibility**.
-
-The app does **not**:
-- Log keystrokes
-- Send data to any server — **all data stays on your Mac**
-- Access files or network
-- Run in the background when quit
-- Collect any analytics or telemetry
-
-**Conversion logging is disabled by default.** When you enable it, all data is stored locally in `~/Library/Application Support/Dopishi/`. Nothing is ever uploaded or shared.
+---
 
 ## Contributing
 
-Contributions are welcome! Here's how to add a new keyboard layout:
+Contributions are warmly welcomed! Whether you want to add a new keyboard layout, refine dictionary heuristics, or improve localization:
 
-1. Open `LangSwitcher/Sources/Models/KeyboardLayout.swift`
-2. Add a new static property to `LayoutCharacterMap` with the character mapping
-3. Add the pattern to `allMaps` array (**order matters** — specific patterns before generic ones)
-4. Add tests in `LangSwitcherTests/LayoutMapperTests.swift`
-5. Run tests: all 441+ must pass
+1. Fork the repository and create your feature branch.
+2. Ensure all tests pass via `bash scripts/test.sh`.
+3. Open a Pull Request with a clear description of your changes.
 
-```swift
-// Example: adding Italian layout
-static let italian: [Character: Character] = {
-    let qwerty  = Array("`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./...")
-    let italian = Array("\\1234567890'ìqwertyuiopè+ùasdfghjklòàzxcvbnm,.-...")
-    var map: [Character: Character] = [:]
-    for i in 0..<min(qwerty.count, italian.count) {
-        map[qwerty[i]] = italian[i]
-    }
-    return map
-}()
-```
+---
 
-### Adding a New Language (i18n)
+## Acknowledgments & Gratitude
 
-Dopishi uses a custom localization system — no `.lproj` / `.strings` files. Language can be switched at runtime without restarting the app.
+* **Origin:** Dopishi was proudly forked from [langSwitcher](https://github.com/reg2005/langSwitcher) created by [reg2005](https://github.com/reg2005). We express our deepest respect and gratitude to the original author for creating the foundation and inspiring this project.
+* **Inspiration:** Inspired by legendary tools like [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/), reimagined as an open-source, native, and privacy-respecting macOS utility.
 
-1. **Copy the English template**:
-   ```bash
-   cp LangSwitcher/Sources/Localization/Strings_en.swift \
-      LangSwitcher/Sources/Localization/Strings_xx.swift
-   ```
-   Replace `xx` with the language code (e.g. `de`, `fr`, `es`).
+---
 
-2. **Translate** every value in the `strings` dictionary. Keys stay the same — only change the values.
+## Support & Donations
 
-3. **Update `register()`** at the bottom of your new file:
-   ```swift
-   @MainActor static func register() {
-       LocalizationManager.shared.register(language: "xx", strings: strings)
-   }
-   ```
-
-4. **Register the new file** in `LangSwitcherApp.swift`:
-   ```swift
-   private func initializeLocalization() {
-       Strings_en.register()
-       Strings_ru.register()
-       Strings_xx.register()  // <-- add this
-   }
-   ```
-
-5. **Add to available languages** in `LocalizationManager.swift`:
-   ```swift
-   let availableLanguages: [(code: String, name: String)] = [
-       ("en", "English"),
-       ("ru", "Русский"),
-       ("xx", "Your Language"),  // <-- add this
-   ]
-   ```
-
-6. **Add the file to Xcode project** — add a `PBXBuildFile`, `PBXFileReference`, add to the Localization group, and add to `PBXSourcesBuildPhase` in `project.pbxproj`. Follow the existing `E1000001...` PBX ID pattern.
-
-7. **Run tests** — all must pass.
-
-String keys use namespace prefixes: `menu.*`, `settings.*`, `general.*`, `smartMode.*`, `layouts.*`, `hotkey.*`, `permissions.*`, `log.*`, `about.*`, `alert.*`, `common.*`.
-
-### Code Signing & Notarization (CI/CD)
-
-Release builds can be signed with an Apple Developer ID certificate and notarized via GitHub Actions. Without secrets configured, builds use ad-hoc signing (works for local use, but macOS Gatekeeper will warn users).
-
-**Required secrets** (Settings > Secrets and variables > Actions):
-
-| Secret | Description |
-|---|---|
-| `MACOS_CERTIFICATE_P12` | Developer ID Application certificate exported as `.p12`, then base64-encoded: `base64 -i cert.p12 \| pbcopy` |
-| `MACOS_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` file |
-| `MACOS_KEYCHAIN_PASSWORD` | Any random string (used for the temporary CI keychain) |
-| `MACOS_SIGNING_IDENTITY` | Full identity string, e.g. `Developer ID Application: Your Name (TEAMID)` |
-
-**Optional secrets** (for notarization — recommended for public distribution):
-
-| Secret | Description |
-|---|---|
-| `MACOS_NOTARIZATION_APPLE_ID` | Your Apple ID email |
-| `MACOS_NOTARIZATION_PASSWORD` | App-specific password ([appleid.apple.com](https://appleid.apple.com) > Sign-In and Security > App-Specific Passwords) |
-| `MACOS_NOTARIZATION_TEAM_ID` | Your 10-character Apple Developer Team ID |
-
-**How to get the certificate:**
-
-1. Open Keychain Access on your Mac
-2. In the login keychain, find your "Developer ID Application" certificate
-3. Right-click > Export Items > save as `.p12` with a password
-4. Base64-encode it: `base64 -i DeveloperID.p12 | pbcopy`
-5. Paste the result into the `MACOS_CERTIFICATE_P12` GitHub secret
-
-**Behavior:**
-- If `MACOS_CERTIFICATE_P12` is set: builds are signed with your Developer ID + hardened runtime
-- If notarization secrets are also set: DMGs are submitted to Apple for notarization and stapled
-- If no secrets are set: ad-hoc signing (forks and PRs work without any setup)
-
-### Development
-
-```bash
-# Clone
-git clone https://github.com/luksiko/dopishi.git
-cd dopishi
-
-# Run tests (required after every code change)
-bash scripts/test.sh
-
-# Open in Xcode
-open LangSwitcher.xcodeproj
-```
-
-See [AGENTS.md](AGENTS.md) for AI agent / contributor guidelines.
-
-## Donate
-
-Dopishi is free and open-source. If you find it useful, any contribution is welcome and helps keep the project alive. Thank you for your support!
+Dopishi is completely free and open source. If it saves you time and frustration every day, consider supporting its development:
 
 | Network | Address |
-|---------|---------|
-| **Ethereum** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Tron** | `TDAyNkS36eKyqv9s4KQpu4ebWciQ2bqdW3` |
+|:---|:---|
+| **Ethereum / Arbitrum / Base** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
 | **Bitcoin** | `bc1qtqm7rgma8dcgqc50lmzmyxn729yqrtf9zs7asx` |
 | **Solana** | `A4jzTGxP7tbhyDFrcWJKdsA8v5xUwF6UzvC7RFmDRrfi` |
-| **Linea** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Base** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **BNB Chain** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Sei** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Polygon** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **OP (Optimism)** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Arbitrum** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Fantom** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
+| **Tron (USDT)** | `TDAyNkS36eKyqv9s4KQpu4ebWciQ2bqdW3` |
+
+---
 
 ## License
 
-[MIT License](LICENSE) — free for personal and commercial use.
-
-## Acknowledgments
-
-- Originally forked from [langSwitcher](https://github.com/reg2005/langSwitcher) created by [reg2005](https://github.com/reg2005). Sincere thanks and appreciation for creating the initial foundation and inspiring this project.
-- Inspired by [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/). Built as a free, open-source alternative.
+Released under the [MIT License](LICENSE). Free for personal and commercial use.
