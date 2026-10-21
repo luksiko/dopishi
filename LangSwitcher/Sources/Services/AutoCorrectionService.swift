@@ -1156,53 +1156,83 @@ final class AutoCorrectionService {
 
         NSLog("[LangSwitcher] AutoCorrection: checking word '\(word)' (trigger='\(triggerChar)')")
 
-        // Step 1: Check if the word looks like it was typed in the wrong layout
-        guard textConverter.looksLikeWrongLayout(word) else {
-            NSLog("[LangSwitcher] AutoCorrection: '\(word)' does not look like wrong layout")
-            return
-        }
+        // Step 1: Try layout conversion if the word looks like wrong layout
+        if textConverter.looksLikeWrongLayout(word),
+           let result = textConverter.convertSelectedTextWithInfo(word) {
+            var convertedWord = result.text
+            if settingsManager.autoCorrectionFixTwoInitialCapitals,
+               let fixedCapitals = textConverter.fixTwoInitialCapitals(convertedWord) {
+                convertedWord = fixedCapitals
+            }
 
-        // Step 2: Convert the word
-        guard let result = textConverter.convertSelectedTextWithInfo(word) else {
-            NSLog("[LangSwitcher] AutoCorrection: conversion failed for '\(word)'")
-            return
-        }
+            var isLayoutConversionValid = true
+            if settingsManager.autoCorrectionUseSpellCheck {
+                let layouts = settingsManager.enabledLayouts
+                let targetLang = layouts.first(where: { $0.id == result.targetLayoutID })?.languageCode
 
-        let convertedWord = result.text
-        NSLog("[LangSwitcher] AutoCorrection: '\(word)' → '\(convertedWord)'")
+                if let lang = targetLang {
+                    if !spellCheckService.isValidWord(convertedWord, language: lang) {
+                        NSLog("[LangSwitcher] AutoCorrection: '\(convertedWord)' not valid in '\(lang)', skipping layout conversion")
+                        isLayoutConversionValid = false
+                    }
+                }
 
-        // Step 3: Validate with spell checker (reduce false positives)
-        if settingsManager.autoCorrectionUseSpellCheck {
-            let layouts = settingsManager.enabledLayouts
-            let targetLang = layouts.first(where: { $0.id == result.targetLayoutID })?.languageCode
-
-            if let lang = targetLang {
-                // Check if converted word is valid in target language
-                if !spellCheckService.isValidWord(convertedWord, language: lang) {
-                    NSLog("[LangSwitcher] AutoCorrection: '\(convertedWord)' not valid in '\(lang)', skipping")
-                    return
+                let sourceLangs = layouts.map(\.languageCode)
+                if spellCheckService.isValidWordInAnyLanguage(word, languages: sourceLangs) {
+                    NSLog("[LangSwitcher] AutoCorrection: '\(word)' is valid in source language, skipping layout conversion")
+                    isLayoutConversionValid = false
                 }
             }
 
-            // Also check if original word IS valid in some language — if so, don't correct
-            let sourceLangs = layouts.map(\.languageCode)
-            if spellCheckService.isValidWordInAnyLanguage(word, languages: sourceLangs) {
-                NSLog("[LangSwitcher] AutoCorrection: '\(word)' is valid in source language, skipping")
+            if isLayoutConversionValid {
+                NSLog("[LangSwitcher] AutoCorrection: layout converted '\(word)' → '\(convertedWord)'")
+                performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                          replacement: token.prefix + convertedWord + token.punctuation + String(triggerChar)) { [weak self] _ in
+                    guard let self else { return }
+                    self.previousWord = convertedWord.lowercased()
+                    if self.settingsManager.autoCorrectionSwitchLayout {
+                        NSLog("[LangSwitcher] AutoCorrection: switching layout to target '\(result.targetLayoutID)'")
+                        KeyboardLayoutDetector.switchToLayout(result.targetLayoutID)
+                    }
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
+                }
                 return
             }
         }
 
-        performCheckedReplacement(expected: bufferedWord + String(triggerChar),
-                                  replacement: token.prefix + convertedWord + token.punctuation + String(triggerChar)) { [weak self] _ in
-            guard let self else { return }
-            self.previousWord = convertedWord.lowercased()
-            if self.settingsManager.autoCorrectionSwitchLayout {
-                NSLog("[LangSwitcher] AutoCorrection: switching layout to target '\(result.targetLayoutID)'")
-                KeyboardLayoutDetector.switchToLayout(result.targetLayoutID)
+        // Step 2: Check for Two Initial Capitals in current layout (e.g. "ПРобую" -> "Пробую", "THis" -> "This")
+        if settingsManager.autoCorrectionFixTwoInitialCapitals,
+           let fixedWord = textConverter.fixTwoInitialCapitals(word) {
+            NSLog("[LangSwitcher] AutoCorrection: checking two initial capitals: '\(word)' → '\(fixedWord)'")
+
+            if settingsManager.autoCorrectionUseSpellCheck {
+                let layouts = settingsManager.enabledLayouts
+                let langs = layouts.map(\.languageCode)
+
+                if spellCheckService.isValidWordInAnyLanguage(word, languages: langs) {
+                    NSLog("[LangSwitcher] AutoCorrection: '\(word)' is already valid in language, skipping capital fix")
+                    return
+                }
+
+                if !spellCheckService.isValidWordInAnyLanguage(fixedWord, languages: langs) {
+                    NSLog("[LangSwitcher] AutoCorrection: '\(fixedWord)' not valid in spellchecker, skipping capital fix")
+                    return
+                }
             }
-            self.playCorrectionFeedback()
-            self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
+
+            NSLog("[LangSwitcher] AutoCorrection: two initial capitals corrected: '\(word)' → '\(fixedWord)'")
+            performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                      replacement: token.prefix + fixedWord + token.punctuation + String(triggerChar)) { [weak self] _ in
+                guard let self else { return }
+                self.previousWord = fixedWord.lowercased()
+                self.playCorrectionFeedback()
+                self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
+            }
+            return
         }
+
+        NSLog("[LangSwitcher] AutoCorrection: '\(word)' does not need correction")
     }
 
     private func playCorrectionFeedback() {

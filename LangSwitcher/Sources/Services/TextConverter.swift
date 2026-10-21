@@ -121,6 +121,29 @@ final class TextConverter {
         }
         return convertIfWrongLayout(text)
     }
+
+    /// Fixes words with two initial capital letters followed by lowercase letters (e.g. "ПРобую" -> "Пробую", "THis" -> "This").
+    /// - Conditions:
+    ///   - Minimum 3 characters
+    ///   - 1st character is uppercase letter
+    ///   - 2nd character is uppercase letter
+    ///   - 3rd character is lowercase letter
+    ///   - All remaining characters from index 2 onwards must not be uppercase
+    /// - Returns: corrected string with the 2nd character converted to lowercase, or nil if not applicable.
+    static func fixTwoInitialCapitals(_ text: String) -> String? {
+        guard text.count >= 3 else { return nil }
+        let chars = Array(text)
+        guard chars[0].isLetter && chars[0].isUppercase else { return nil }
+        guard chars[1].isLetter && chars[1].isUppercase else { return nil }
+        guard chars[2].isLetter && chars[2].isLowercase else { return nil }
+        guard chars.dropFirst(2).allSatisfy({ !$0.isUppercase }) else { return nil }
+        return String(chars[0]) + chars[1].lowercased() + String(chars.dropFirst(2))
+    }
+
+    /// Instance wrapper for fixTwoInitialCapitals.
+    func fixTwoInitialCapitals(_ text: String) -> String? {
+        Self.fixTwoInitialCapitals(text)
+    }
     
     /// Check if text looks like it was typed in the wrong keyboard layout.
     /// For example, "ghbdtn" typed on QWERTY when meaning "привет" on Russian layout.

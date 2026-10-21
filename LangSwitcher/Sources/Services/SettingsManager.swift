@@ -176,6 +176,11 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionSwitchLayout, forKey: Keys.autoCorrectionSwitchLayout) }
     }
 
+    /// Whether to fix two initial capitals in words (e.g. "ПРобую" -> "Пробую", "THis" -> "This"). Default: true.
+    @Published var autoCorrectionFixTwoInitialCapitals: Bool {
+        didSet { defaults.set(autoCorrectionFixTwoInitialCapitals, forKey: Keys.autoCorrectionFixTwoInitialCapitals) }
+    }
+
     /// Whether real-time word autocompletion HUD is enabled. Default: true.
     @Published var autoCompletionEnabled: Bool {
         didSet {
@@ -644,6 +649,7 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionEnabled = "autoCorrectionEnabled"
         static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
         static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
+        static let autoCorrectionFixTwoInitialCapitals = "autoCorrectionFixTwoInitialCapitals"
         static let autoCompletionEnabled = "autoCompletionEnabled"
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
         static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
@@ -725,6 +731,7 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionEnabled = defaults.object(forKey: Keys.autoCorrectionEnabled) as? Bool ?? false     // Default: OFF
         self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
         self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
+        self.autoCorrectionFixTwoInitialCapitals = defaults.object(forKey: Keys.autoCorrectionFixTwoInitialCapitals) as? Bool ?? true // Default: ON
         
         self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
         let savedAcceptKey = defaults.string(forKey: Keys.autoCompletionAcceptKey)

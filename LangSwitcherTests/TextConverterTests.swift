@@ -311,4 +311,57 @@ final class TextConverterTests: XCTestCase {
         XCTAssertEqual(boundary?.keep, "")
         XCTAssertEqual(boundary?.convert, "ghbdtn rfr ltkf 123")
     }
+
+    // MARK: - Fix Two Initial Capitals
+
+    func testFixTwoInitialCapitals_RussianWords() {
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("ПРобую"), "Пробую")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("ПРивет"), "Привет")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("ВОт"), "Вот")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("ТОлько"), "Только")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("ПРобую-ка"), "Пробую-ка")
+    }
+
+    func testFixTwoInitialCapitals_EnglishWords() {
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("THis"), "This")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("WOrld"), "World")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("HEllo"), "Hello")
+        XCTAssertEqual(TextConverter.fixTwoInitialCapitals("COmputer"), "Computer")
+    }
+
+    func testFixTwoInitialCapitals_ShouldNotModifyValidOrSpecialWords() {
+        // Two-letter words (acronyms or short words) must NOT be modified
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("ПР"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("РФ"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("US"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("IT"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("AI"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("ID"))
+
+        // All-uppercase words (acronyms / abbreviations) must NOT be modified
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("ООН"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("СССР"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("HTML"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("NASA"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("ПРОБУЮ"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("WORLD"))
+
+        // Code identifiers / camelCase must NOT be modified
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("IDGenerator"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("XMLParser"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("iPhone"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("baseURL"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("PRoGram"))
+
+        // Already correct words must NOT be modified
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("Пробую"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("Привет"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("This"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("hello"))
+
+        // Empty and single character strings
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals(""))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("A"))
+        XCTAssertNil(TextConverter.fixTwoInitialCapitals("П"))
+    }
 }

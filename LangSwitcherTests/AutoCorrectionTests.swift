@@ -127,6 +127,59 @@ final class AutoCorrectionTests: XCTestCase {
         }
     }
 
+    func testTwoInitialCapitalsAutoCorrection() {
+        // 1. "ПРивет" is a Russian word vetoed by dictionary from being wrong layout
+        let vetoedWord = "ПРивет"
+        XCTAssertFalse(textConverter.looksLikeWrongLayout(vetoedWord))
+        guard let fixedVetoed = textConverter.fixTwoInitialCapitals(vetoedWord) else {
+            XCTFail("Two initial capitals fix returned nil for \(vetoedWord)")
+            return
+        }
+        XCTAssertEqual(fixedVetoed, "Привет")
+        XCTAssertTrue(spellCheckService.isValidWord(fixedVetoed, language: "ru"))
+
+        // 2. "ПРобую" is a valid Russian word (though not in top-1000 veto wordlist)
+        let nonVetoedWord = "ПРобую"
+        guard let fixedNonVetoed = textConverter.fixTwoInitialCapitals(nonVetoedWord) else {
+            XCTFail("Two initial capitals fix returned nil for \(nonVetoedWord)")
+            return
+        }
+        XCTAssertEqual(fixedNonVetoed, "Пробую")
+        XCTAssertTrue(spellCheckService.isValidWord(fixedNonVetoed, language: "ru"))
+
+        // When converting "ПРобую" to US layout it produces "GHj,e.", which is NOT valid English
+        if let converted = textConverter.convertSelectedTextWithInfo(nonVetoedWord) {
+            XCTAssertFalse(spellCheckService.isValidWord(converted.text, language: "en"))
+        }
+
+        // 3. English word "THis"
+        let englishWord = "THis"
+        guard let fixedEnglish = textConverter.fixTwoInitialCapitals(englishWord) else {
+            XCTFail("Two initial capitals fix returned nil for \(englishWord)")
+            return
+        }
+        XCTAssertEqual(fixedEnglish, "This")
+        XCTAssertTrue(spellCheckService.isValidWord(fixedEnglish, language: "en"))
+    }
+
+    func testTwoInitialCapitalsOnWrongLayoutConversion() {
+        // "GHbdtny" in US layout corresponds to "ПРиветн" or similar
+        // Let's test "GHbdtn" -> converts to "ПРивет"
+        let input = "GHbdtn"
+        XCTAssertTrue(textConverter.looksLikeWrongLayout(input))
+
+        guard let result = textConverter.convertSelectedTextWithInfo(input) else {
+            XCTFail("Conversion failed")
+            return
+        }
+        XCTAssertEqual(result.text, "ПРивет")
+
+        // With fixTwoInitialCapitals, it becomes "Привет"
+        let fixed = textConverter.fixTwoInitialCapitals(result.text)
+        XCTAssertEqual(fixed, "Привет")
+        XCTAssertTrue(spellCheckService.isValidWord(fixed!, language: "ru"))
+    }
+
     func testUserReportedSentenceWords() {
         let wordsWithExpected: [(input: String, expected: String)] = [
             ("ns", "ты"),

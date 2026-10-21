@@ -229,6 +229,8 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "general.autoCorrectionSpellCheckDesc":  "Only auto-correct when the converted word is recognized by macOS spell checker. Reduces false positives but may miss some valid words.",
         "general.autoCorrectionSwitchLayout":    "Switch system layout after auto-correction",
         "general.autoCorrectionSwitchLayoutDesc": "Automatically switch the system input language to match the corrected word (e.g. to Russian after 'ghbdtn ' → 'привет ').",
+        "general.autoCorrectionFixTwoCapitals":    "Fix two initial capitals (e.g. 'THis' → 'This')",
+        "general.autoCorrectionFixTwoCapitalsDesc": "Automatically corrects words typed with two uppercase letters at the beginning if followed by lowercase letters.",
 
         // ── Autocompletion ──────────────────────────────────────────
         "general.autocompletion":                "Word Autocompletion",

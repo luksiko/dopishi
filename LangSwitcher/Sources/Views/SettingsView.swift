@@ -179,6 +179,13 @@ struct GeneralSettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
+
+                    Toggle(l10n.t("general.autoCorrectionFixTwoCapitals"), isOn: $settingsManager.autoCorrectionFixTwoInitialCapitals)
+
+                    Text(l10n.t("general.autoCorrectionFixTwoCapitalsDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
             }
             
