@@ -284,6 +284,7 @@ LangSwitcher нуждается в разрешении универсально
         "autocompletion.minPrefixLength":        "Минимум символов для подсказки:",
         "autocompletion.delay":                  "Задержка появления подсказок:",
         "autocompletion.delayDesc":              "Пауза перед отображением всплывающего окна подсказок.",
+        "autocompletion.badge.context":          "Контекст",
         "autocompletion.hint.toAccept":          "вставить",
         "autocompletion.displayMode":            "Стиль отображения",
         "autocompletion.displayMode.popup":      "Всплывающее меню",

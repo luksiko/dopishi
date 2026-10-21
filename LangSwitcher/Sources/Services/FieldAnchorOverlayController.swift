@@ -11,6 +11,8 @@ final class FieldAnchorOverlayController: NSObject {
     private var panel: NSPanel?
     private var badgeView: FieldAnchorBadgeView?
     private(set) var lastFieldRect: CGRect?
+    private(set) var hasScreenContext: Bool = false
+    private(set) var hasPendingQuestion: Bool = false
     
     var isVisible: Bool {
         panel?.isVisible == true
@@ -18,6 +20,14 @@ final class FieldAnchorOverlayController: NSObject {
     
     override init() {
         super.init()
+    }
+    
+    func updateContextState(hasScreenContext: Bool, hasPendingQuestion: Bool) {
+        self.hasScreenContext = hasScreenContext
+        self.hasPendingQuestion = hasPendingQuestion
+        badgeView?.hasScreenContext = hasScreenContext
+        badgeView?.hasPendingQuestion = hasPendingQuestion
+        badgeView?.needsDisplay = true
     }
     
     func show(fieldRect: CGRect) {
@@ -52,6 +62,10 @@ final class FieldAnchorOverlayController: NSObject {
         // Immediate dismissal cannot later hide a panel reused by a new field.
         panel?.orderOut(nil)
         lastFieldRect = nil
+        hasScreenContext = false
+        hasPendingQuestion = false
+        badgeView?.hasScreenContext = false
+        badgeView?.hasPendingQuestion = false
     }
 
     private func getOrCreatePanel() -> NSPanel {
@@ -73,6 +87,8 @@ final class FieldAnchorOverlayController: NSObject {
         p.ignoresMouseEvents = true // Pass all clicks straight to the underlying text view
         
         let v = FieldAnchorBadgeView(frame: NSRect(x: 0, y: 0, width: 22, height: 22))
+        v.hasScreenContext = self.hasScreenContext
+        v.hasPendingQuestion = self.hasPendingQuestion
         p.contentView = v
         self.badgeView = v
         self.panel = p
@@ -82,6 +98,8 @@ final class FieldAnchorOverlayController: NSObject {
 
 // MARK: - Native Field Anchor Badge View
 private final class FieldAnchorBadgeView: NSView {
+    var hasScreenContext: Bool = false
+    var hasPendingQuestion: Bool = false
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -98,10 +116,22 @@ private final class FieldAnchorBadgeView: NSView {
         NSColor.separatorColor.withAlphaComponent(0.5).setStroke()
         circlePath.stroke()
         
-        // SF Symbol "sparkles" tinted with accent color
+        let symbolName: String
+        let tintColor: NSColor
+        if hasPendingQuestion {
+            symbolName = "questionmark.bubble.fill"
+            tintColor = NSColor.systemPurple
+        } else if hasScreenContext {
+            symbolName = "bubble.left.and.bubble.right.fill"
+            tintColor = NSColor.systemPurple
+        } else {
+            symbolName = "sparkles"
+            tintColor = NSColor.controlAccentColor
+        }
+        
         let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-            .applying(NSImage.SymbolConfiguration(hierarchicalColor: NSColor.controlAccentColor))
-        if let symbol = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "AI Active")?.withSymbolConfiguration(config) {
+            .applying(NSImage.SymbolConfiguration(hierarchicalColor: tintColor))
+        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: "AI Active")?.withSymbolConfiguration(config) {
             let iconRect = NSRect(
                 x: (bounds.width - 12) / 2,
                 y: (bounds.height - 12) / 2,

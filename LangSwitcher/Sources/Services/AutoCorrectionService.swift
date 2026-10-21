@@ -613,6 +613,7 @@ final class AutoCorrectionService {
         lastCaretContext = nil
         overlayController.hide()
         ghostTextController.hide()
+        fieldAnchorController.updateContextState(hasScreenContext: false, hasPendingQuestion: false)
     }
 
     /// Full dismissal called on Escape, App switch, or deactivation.
@@ -745,6 +746,11 @@ final class AutoCorrectionService {
                 }
             }
 
+            self.fieldAnchorController.updateContextState(
+                hasScreenContext: screenContextText != nil,
+                hasPendingQuestion: hasPendingQuestion
+            )
+
             var effectiveMaxWords = maxWords
             let contextWordCount = liveContext.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").count
             if screenContextText == nil && contextWordCount <= 1 {
@@ -752,6 +758,8 @@ final class AutoCorrectionService {
                 // keep continuation conservative to prevent ungrounded topic invention.
                 effectiveMaxWords = min(maxWords, self.wordBuffer.isEmpty ? 1 : 2)
             }
+
+            let hasContext = screenContextText != nil
 
             if self.settingsManager.aiStreamingEnabled {
                 let streamResult = await AIInferenceEngine.shared.predictContinuationStream(
@@ -768,14 +776,14 @@ final class AutoCorrectionService {
                           self.completionsEnabledForCurrentApp,
                           let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
                           current == caretContext else { return }
-                    self.presentAIPrediction(suffix: partialSuffix, activeLayoutID: activeLayoutID)
+                    self.presentAIPrediction(suffix: partialSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
                 }
                 if let finalSuffix = streamResult {
                     guard self.physicalInputRevision == captureRevision,
                           self.completionsEnabledForCurrentApp,
                           let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
                           current == caretContext else { return }
-                    self.presentAIPrediction(suffix: finalSuffix, activeLayoutID: activeLayoutID)
+                    self.presentAIPrediction(suffix: finalSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
                 } else {
                     self.dismissSuggestionsOnly()
                 }
@@ -796,12 +804,12 @@ final class AutoCorrectionService {
                       let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
                       current == caretContext else { return }
 
-                self.presentAIPrediction(suffix: suffix, activeLayoutID: activeLayoutID)
+                self.presentAIPrediction(suffix: suffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
             }
         }
     }
 
-    private func presentAIPrediction(suffix: String, activeLayoutID: String) {
+    private func presentAIPrediction(suffix: String, activeLayoutID: String, hasScreenContext: Bool = false) {
         guard !suffix.isEmpty else { return }
         let displayMode = settingsManager.autoCompletionDisplayMode
 
@@ -832,7 +840,8 @@ final class AutoCorrectionService {
             word: fullPhrase,
             targetLayoutID: activeLayoutID,
             isCrossLayout: false,
-            score: 1500
+            score: 1500,
+            hasScreenContext: hasScreenContext
         )
 
         suggestionTarget = accessibilityService.captureReplacementTarget()

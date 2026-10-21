@@ -285,6 +285,7 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "autocompletion.minPrefixLength":        "Min prefix length:",
         "autocompletion.delay":                  "Popup delay:",
         "autocompletion.delayDesc":              "Pause before showing suggestions popup.",
+        "autocompletion.badge.context":          "Context",
         "autocompletion.hint.toAccept":          "to insert",
         "autocompletion.displayMode":            "Display style",
         "autocompletion.displayMode.popup":      "Popup Menu",

@@ -254,4 +254,40 @@ extension GhostTextOverlayTests {
         let none = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: nil)
         XCTAssertEqual(none, rawCaret)
     }
+
+    func testFieldAnchorContextStateUpdates() {
+        let anchor = FieldAnchorOverlayController()
+        defer { anchor.hide() }
+        
+        anchor.show(fieldRect: CGRect(x: 100, y: 200, width: 500, height: 100))
+        XCTAssertFalse(anchor.hasScreenContext)
+        XCTAssertFalse(anchor.hasPendingQuestion)
+        
+        anchor.updateContextState(hasScreenContext: true, hasPendingQuestion: false)
+        XCTAssertTrue(anchor.hasScreenContext)
+        XCTAssertFalse(anchor.hasPendingQuestion)
+        
+        anchor.updateContextState(hasScreenContext: true, hasPendingQuestion: true)
+        XCTAssertTrue(anchor.hasScreenContext)
+        XCTAssertTrue(anchor.hasPendingQuestion)
+        
+        anchor.hide()
+        XCTAssertFalse(anchor.hasScreenContext)
+        XCTAssertFalse(anchor.hasPendingQuestion)
+    }
+
+    func testAutocompletionCandidateHasScreenContext() {
+        let regular = AutocompletionCandidate(
+            word: "привет",
+            targetLayoutID: "com.apple.keylayout.Russian"
+        )
+        XCTAssertFalse(regular.hasScreenContext)
+        
+        let contextual = AutocompletionCandidate(
+            word: "да, конечно",
+            targetLayoutID: "com.apple.keylayout.Russian",
+            hasScreenContext: true
+        )
+        XCTAssertTrue(contextual.hasScreenContext)
+    }
 }

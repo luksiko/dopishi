@@ -31,6 +31,21 @@ struct AutocompletionPopupView: View {
                         
                         Spacer(minLength: 8)
                         
+                        // Screen context badge if applicable
+                        if candidate.hasScreenContext {
+                            HStack(spacing: 2) {
+                                Image(systemName: "bubble.left.fill")
+                                    .font(.system(size: 8))
+                                Text(LocalizationManager.shared.t("autocompletion.badge.context"))
+                                    .font(.system(size: 8.5, weight: .bold))
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.15))
+                            .foregroundStyle(Color.purple)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        
                         // Cross-layout badge if applicable
                         if candidate.isCrossLayout {
                             HStack(spacing: 2) {

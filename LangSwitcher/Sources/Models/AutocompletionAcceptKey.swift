@@ -10,13 +10,21 @@ struct AutocompletionCandidate: Identifiable, Equatable, Hashable {
     let targetLayoutID: String
     let isCrossLayout: Bool
     let score: Int
+    let hasScreenContext: Bool
     
-    init(word: String, targetLayoutID: String, isCrossLayout: Bool = false, score: Int = 0) {
+    init(
+        word: String,
+        targetLayoutID: String,
+        isCrossLayout: Bool = false,
+        score: Int = 0,
+        hasScreenContext: Bool = false
+    ) {
         self.id = "\(targetLayoutID):\(word)"
         self.word = word
         self.targetLayoutID = targetLayoutID
         self.isCrossLayout = isCrossLayout
         self.score = score
+        self.hasScreenContext = hasScreenContext
     }
 }
 
