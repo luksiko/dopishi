@@ -220,7 +220,7 @@ struct TerminalPromptExtractor {
             i < chars.count - 1 && arrowMarkers.contains(chars[i]) && chars[i + 1].isWhitespace
         }) {
             promptCol = arrow
-        } else if let regex = shellPromptRegex {
+        } else if let regex = shellPromptSearchRegex {
             let range = NSRange(location: 0, length: line.utf16.count)
             if let match = regex.firstMatch(in: line, range: range) {
                 promptCol = match.range.location + match.range.length

@@ -25,6 +25,7 @@ DerivedData/
 
 # DMG artifacts
 *.dmg
+*.zip
 dmg_contents/
 
 # Swift Package Manager
