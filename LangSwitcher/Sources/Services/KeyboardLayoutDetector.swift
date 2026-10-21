@@ -86,6 +86,8 @@ final class KeyboardLayoutDetector {
         
         // Pass 1: exact match
         for source in inputSources {
+            guard let isSelectablePtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsSelectCapable),
+                  CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(isSelectablePtr).takeUnretainedValue()) else { continue }
             guard let sourceIDPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { continue }
             let sourceID = Unmanaged<CFString>.fromOpaque(sourceIDPtr).takeUnretainedValue() as String
             
@@ -94,16 +96,18 @@ final class KeyboardLayoutDetector {
                 if status == noErr {
                     NSLog("[LangSwitcher] switchToLayout: switched to exact '\(targetID)'")
                     NotificationCenter.default.post(name: .keyboardLayoutSelectionChanged, object: nil)
+                    return
                 } else {
                     NSLog("[LangSwitcher] switchToLayout: TISSelectInputSource failed with status \(status)")
                 }
-                return
             }
         }
         
         // Pass 2: family fallback match (e.g. RussianWin <-> Russian, ABC <-> US)
         let targetLower = targetID.lowercased()
         for source in inputSources {
+            guard let isSelectablePtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsSelectCapable),
+                  CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(isSelectablePtr).takeUnretainedValue()) else { continue }
             guard let sourceIDPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { continue }
             let sourceID = Unmanaged<CFString>.fromOpaque(sourceIDPtr).takeUnretainedValue() as String
             let sourceLower = sourceID.lowercased()

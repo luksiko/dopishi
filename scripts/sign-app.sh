@@ -16,6 +16,12 @@ if [[ "$BUNDLE_ID" != "com.langswitcher.app" ]]; then
     echo "Refusing to sign unexpected bundle identifier: $BUNDLE_ID" >&2
     exit 1
 fi
+if [[ -d "$APP_PATH/Contents/Frameworks" ]]; then
+    find "$APP_PATH/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) -exec /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" {} + 2>/dev/null || true
+fi
+if [[ -d "$APP_PATH/Contents/Helpers" ]]; then
+    find "$APP_PATH/Contents/Helpers" -type f -perm +111 -exec /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" {} + 2>/dev/null || true
+fi
 /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --identifier "$BUNDLE_ID" "$APP_PATH"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 DETAILS=$(/usr/bin/codesign --display --verbose=2 "$APP_PATH" 2>&1)

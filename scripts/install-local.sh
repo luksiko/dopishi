@@ -30,6 +30,7 @@ trap cleanup EXIT
 
 # Sign and verify before touching the installed application or its process.
 ditto "$source_app" "$staging_dir/LangSwitcher.app"
+bash "$script_dir/embed-inference.sh" "$staging_dir/LangSwitcher.app"
 bash "$script_dir/sign-app.sh" "$staging_dir/LangSwitcher.app"
 if [[ -d "$installed_app" ]]; then
     # Require the same designated identity for certificate-signed updates.

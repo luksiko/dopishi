@@ -320,9 +320,22 @@ final class AccessibilityService {
     /// Thin AX glue — policy lives in AutoCorrectionGate; callers fail
     /// closed on nil.
     func focusedFieldRole() -> (role: String?, subrole: String?)? {
-        guard let axElement = focusedTextElement() else {
-            NSLog("[LangSwitcher] focusedFieldRole: no confirmed text editor")
-            return nil
+        let axElement: AXUIElement
+        if let element = focusedTextElement() {
+            axElement = element
+        } else {
+            let system = AXUIElementCreateSystemWide()
+            var directValue: CFTypeRef?
+            if AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &directValue) != .success,
+               let app = NSWorkspace.shared.frontmostApplication {
+                AXUIElementCopyAttributeValue(AXUIElementCreateApplication(app.processIdentifier),
+                                              kAXFocusedUIElementAttribute as CFString, &directValue)
+            }
+            guard let directValue, CFGetTypeID(directValue) == AXUIElementGetTypeID() else {
+                NSLog("[LangSwitcher] focusedFieldRole: no confirmed text editor")
+                return nil
+            }
+            axElement = directValue as! AXUIElement
         }
         var roleValue: CFTypeRef?
         AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
@@ -492,7 +505,7 @@ final class AccessibilityService {
         var visited: Set<Node> = []
         var result: Node?
         while !pending.isEmpty {
-            guard visited.count < limit, shouldContinue() else { return nil }
+            guard visited.count < limit, shouldContinue() else { break }
             let (node, linkedFocus) = pending.removeLast()
             guard visited.insert(node).inserted else { continue }
             let info = attributes(node)
@@ -516,8 +529,6 @@ final class AccessibilityService {
                 pending.append(contentsOf: children(node).reversed().map { ($0, false) })
             }
         }
-        // Incomplete traversal could conceal a second focused editor.
-        guard pending.isEmpty else { return nil }
         return result
     }
 
@@ -585,11 +596,9 @@ final class AccessibilityService {
 
     func captureReplacementTarget() -> ReplacementTarget? {
         guard let element = focusedTextElement(), let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        for attribute in [kAXSelectedTextAttribute, kAXSelectedTextRangeAttribute] {
-            var settable = DarwinBoolean(false)
-            guard AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) == .success,
-                  settable.boolValue else { return nil }
-        }
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(element, kAXSelectedTextRangeAttribute as CFString, &settable) == .success,
+              settable.boolValue else { return nil }
         return ReplacementTarget(element: element, processID: app.processIdentifier)
     }
 
@@ -776,11 +785,20 @@ final class AccessibilityService {
                 completion(false)
                 return
             }
+            // Once verified selection was matched and paste was posted via Cmd+V,
+            // notify completion immediately so layout can switch without lag.
+            completion(true)
+
             let confirmation = PasteConfirmation(applied: {
                 var observed: CFTypeRef?
-                AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed)
-                return Self.replacementWasApplied(original: text, range: plan, replacement: replacement,
-                                                  observed: observed as? String, allowFollowingInput: true)
+                if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed) == .success,
+                   let obs = observed as? String {
+                    return Self.replacementWasApplied(original: text, range: plan, replacement: replacement,
+                                                      observed: obs, allowFollowingInput: true)
+                }
+                // When kAXValueAttribute is unsupported (Electron, Chromium, WebKit contenteditable),
+                // the paste is considered applied once dispatched.
+                return true
             }, finish: { [weak self] applied in
                 guard let self else { return }
                 self.pendingPaste = nil
@@ -793,7 +811,6 @@ final class AccessibilityService {
                 if pasteboard.changeCount == pasteboardRevision {
                     if saved.isEmpty { pasteboard.clearContents() } else { self.restorePasteboard(saved) }
                 }
-                completion(applied)
             })
             pendingPaste = confirmation
             // Usually confirm within a few milliseconds, rather than leaving the

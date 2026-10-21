@@ -20,6 +20,21 @@ final class AutoCorrectionGateTests: XCTestCase {
             role: "AXTextArea", subrole: "AXContentList", bundleID: textEdit))
     }
     
+    func testSearchFieldAllowed() {
+        XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(
+            role: "AXSearchField", subrole: nil, bundleID: textEdit))
+    }
+
+    func testComboBoxAllowed() {
+        XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(
+            role: "AXComboBox", subrole: nil, bundleID: textEdit))
+    }
+
+    func testWebAreaAllowed() {
+        XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(
+            role: "AXWebArea", subrole: nil, bundleID: textEdit))
+    }
+    
     func testSecureRoleDenied() {
         XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(
             role: "AXSecureTextField", subrole: nil, bundleID: textEdit))
@@ -105,6 +120,13 @@ final class AutoCorrectionGateTests: XCTestCase {
         XCTAssertEqual(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
             (node == 1 ? "AXTextArea" : "AXGroup", nil, false)
         }, focusedChild: { $0 == 0 ? 1 : nil }, children: { _ in Array(2..<1000) }, limit: 3), 1)
+    }
+
+    func testFoundEditorPreservedEvenIfPendingHasUnvisitedChildren() {
+        // Node 0 has child 1 (focused text area) and 50 other unvisited sibling nodes
+        XCTAssertEqual(AccessibilityService.resolveFocusedTextNode(root: 0, attributes: { node in
+            (node == 1 ? "AXTextArea" : "AXGroup", nil, node == 1)
+        }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1] + Array(2..<50) : [] }, limit: 5), 1)
     }
 
 }

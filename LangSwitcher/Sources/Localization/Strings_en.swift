@@ -24,6 +24,7 @@ enum Strings_en {
         "settings.tab.general":          "General",
         "settings.tab.layouts":          "Layouts",
         "settings.tab.hotkey":           "Hotkey",
+        "settings.tab.ai":               "AI Assistant",
         "settings.tab.permissions":      "Permissions",
         "settings.tab.log":              "Log",
         "settings.iconStyle.languageBadge": "Language badge in frame (RU, EN)",
@@ -37,7 +38,7 @@ enum Strings_en {
         "general.showNotifications":     "Show Notifications",
         "general.smartConversion":       "Smart Conversion (No Selection)",
         "general.mode":                  "Mode:",
-        "general.layoutSwitch":          "Layout Switch after Conversion",
+        "general.layoutSwitch":          "Layout Switch on Hotkey Conversion",
         "general.howItWorks":            "How It Works",
         "general.howItWorksText":        "When text is selected, the shortcut converts the selection.\nWhen no text is selected, the behavior depends on the Smart Conversion mode above.",
         "general.statistics":            "Statistics",
@@ -56,10 +57,10 @@ enum Strings_en {
         "layoutSwitchMode.ifLastWord.name":      "Switch if last word was converted",
         "layoutSwitchMode.ifAnyWord.name":       "Switch if any word required conversion",
         "layoutSwitchMode.never.name":           "Do not switch layout",
-        "layoutSwitchMode.always.desc":          "Always switch the keyboard layout after pressing the hotkey, regardless of whether text was converted.",
-        "layoutSwitchMode.ifLastWord.desc":      "Switch the layout only if the last word before the cursor was typed in the wrong layout and got reconverted.",
-        "layoutSwitchMode.ifAnyWord.desc":       "Switch the layout if any word in the converted text needed reconversion to the correct layout.",
-        "layoutSwitchMode.never.desc":           "Convert text without changing the keyboard layout.",
+        "layoutSwitchMode.always.desc":          "Always switch the keyboard layout on hotkey conversion, even if no text required conversion.",
+        "layoutSwitchMode.ifLastWord.desc":      "Switch the layout on hotkey conversion only if the last word before the cursor was reconverted.",
+        "layoutSwitchMode.ifAnyWord.desc":       "Switch the layout on hotkey conversion if any word in the converted text needed reconversion.",
+        "layoutSwitchMode.never.desc":           "Convert text via hotkey without changing the keyboard layout.",
 
         // ── Layouts Tab ─────────────────────────────────────────────
         "layouts.title":                 "Active Keyboard Layouts",
@@ -175,6 +176,7 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
 
         // ── Common ──────────────────────────────────────────────────
         "common.cancel":                 "Cancel",
+        "common.ms":                     "ms",
 
         "menu.previewRecovery":          "Preview Recovery...",
         "general.autoCorrectOnSpace":      "Auto-correct on Space",
@@ -225,8 +227,8 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "general.autoCorrectionDesc":            "Automatically detects and corrects words typed in the wrong keyboard layout when you press Space, Enter, or punctuation. Uses system spell checker to reduce false positives.",
         "general.autoCorrectionSpellCheck":      "Validate with system spell checker",
         "general.autoCorrectionSpellCheckDesc":  "Only auto-correct when the converted word is recognized by macOS spell checker. Reduces false positives but may miss some valid words.",
-        "general.autoCorrectionSwitchLayout":    "Switch layout after auto-correction",
-        "general.autoCorrectionSwitchLayoutDesc": "Automatically switch system keyboard layout to match the corrected text language.",
+        "general.autoCorrectionSwitchLayout":    "Switch system layout after auto-correction",
+        "general.autoCorrectionSwitchLayoutDesc": "Automatically switch the system input language to match the corrected word (e.g. to Russian after 'ghbdtn ' → 'привет ').",
 
         // ── Autocompletion ──────────────────────────────────────────
         "general.autocompletion":                "Word Autocompletion",
@@ -249,8 +251,12 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "autocompletion.useNumberShortcuts":     "Select with number keys (1–5)",
         "autocompletion.includeCrossLayout":     "Include cross-layout suggestions",
         "autocompletion.crossLayoutDesc":        "e.g. typing 'ghbd' suggests 'привет' and automatically switches layout.",
+        "autocompletion.suggestProfanity":       "Suggest profanity and curse words",
+        "autocompletion.suggestProfanityDesc":   "Allow offensive words and profanity in autocompletion suggestions. Disabled by default.",
         "autocompletion.maxSuggestions":         "Max suggestions:",
         "autocompletion.minPrefixLength":        "Min prefix length:",
+        "autocompletion.delay":                  "Popup delay:",
+        "autocompletion.delayDesc":              "Pause before showing suggestions popup.",
         "autocompletion.hint.toAccept":          "to insert",
         "autocompletion.displayMode":            "Display style",
         "autocompletion.displayMode.popup":      "Popup Menu",
@@ -282,6 +288,64 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "permissions.revealCopy": "Show in Finder",
         "permissions.instanceError": "Could not protect against duplicate launch",
         "permissions.instanceErrorDetail": "LangSwitcher will quit to avoid running multiple keyboard monitors. Check access to its Application Support folder.",
+
+        // ── AI Assistant ─────────────────────────────────────────────
+        "ai.title":                              "Local AI Assistant",
+        "ai.subtitle":                           "Offline neural engine for predictive continuation (100% private, no internet required).",
+        "ai.model.name":                         "Model",
+        "ai.model.status":                       "Status",
+        "ai.model.status.ready":                 "Ready",
+        "ai.model.status.downloading":           "Downloading (%@)",
+        "ai.model.status.notDownloaded":         "Not Downloaded",
+        "ai.model.status.error":                 "Error",
+        "ai.model.downloadButton":               "Download Model (~390 MB)",
+        "ai.model.cancelDownload":               "Cancel",
+        "ai.model.deleteButton":                 "Delete Model",
+        "ai.model.deleteConfirm":                "Are you sure you want to delete the model weights?",
+        "ai.predictive.enable":                  "Predictive Text Continuation",
+        "ai.predictive.desc":                    "Suggests 2–4 words after a typing pause (350 ms).",
+        "ai.predictive.wordCount":               "Continuation Length",
+        "ai.predictive.words":                   "%d words",
+        "ai.predictive.debounceDelay":           "Prediction delay:",
+        "ai.predictive.debounceDesc":            "Typing pause before AI generates continuation.",
+        "ai.predictive.fast":                    "150 ms (Fast)",
+        "ai.predictive.slow":                    "1000 ms (Relaxed)",
+        "ai.battery.title":                      "Battery Mode",
+        "ai.battery.desc":                       "Automatically disable background AI when running on battery (preserving instant dictionary mode only).",
+        "ai.battery.status.ac":                  "⚡ AC Power — AI active",
+        "ai.battery.status.battery":             "🔋 Battery Power — AI paused to save power",
+        "ai.battery.status.unknown":             "Power source: %@",
+
+        // ── Recommended Models ─────────────────────────────────────────
+        "ai.model.recommended":                  "Recommended Models",
+        "ai.model.recommended.desc":             "Choose a lightweight local model for fast auto-completions without sending data to the cloud.",
+        "ai.model.active":                       "Active",
+        "ai.model.select":                       "Select",
+        "ai.model.badge.recommended":            "Recommended",
+        "ai.model.desc.qwen05b":                 "Ultra-fast Qwen 0.5B, ideal for low-latency completions on any Mac.",
+        "ai.model.desc.smollm360m":               "Extremely lightweight 360M model with minimal RAM footprint (~229 MB).",
+        "ai.model.desc.qwen15b":                 "High quality reasoning and vocabulary, best on Apple Silicon with 16GB+ RAM.",
+        "ai.model.desc.llama1b":                 "Compact Meta Llama 3.2 model optimized for natural English text.",
+
+        // ── AI Custom Instructions ─────────────────────────────────────
+        "ai.instructions.title":                 "AI Instructions",
+        "ai.instructions.desc":                  "Personalize completion style, role, or technical terminology.",
+        "ai.instructions.placeholder":           "e.g. I am a programmer, write concisely, keep technical terms in English.",
+        "ai.instructions.preset.coder":          "Programmer",
+        "ai.instructions.preset.coder.text":     "I am a programmer, write concisely, keep technical terms in English.",
+        "ai.instructions.preset.concise":        "Concise",
+        "ai.instructions.preset.concise.text":   "Write briefly and to the point, no filler words.",
+        "ai.instructions.preset.business":       "Business",
+        "ai.instructions.preset.business.text":  "Polite, professional business tone.",
+        "ai.instructions.clear":                 "Clear",
+
+        // ── Extended Statistics ───────────────────────────────────────
+        "ai.stats.title":                        "Productivity Statistics",
+        "ai.stats.savedChars":                   "Characters Saved",
+        "ai.stats.savedClicks":                  "Keystrokes Saved",
+        "ai.stats.conversions":                  "Corrections",
+        "ai.stats.reset":                        "Reset Statistics",
+        "ai.stats.resetConfirm":                 "Are you sure you want to reset all productivity statistics?",
     ]
 
     @MainActor static func register() {

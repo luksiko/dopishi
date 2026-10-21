@@ -9,7 +9,13 @@ enum AutoCorrectionGate {
     /// Roles the auto-correction may touch. Deliberately narrow:
     /// any other focused control (a button, a menu) must never hijack
     /// the selection.
-    static let textInputRoles: Set<String> = ["AXTextField", "AXTextArea"]
+    static let textInputRoles: Set<String> = [
+        "AXTextField",
+        "AXTextArea",
+        "AXSearchField",
+        "AXComboBox",
+        "AXWebArea"
+    ]
     
     /// Accessibility identifier marking a password field — appears either
     /// as the role itself or, Safari-style, as the subrole of an AXTextField.

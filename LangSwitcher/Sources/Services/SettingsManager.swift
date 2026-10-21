@@ -252,6 +252,76 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCompletionIncludeCrossLayout, forKey: Keys.autoCompletionIncludeCrossLayout) }
     }
 
+    /// Whether to suggest profanity and curse words in autocompletion. Default: false (OFF).
+    @Published var autoCompletionSuggestProfanity: Bool {
+        didSet { defaults.set(autoCompletionSuggestProfanity, forKey: Keys.autoCompletionSuggestProfanity) }
+    }
+
+    /// Delay before showing autocompletion popup (in seconds). Default: 0.035 (35 ms).
+    @Published var autoCompletionDelay: Double {
+        didSet { defaults.set(autoCompletionDelay, forKey: Keys.autoCompletionDelay) }
+    }
+
+    // MARK: - AI Assistant Settings
+
+    /// Whether predictive AI continuation (2-4 words) is enabled. Default: true.
+    @Published var aiPredictiveEnabled: Bool {
+        didSet {
+            defaults.set(aiPredictiveEnabled, forKey: Keys.aiPredictiveEnabled)
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
+    /// Whether AI is automatically disabled when running on battery power. Default: true.
+    @Published var aiBatteryModeEnabled: Bool {
+        didSet {
+            defaults.set(aiBatteryModeEnabled, forKey: Keys.aiBatteryModeEnabled)
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
+    /// Maximum number of words in an AI prediction (2...4). Default: 3.
+    @Published var aiMaxContinuationWords: Int {
+        didSet { defaults.set(aiMaxContinuationWords, forKey: Keys.aiMaxContinuationWords) }
+    }
+
+    /// Typing debounce delay for AI continuation (in seconds). Default: 0.350 (350 ms).
+    @Published var aiDebounceDelay: Double {
+        didSet { defaults.set(aiDebounceDelay, forKey: Keys.aiDebounceDelay) }
+    }
+
+    /// User-defined system instructions for the AI assistant.
+    @Published var aiCustomInstructions: String {
+        didSet { defaults.set(aiCustomInstructions, forKey: Keys.aiCustomInstructions) }
+    }
+
+    /// Currently active/selected model identifier. Default: "qwen2.5-0.5b".
+    @Published var selectedModelId: String {
+        didSet {
+            defaults.set(selectedModelId, forKey: Keys.selectedModelId)
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
+    /// Total characters saved via autocompletion and autocorrection.
+    @Published var savedCharactersCount: Int {
+        didSet { defaults.set(savedCharactersCount, forKey: Keys.savedCharactersCount) }
+    }
+
+    /// Total keystrokes/clicks saved via autocompletion.
+    @Published var savedClicksCount: Int {
+        didSet { defaults.set(savedClicksCount, forKey: Keys.savedClicksCount) }
+    }
+
+    /// Computed check: whether AI inference is allowed based on preferences and battery state.
+    var isAIAllowed: Bool {
+        guard aiPredictiveEnabled else { return false }
+        if aiBatteryModeEnabled && PowerService.shared.isOnBattery {
+            return false
+        }
+        return true
+    }
+
     /// Autocompletion display presentation style (popup HUD, inline ghost text, or both). Default: .both.
     @Published var autoCompletionDisplayMode: AutocompletionDisplayMode {
         didSet {
@@ -414,13 +484,23 @@ final class SettingsManager: ObservableObject {
         static let autoCompletionMinPrefixLength = "autoCompletionMinPrefixLength"
         static let autoCompletionUseNumberShortcuts = "autoCompletionUseNumberShortcuts"
         static let autoCompletionIncludeCrossLayout = "autoCompletionIncludeCrossLayout"
+        static let autoCompletionSuggestProfanity = "autoCompletionSuggestProfanity"
         static let autoCompletionDisplayMode = "autoCompletionDisplayMode"
+        static let autoCompletionDelay = "autoCompletionDelay"
         static let excludedAppBundleIDs = "excludedAppBundleIDs"
         static let statusBarIconStyle = "statusBarIconStyle"
         static let thoughtRecoveryEnabled = "thoughtRecoveryEnabled"
         static let thoughtRecoveryPreview = "thoughtRecoveryPreview"
         static let recoveryCount = "recoveryCount"
         static let recoveryRevertCount = "recoveryRevertCount"
+        static let aiPredictiveEnabled = "aiPredictiveEnabled"
+        static let aiBatteryModeEnabled = "aiBatteryModeEnabled"
+        static let aiMaxContinuationWords = "aiMaxContinuationWords"
+        static let aiDebounceDelay = "aiDebounceDelay"
+        static let aiCustomInstructions = "aiCustomInstructions"
+        static let selectedModelId = "selectedModelId"
+        static let savedCharactersCount = "savedCharactersCount"
+        static let savedClicksCount = "savedClicksCount"
     }
     
     // MARK: - Init
@@ -471,8 +551,10 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
         self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true
         self.autoCompletionIncludeCrossLayout = defaults.object(forKey: Keys.autoCompletionIncludeCrossLayout) as? Bool ?? true
+        self.autoCompletionSuggestProfanity = defaults.object(forKey: Keys.autoCompletionSuggestProfanity) as? Bool ?? false // Default: OFF
         let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
         self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? 2) ?? .both
+        self.autoCompletionDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double ?? 0.035
         
         let savedExcluded = defaults.stringArray(forKey: Keys.excludedAppBundleIDs)
         self.excludedAppBundleIDs = savedExcluded ?? Array(AutoCorrectionGate.defaultExcludedBundleIDs).sorted()
@@ -481,6 +563,15 @@ final class SettingsManager: ObservableObject {
         self.thoughtRecoveryPreview = defaults.object(forKey: Keys.thoughtRecoveryPreview) as? Bool ?? false // Default: OFF
         self.recoveryCount = defaults.integer(forKey: Keys.recoveryCount)
         self.recoveryRevertCount = defaults.integer(forKey: Keys.recoveryRevertCount)
+        
+        self.aiPredictiveEnabled = defaults.object(forKey: Keys.aiPredictiveEnabled) as? Bool ?? true   // Default: ON
+        self.aiBatteryModeEnabled = defaults.object(forKey: Keys.aiBatteryModeEnabled) as? Bool ?? true // Default: ON
+        self.aiMaxContinuationWords = defaults.object(forKey: Keys.aiMaxContinuationWords) as? Int ?? 3  // Default: 3 words
+        self.aiDebounceDelay = defaults.object(forKey: Keys.aiDebounceDelay) as? Double ?? 0.350        // Default: 350 ms
+        self.aiCustomInstructions = defaults.string(forKey: Keys.aiCustomInstructions) ?? ""
+        self.selectedModelId = defaults.string(forKey: Keys.selectedModelId) ?? RecommendedAIModel.defaultModelID
+        self.savedCharactersCount = defaults.integer(forKey: Keys.savedCharactersCount)
+        self.savedClicksCount = defaults.integer(forKey: Keys.savedClicksCount)
         
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge
@@ -522,6 +613,34 @@ final class SettingsManager: ObservableObject {
 
     func incrementRecoveryRevertCount() {
         recoveryRevertCount += 1
+    }
+    
+    func recordSavedText(inserted: Int, typed: Int) {
+        let saved = max(0, inserted - typed)
+        savedCharactersCount += saved
+        savedClicksCount += saved
+        defaults.set(savedCharactersCount, forKey: Keys.savedCharactersCount)
+        defaults.set(savedClicksCount, forKey: Keys.savedClicksCount)
+    }
+
+    func recordAutoCorrection(charCount: Int) {
+        savedCharactersCount += charCount
+        savedClicksCount += charCount * 2
+        defaults.set(savedCharactersCount, forKey: Keys.savedCharactersCount)
+        defaults.set(savedClicksCount, forKey: Keys.savedClicksCount)
+    }
+
+    func resetStatistics() {
+        conversionCount = 0
+        recoveryCount = 0
+        recoveryRevertCount = 0
+        savedCharactersCount = 0
+        savedClicksCount = 0
+        defaults.set(0, forKey: Keys.conversionCount)
+        defaults.set(0, forKey: Keys.recoveryCount)
+        defaults.set(0, forKey: Keys.recoveryRevertCount)
+        defaults.set(0, forKey: Keys.savedCharactersCount)
+        defaults.set(0, forKey: Keys.savedClicksCount)
     }
     
     private func saveLayouts() {

@@ -46,7 +46,8 @@ final class AutocompletionEngine {
         activeLayoutID: String,
         enabledLayouts: [KeyboardLayout],
         maxSuggestions: Int = 4,
-        includeCrossLayout: Bool = true
+        includeCrossLayout: Bool = true,
+        allowProfanity: Bool = false
     ) -> [AutocompletionCandidate] {
         let trimmed = partialWord.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
@@ -56,6 +57,11 @@ final class AutocompletionEngine {
         
         var results: [AutocompletionCandidate] = []
         var seenWords = Set<String>()
+        
+        func isCandidateAllowed(_ word: String) -> Bool {
+            if allowProfanity { return true }
+            return !ProfanityFilter.isProfane(word)
+        }
         
         // Find language code of active layout
         let effectiveActiveLayoutID = activeLayoutID.isEmpty ? (KeyboardLayoutDetector.getCurrentLayout()?.id ?? enabledLayouts.first?.id ?? "com.apple.keylayout.US") : activeLayoutID
@@ -73,6 +79,7 @@ final class AutocompletionEngine {
             let continuations = adaptiveStore.topContinuations(after: prev, limit: 10)
             for cont in continuations where cont.hasPrefix(lower) {
                 let formatted = formatCase(cont, isCapitalized: isCapitalized)
+                guard isCandidateAllowed(formatted) else { continue }
                 if seenWords.insert(formatted.lowercased()).inserted {
                     let score = calculateScore(base: 1200, word: cont)
                     results.append(AutocompletionCandidate(
@@ -89,6 +96,7 @@ final class AutocompletionEngine {
         for userWord in userDictionary.words {
             if userWord.lowercased().hasPrefix(lower) && userWord.lowercased() != lower {
                 let formatted = formatCase(userWord, isCapitalized: isCapitalized)
+                guard isCandidateAllowed(formatted) else { continue }
                 if seenWords.insert(formatted.lowercased()).inserted {
                     let score = calculateScore(base: 1000, word: userWord)
                     results.append(AutocompletionCandidate(
@@ -107,6 +115,7 @@ final class AutocompletionEngine {
         for (index, word) in wordlist.enumerated() {
             if word.hasPrefix(lower) && word != lower {
                 let formatted = formatCase(word, isCapitalized: isCapitalized)
+                guard isCandidateAllowed(formatted) else { continue }
                 if seenWords.insert(formatted.lowercased()).inserted {
                     let baseScore = max(100, 500 - index)
                     let score = calculateScore(base: baseScore, word: word)
@@ -128,6 +137,7 @@ final class AutocompletionEngine {
             let wordLower = word.lowercased()
             if wordLower.hasPrefix(lower) && wordLower != lower {
                 let formatted = formatCase(word, isCapitalized: isCapitalized)
+                guard isCandidateAllowed(formatted) else { continue }
                 if seenWords.insert(formatted.lowercased()).inserted {
                     let score = calculateScore(base: 50, word: word)
                     results.append(AutocompletionCandidate(
@@ -153,6 +163,7 @@ final class AutocompletionEngine {
                     for (index, word) in otherWordlist.enumerated() {
                         if word.hasPrefix(convertedLower) {
                             let formatted = formatCase(word, isCapitalized: isCapitalized)
+                            guard isCandidateAllowed(formatted) else { continue }
                             if seenWords.insert(formatted.lowercased()).inserted {
                                 let baseScore = max(50, 400 - index)
                                 let score = calculateScore(base: baseScore, word: word)
@@ -174,6 +185,7 @@ final class AutocompletionEngine {
                         let wordLower = word.lowercased()
                         if wordLower.hasPrefix(convertedLower) {
                             let formatted = formatCase(word, isCapitalized: isCapitalized)
+                            guard isCandidateAllowed(formatted) else { continue }
                             if seenWords.insert(formatted.lowercased()).inserted {
                                 let score = calculateScore(base: 40, word: word)
                                 results.append(AutocompletionCandidate(
@@ -187,6 +199,10 @@ final class AutocompletionEngine {
                     }
                 }
             }
+        }
+        
+        if !allowProfanity {
+            results.removeAll { ProfanityFilter.isProfane($0.word) }
         }
         
         // Sort by score descending, take top N

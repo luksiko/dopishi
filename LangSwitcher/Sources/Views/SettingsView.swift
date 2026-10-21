@@ -10,6 +10,7 @@ struct SettingsView: View {
             (l10n.t("settings.tab.general"), "gear"),
             (l10n.t("settings.tab.layouts"), "keyboard"),
             (l10n.t("settings.tab.hotkey"), "command"),
+            (l10n.t("settings.tab.ai"), "sparkles"),
             (l10n.t("settings.tab.permissions"), "lock.shield"),
             (l10n.t("settings.tab.log"), "list.bullet.rectangle"),
         ]
@@ -60,9 +61,13 @@ struct SettingsView: View {
                         .environmentObject(settingsManager)
                         .environmentObject(l10n)
                 case 3:
-                    PermissionsView()
+                    AIAssistantSettingsTab()
+                        .environmentObject(settingsManager)
                         .environmentObject(l10n)
                 case 4:
+                    PermissionsView()
+                        .environmentObject(l10n)
+                case 5:
                     ConversionLogView(logStore: ConversionLogStore.shared)
                         .environmentObject(settingsManager)
                         .environmentObject(l10n)
@@ -72,7 +77,7 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 580, height: 520)
+        .frame(width: 580, height: 560)
     }
 }
 
@@ -230,10 +235,30 @@ struct GeneralSettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
+
+                    Toggle(l10n.t("autocompletion.suggestProfanity"), isOn: $settingsManager.autoCompletionSuggestProfanity)
+                    
+                    Text(l10n.t("autocompletion.suggestProfanityDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                     
                     Stepper("\(l10n.t("autocompletion.minPrefixLength")) \(settingsManager.autoCompletionMinPrefixLength)", value: $settingsManager.autoCompletionMinPrefixLength, in: 2...5)
                     
                     Stepper("\(l10n.t("autocompletion.maxSuggestions")) \(settingsManager.autoCompletionMaxSuggestions)", value: $settingsManager.autoCompletionMaxSuggestions, in: 1...6)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(l10n.t("autocompletion.delay"))
+                            Spacer()
+                            Text("\(Int(settingsManager.autoCompletionDelay * 1000)) \(l10n.t("common.ms"))")
+                                .font(.subheadline)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $settingsManager.autoCompletionDelay, in: 0.0...0.30, step: 0.025)
+                    }
+                    .padding(.vertical, 2)
                     
                     Divider()
                         .padding(.vertical, 2)

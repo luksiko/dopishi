@@ -23,6 +23,7 @@ enum Strings_ru {
         "settings.tab.general":          "Основные",
         "settings.tab.layouts":          "Раскладки",
         "settings.tab.hotkey":           "Горячая клавиша",
+        "settings.tab.ai":               "AI Помощник",
         "settings.tab.permissions":      "Разрешения",
         "settings.tab.log":              "Журнал",
         "settings.iconStyle.languageBadge": "Код языка в рамке (RU, EN)",
@@ -36,7 +37,7 @@ enum Strings_ru {
         "general.showNotifications":     "Показывать уведомления",
         "general.smartConversion":       "Умная конвертация (без выделения)",
         "general.mode":                  "Режим:",
-        "general.layoutSwitch":          "Переключение раскладки после конвертации",
+        "general.layoutSwitch":          "Переключение раскладки по горячей клавише",
         "general.howItWorks":            "Как это работает",
         "general.howItWorksText":        "Если текст выделен, горячая клавиша конвертирует выделение.\nЕсли текст не выделен, поведение зависит от режима умной конвертации выше.",
         "general.statistics":            "Статистика",
@@ -55,10 +56,10 @@ enum Strings_ru {
         "layoutSwitchMode.ifLastWord.name":      "Переключать, если последнее слово было конвертировано",
         "layoutSwitchMode.ifAnyWord.name":       "Переключать, если хоть одно слово потребовало конвертации",
         "layoutSwitchMode.never.name":           "Не переключать раскладку",
-        "layoutSwitchMode.always.desc":          "Всегда переключать раскладку клавиатуры после нажатия горячей клавиши, независимо от того, был ли текст конвертирован.",
-        "layoutSwitchMode.ifLastWord.desc":      "Переключать раскладку, только если последнее слово перед курсором было набрано в неправильной раскладке и было конвертировано.",
-        "layoutSwitchMode.ifAnyWord.desc":       "Переключать раскладку, если хотя бы одно слово в конвертированном тексте потребовало преобразования.",
-        "layoutSwitchMode.never.desc":           "Конвертировать текст без смены раскладки клавиатуры.",
+        "layoutSwitchMode.always.desc":          "Всегда переключать раскладку клавиатуры при нажатии горячей клавиши, даже если текст не потребовал конвертации.",
+        "layoutSwitchMode.ifLastWord.desc":      "Переключать раскладку по горячей клавише, только если последнее слово перед курсором было конвертировано.",
+        "layoutSwitchMode.ifAnyWord.desc":       "Переключать раскладку по горячей клавише, если хотя бы одно слово в тексте было конвертировано.",
+        "layoutSwitchMode.never.desc":           "Конвертировать текст по горячей клавише без смены раскладки клавиатуры.",
 
         // ── Вкладка «Раскладки» ─────────────────────────────────────
         "layouts.title":                 "Активные раскладки клавиатуры",
@@ -174,6 +175,7 @@ LangSwitcher нуждается в разрешении универсально
 
         // ── Общее ───────────────────────────────────────────────────
         "common.cancel":                 "Отмена",
+        "common.ms":                     "мс",
 
         "menu.previewRecovery":          "Предпросмотр восстановления...",
         "general.autoCorrectOnSpace":      "Автокоррекция по пробелу",
@@ -224,8 +226,8 @@ LangSwitcher нуждается в разрешении универсально
         "general.autoCorrectionDesc":            "Автоматически обнаруживает и исправляет слова, набранные в неправильной раскладке, при нажатии пробела, Enter или знака пунктуации. Использует системную проверку правописания для уменьшения ложных срабатываний.",
         "general.autoCorrectionSpellCheck":      "Проверять системным словарём",
         "general.autoCorrectionSpellCheckDesc":  "Автоисправление только когда преобразованное слово распознаётся проверкой правописания macOS. Уменьшает ложные срабатывания, но может пропускать некоторые слова.",
-        "general.autoCorrectionSwitchLayout":    "Переключать раскладку после автоисправления",
-        "general.autoCorrectionSwitchLayoutDesc": "Автоматически переключать раскладку клавиатуры на язык исправленного текста.",
+        "general.autoCorrectionSwitchLayout":    "Переключать язык ввода после автоисправления",
+        "general.autoCorrectionSwitchLayoutDesc": "Автоматически переключать раскладку/язык клавиатуры в macOS на язык исправленного слова (например, на русский после «ghbdtn » → «привет »).",
 
         // ── Автодополнение ──────────────────────────────────────────
         "general.autocompletion":                "Автодополнение слов",
@@ -248,8 +250,12 @@ LangSwitcher нуждается в разрешении универсально
         "autocompletion.useNumberShortcuts":     "Выбор цифрами (1–5)",
         "autocompletion.includeCrossLayout":     "Подсказывать слова из другой раскладки",
         "autocompletion.crossLayoutDesc":        "Например, при наборе 'ghbd' подскажет 'привет' и автоматически переключит раскладку.",
+        "autocompletion.suggestProfanity":       "Предлагать нецензурные слова",
+        "autocompletion.suggestProfanityDesc":   "Разрешить ненормативную лексику и мат в подсказках автодополнения. По умолчанию отключено.",
         "autocompletion.maxSuggestions":         "Количество подсказок:",
         "autocompletion.minPrefixLength":        "Минимум символов для подсказки:",
+        "autocompletion.delay":                  "Задержка появления подсказок:",
+        "autocompletion.delayDesc":              "Пауза перед отображением всплывающего окна подсказок.",
         "autocompletion.hint.toAccept":          "вставить",
         "autocompletion.displayMode":            "Стиль отображения",
         "autocompletion.displayMode.popup":      "Всплывающее меню",
@@ -281,6 +287,64 @@ LangSwitcher нуждается в разрешении универсально
         "permissions.revealCopy": "Показать в Finder",
         "permissions.instanceError": "Не удалось защититься от повторного запуска",
         "permissions.instanceErrorDetail": "LangSwitcher завершится, чтобы не запускать несколько обработчиков клавиш. Проверьте доступ к папке приложения в Application Support.",
+
+        // ── AI Assistant ─────────────────────────────────────────────
+        "ai.title":                              "Локальный AI Помощник",
+        "ai.subtitle":                           "Локальная нейросеть для предиктивного набора (100% офлайн, без интернета).",
+        "ai.model.name":                         "Модель",
+        "ai.model.status":                       "Статус",
+        "ai.model.status.ready":                 "Готов к работе",
+        "ai.model.status.downloading":           "Загрузка (%@)",
+        "ai.model.status.notDownloaded":         "Не загружен",
+        "ai.model.status.error":                 "Ошибка",
+        "ai.model.downloadButton":               "Загрузить модель (~390 МБ)",
+        "ai.model.cancelDownload":               "Отмена",
+        "ai.model.deleteButton":                 "Удалить модель",
+        "ai.model.deleteConfirm":                "Вы уверены, что хотите удалить веса модели?",
+        "ai.predictive.enable":                  "Предиктивное продолжение текста",
+        "ai.predictive.desc":                    "Предлагает продолжение на 2–4 слова при паузе в наборе (350 мс).",
+        "ai.predictive.wordCount":               "Длина продолжения",
+        "ai.predictive.words":                   "%d слова",
+        "ai.predictive.debounceDelay":           "Задержка подсказок:",
+        "ai.predictive.debounceDesc":            "Пауза в наборе текста перед появлением подсказок AI.",
+        "ai.predictive.fast":                    "150 мс (Быстро)",
+        "ai.predictive.slow":                    "1000 мс (Спокойно)",
+        "ai.battery.title":                      "Режим батареи",
+        "ai.battery.desc":                       "Автоматически отключать фоновый AI при работе от аккумулятора (остаётся только мгновенный словарный режим).",
+        "ai.battery.status.ac":                  "⚡ Питание от сети — AI активен",
+        "ai.battery.status.battery":             "🔋 Работа от аккумулятора — AI приостановлен для экономии",
+        "ai.battery.status.unknown":             "Источник питания: %@",
+
+        // ── Recommended Models ─────────────────────────────────────────
+        "ai.model.recommended":                  "Рекомендуемые модели",
+        "ai.model.recommended.desc":             "Выберите локальную модель для быстрых подсказок без отправки данных в облако.",
+        "ai.model.active":                       "Активна",
+        "ai.model.select":                       "Выбрать",
+        "ai.model.badge.recommended":            "Рекомендуется",
+        "ai.model.desc.qwen05b":                 "Сверхбыстрая Qwen 0.5B, идеальный баланс скорости и качества на любом Mac.",
+        "ai.model.desc.smollm360m":               "Минималистичная модель 360M с минимальным потреблением памяти (~229 МБ).",
+        "ai.model.desc.qwen15b":                 "Высокое качество продолжений и словарный запас, для Mac с 16+ ГБ RAM.",
+        "ai.model.desc.llama1b":                 "Компактная модель Meta Llama 3.2, оптимизированная для естественной речи.",
+
+        // ── AI Custom Instructions ─────────────────────────────────────
+        "ai.instructions.title":                 "Инструкции для AI",
+        "ai.instructions.desc":                  "Персонализируйте стиль продолжений, роль или правила для терминов.",
+        "ai.instructions.placeholder":           "Например: Я программист, пиши лаконично, термины оставляй на английском.",
+        "ai.instructions.preset.coder":          "Программист",
+        "ai.instructions.preset.coder.text":     "Я программист, пиши лаконично, термины оставляй на английском.",
+        "ai.instructions.preset.concise":        "Лаконично",
+        "ai.instructions.preset.concise.text":   "Пиши кратко и по существу, без лишних вводных слов.",
+        "ai.instructions.preset.business":       "Деловой стиль",
+        "ai.instructions.preset.business.text":  "Вежливый и профессиональный деловой стиль общения.",
+        "ai.instructions.clear":                 "Очистить",
+
+        // ── Extended Statistics ───────────────────────────────────────
+        "ai.stats.title":                        "Статистика продуктивности",
+        "ai.stats.savedChars":                   "Сэкономлено символов",
+        "ai.stats.savedClicks":                  "Сэкономлено кликов/клавиш",
+        "ai.stats.conversions":                  "Исправлений",
+        "ai.stats.reset":                        "Сбросить статистику",
+        "ai.stats.resetConfirm":                 "Вы уверены, что хотите сбросить всю накопленную статистику?",
     ]
 
     @MainActor static func register() {

@@ -166,4 +166,60 @@ final class AutocompletionEngineTests: XCTestCase {
         overlay.hide()
         XCTAssertFalse(overlay.isVisible)
     }
+    
+    func testSuggestFiltersOutProfanityByDefault() {
+        // "fuc" prefix matches "fuck", "fucker", etc. in wordlist
+        let results = engine.suggest(
+            for: "fuc",
+            activeLayoutID: "com.apple.keylayout.US",
+            enabledLayouts: enabledLayouts,
+            maxSuggestions: 6,
+            includeCrossLayout: false,
+            allowProfanity: false
+        )
+        
+        for candidate in results {
+            XCTAssertFalse(ProfanityFilter.isProfane(candidate.word), "Expected '\(candidate.word)' not to be suggested when profanity is disabled")
+        }
+    }
+    
+    func testSuggestAllowsProfanityWhenExplicitlyEnabled() {
+        let results = engine.suggest(
+            for: "fuc",
+            activeLayoutID: "com.apple.keylayout.US",
+            enabledLayouts: enabledLayouts,
+            maxSuggestions: 6,
+            includeCrossLayout: false,
+            allowProfanity: true
+        )
+        
+        XCTAssertTrue(results.contains { $0.word.lowercased() == "fuck" }, "Expected 'fuck' to be suggested when allowProfanity is true")
+    }
+    
+    func testSuggestFiltersRussianMatByDefault() {
+        // "бля" in Russian wordlist matches "блядь", "бляха"
+        let resultsDefault = engine.suggest(
+            for: "бля",
+            activeLayoutID: "com.apple.keylayout.Russian",
+            enabledLayouts: enabledLayouts,
+            maxSuggestions: 6,
+            includeCrossLayout: false,
+            allowProfanity: false
+        )
+        
+        for candidate in resultsDefault {
+            XCTAssertFalse(candidate.word.lowercased().hasPrefix("бляд"), "Did not expect 'блядь' in suggestions when profanity is disabled")
+        }
+        
+        let resultsAllowed = engine.suggest(
+            for: "бля",
+            activeLayoutID: "com.apple.keylayout.Russian",
+            enabledLayouts: enabledLayouts,
+            maxSuggestions: 6,
+            includeCrossLayout: false,
+            allowProfanity: true
+        )
+        
+        XCTAssertTrue(resultsAllowed.contains { $0.word.lowercased() == "блядь" }, "Expected 'блядь' to be suggested when allowProfanity is true")
+    }
 }

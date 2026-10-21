@@ -207,3 +207,61 @@
   - `ExcludedAppsSettingsView` allows users to disable autocompletion and auto-correction in sensitive or developer applications (Terminal, iTerm, Figma, games, etc.).
   - Supports quick addition from running applications menu or selecting an `.app` from disk.
   - Enforced via `AutoCorrectionGate.allowsAutoCorrection(role:subrole:bundleID:excludedBundleIDs:)`.
+- **Profanity / Curse Words Filtering (`ProfanityFilter.swift`)**:
+  - By default (`autoCompletionSuggestProfanity = false`), offensive words, curses, and Slavic mat are excluded from all suggestion candidates (frequency lists, NSSpellChecker completions, user dictionary, adaptive bigrams, and cross-layout translations).
+  - Uses comprehensive regular expressions and exact lookup tables for Slavic mat (`хуй*`, `пизд*`, `[её]б*`, `бляд*`), English obscenities, and Ukrainian/Polish forms with zero false positives on legitimate words (`оскорблять`, `рубля`, `хлеб`, `ребёнок`, `бляшка`, `художник`, `хулиган`, `cocktail`).
+  - Users can explicitly enable suggesting profanity via the "Suggest profanity and curse words" toggle in Settings.
+
+### Local AI Engine, Personalization & Multi-Word Continuation (Sprints 2 & 3)
+- **Local Neural Inference Engine (`AIInferenceEngine.swift`)**:
+  - Runs embedded `llama-server` on an ephemeral localhost port with full offline isolation (zero telemetry or cloud calls).
+  - Dynamically starts and monitors daemon health with fast graceful lifecycle management.
+  - Generates 2–4 word predictive text continuations with a 350 ms typing debounce.
+- **Multi-Model Catalog (`RecommendedAIModel.swift`, `AIModelManager.swift`)**:
+  - Curated lightweight models catalog:
+    - *Qwen 2.5 0.5B Instruct* (~390 MB, recommended default).
+    - *SmolLM2 360M Instruct* (~229 MB, ultra-lightweight).
+    - *Qwen 2.5 1.5B Instruct* (~986 MB, high reasoning).
+    - *Llama 3.2 1B Instruct* (~770 MB, Meta compact model).
+  - 1-click download with speed/progress tracking, model deletion, and instant model switching.
+- **Custom Instructions / Personalization**:
+  - `aiCustomInstructions` in Settings allows users to define tone and guidelines (e.g. "I am a programmer, write concisely, keep technical terms in English").
+  - Formatted into prompt via `[System: \(instructions)]\n\(context)`.
+  - Preset quick-pills in UI ("Programmer", "Concise", "Business").
+- **Extended Productivity Statistics**:
+  - Persisted tracking of saved characters (`savedCharactersCount`), keystrokes/clicks (`savedClicksCount`), and corrections (`conversionCount`).
+  - Integrated into autocompletion accept pipeline and autocorrection engine.
+  - Reset statistics with confirmation dialog.
+- **Battery-Saving Mode (`PowerService.swift`)**:
+  - Real-time `IOPowerSources` monitoring to detect AC vs Battery power.
+  - Automatically suspends local AI inference on battery power to conserve energy, falling back to instant offline dictionary mode.
+- **Typing Flow & Multi-Word Prediction Fixes**:
+  - Triggers AI debounce upon space boundary and punctuation, enabling immediate prediction of subsequent 2–3 words after finishing a word.
+  - Context engine extracts rich sentence context from accessibility `textBeforeCaret` (up to 300 characters).
+  - Seamless inline Ghost Text rendering and one-key acceptance for complete multi-word phrases.
+
+---
+
+## 7. Auto-Correction & Layout Switching Pipeline Hardening
+
+### 1. Decoupled Layout Switching Settings
+- **Problem**: Previously, "layout switch after conversion" setting description referred only to hotkey conversion ("после нажатия горячей клавиши"), confusing users who wanted language switching automatically after background auto-correction.
+- **Solution**: Decoupled the settings:
+  - `general.layoutSwitch` ("Переключение раскладки по горячей клавише") for explicit manual hotkey conversion (`layoutSwitchMode`: `.always`, `.ifLastWordConverted`, `.ifAnyWordConverted`, `.never`).
+  - `general.autoCorrectionSwitchLayout` ("Переключать язык ввода после автоисправления") dedicated specifically to real-time auto-correction on word boundaries.
+
+### 2. Elimination of Premature Traversal Failure in `AccessibilityService`
+- **Problem**: `resolveFocusedTextNode` had a strict 128-node / 40ms limit followed by `guard pending.isEmpty else { return nil }`. In real apps with large DOM or widget trees (Chromium, Electron, JetBrains, complex WebViews), `pending` was never empty, causing the function to discard a valid focused editor and return `nil`.
+- **Solution**:
+  - If a confirmed editor (`result != nil`) is resolved, return it directly rather than dropping it due to unvisited sibling branches.
+  - Expanded `AutoCorrectionGate.textInputRoles` to include `"AXSearchField"`, `"AXComboBox"`, and `"AXWebArea"`.
+  - Added fallback direct query on `AXUIElementCreateSystemWide()` and frontmost application `AXUIElementCreateApplication(pid)` for `focusedFieldRole()` and `captureReplacementTarget()`.
+
+### 3. Asynchronous Paste Completion & Layout Switch Race in `pasteVerifiedSuffix`
+- **Problem**: For Web and Electron editors where direct AX attribute setting is rejected (`AXSelectedText`), `pasteVerifiedSuffix` dispatches synthetic `⌘V` and then waits for `kAXValueAttribute` to update via `PasteConfirmation` (20 attempts over 100ms). Web and Electron editors frequently do not support or do not update `kAXValueAttribute` within 100ms. As a result, `applied` was evaluated as `false`, the completion handler passed `false`, and `KeyboardLayoutDetector.switchToLayout(...)` was never called, leaving the keyboard layout in the wrong language even though the text had been visually replaced on screen.
+- **Solution**:
+  - Once verified selection is matched and `dispatchVerifiedPaste` dispatches `⌘V` (`sent == true`), notify `completion(true)` immediately.
+  - Layout switching executes without lag before the next user keystroke arrives.
+  - Added `kTISPropertyInputSourceIsSelectCapable` check in `KeyboardLayoutDetector.switchToLayout` to prevent selecting non-selectable input source components.
+
+

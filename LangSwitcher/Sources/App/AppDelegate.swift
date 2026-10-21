@@ -124,6 +124,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil
         )
+        
+        // Warm up AI inference engine if enabled
+        if settingsManager.isAIAllowed {
+            Task { @MainActor in
+                await AIInferenceEngine.shared.ensureRunning()
+            }
+        }
     }
 
     @objc private func systemDidWake() {
@@ -138,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         healthTimer?.invalidate()
+        AIInferenceEngine.shared.stop()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         if ownsInstance { autoCorrectionService.stop() }
         ServiceStatus.shared.onRestart = nil
@@ -242,31 +250,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Smart conversion fallback when no text is explicitly selected
         NSLog("[LangSwitcher] Direct conversion failed/no selection. Trying smart conversion after short delay...")
         usleep(50_000) // 50ms — give time for physical modifier release to settle
-        performSmartConversion()
+        let converted = performSmartConversion()
+        if !converted {
+            switchLayoutIfNeeded(targetLayoutID: nil, conversionOccurred: false)
+        }
     }
     
     // MARK: - Smart Conversion Modes
     
     /// Routes to the appropriate smart conversion strategy based on user settings
-    private func performSmartConversion() {
+    @discardableResult
+    private func performSmartConversion() -> Bool {
         let mode = settingsManager.smartConversionMode
         NSLog("[LangSwitcher] performSmartConversion() mode=\(mode.displayName)")
         
         switch mode {
         case .disabled:
             NSLog("[LangSwitcher] Smart conversion is disabled")
-            return
+            return false
             
         case .lastWord:
-            performLastWordConversion()
+            return performLastWordConversion()
             
         case .greedyLine:
-            performGreedyLineConversion()
+            return performGreedyLineConversion()
         }
     }
     
     /// Last Word mode: select one word left, convert if it looks wrong
-    private func performLastWordConversion() {
+    @discardableResult
+    private func performLastWordConversion() -> Bool {
         var capturedInput: String?
         var capturedOutput: String?
         var capturedTargetLayout: String?
@@ -292,14 +305,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             playFeedback()
             showConversionNotification(input: capturedInput, output: capturedOutput)
         }
+        return success
     }
     
     /// Greedy Line mode: select to line start, find boundary, convert wrong-layout tail.
     /// If Thought Recovery is enabled, span-level reconstruction runs first.
-    private func performGreedyLineConversion() {
+    @discardableResult
+    private func performGreedyLineConversion() -> Bool {
         if settingsManager.thoughtRecoveryPreview, settingsManager.thoughtRecoveryEnabled {
             performRecoveryPreview()
-            return
+            return true
         }
 
         var capturedInput: String?
@@ -341,6 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             playFeedback()
             showConversionNotification(input: capturedInput, output: capturedOutput)
         }
+        return success
     }
 
     // MARK: - Thought Recovery Preview
@@ -509,13 +525,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Switch system keyboard layout to the target after conversion, based on user's setting.
     private func switchLayoutIfNeeded(targetLayoutID: String?, conversionOccurred: Bool) {
-        guard let targetLayoutID = targetLayoutID, !targetLayoutID.isEmpty else { return }
-        
         switch settingsManager.layoutSwitchMode {
         case .always:
-            KeyboardLayoutDetector.switchToLayout(targetLayoutID)
+            if let targetLayoutID = targetLayoutID, !targetLayoutID.isEmpty {
+                KeyboardLayoutDetector.switchToLayout(targetLayoutID)
+            } else {
+                _ = KeyboardLayoutDetector.switchToNextLayout(among: settingsManager.enabledLayouts)
+            }
         case .ifLastWordConverted, .ifAnyWordConverted:
-            if conversionOccurred {
+            if conversionOccurred, let targetLayoutID = targetLayoutID, !targetLayoutID.isEmpty {
                 KeyboardLayoutDetector.switchToLayout(targetLayoutID)
             }
         case .never:
@@ -607,6 +625,7 @@ extension Notification.Name {
     static let autoCompletionSettingsChanged = Notification.Name("autoCompletionSettingsChanged")
     static let statusBarIconStyleChanged = Notification.Name("statusBarIconStyleChanged")
     static let keyboardLayoutSelectionChanged = Notification.Name("keyboardLayoutSelectionChanged")
+    static let aiSettingsChanged = Notification.Name("aiSettingsChanged")
 }
 
 /// Kernel lock survives simultaneous launches and is released automatically on

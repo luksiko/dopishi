@@ -125,6 +125,21 @@ final class AutoCorrectionTests: XCTestCase {
             XCTAssertTrue(isValidInRu, "\(word) should be recognized as valid Russian")
         }
     }
+
+    func testUserReportedSentenceWords() {
+        let words = [
+            "ns", "cyjdf", "gthtcnfk", "gjnjve", "xnj", "z", "cvtybk",
+            "zpsr", "yf", "fyukbqcrbq", "f", ",jkmit", "yt", "cnfk", "vtyz", "bcghfdkznm"
+        ]
+        
+        for w in words {
+            let looksWrong = textConverter.looksLikeWrongLayout(w)
+            let conv = textConverter.convertSelectedTextWithInfo(w)
+            let validRu = conv.map { spellCheckService.isValidWord($0.text, language: "ru") } ?? false
+            let validEn = spellCheckService.isValidWord(w, language: "en")
+            print("TEST_WORD [\(w)]: looksWrong=\(looksWrong), conv='\(conv?.text ?? "nil")', validRu=\(validRu), validEn=\(validEn)")
+        }
+    }
 }
 
 final class ServiceRecoveryTests: XCTestCase {

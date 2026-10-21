@@ -49,6 +49,12 @@
 		E1000001000000000000003A /* GhostTextOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003A /* GhostTextOverlayController.swift */; };
 		E1000001000000000000003B /* GhostTextPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003B /* GhostTextPreviewView.swift */; };
 		E1000001000000000000003C /* ExcludedAppsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003C /* ExcludedAppsSettingsView.swift */; };
+		E1000001000000000000003D /* PowerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003D /* PowerService.swift */; };
+		E1000001000000000000003E /* AIModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003E /* AIModelManager.swift */; };
+		E1000001000000000000003F /* AIInferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000003F /* AIInferenceEngine.swift */; };
+		E10000010000000000000040 /* AIAssistantSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000040 /* AIAssistantSettingsTab.swift */; };
+		E10000010000000000000041 /* RecommendedAIModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000041 /* RecommendedAIModel.swift */; };
+		E10000010000000000000042 /* ProfanityFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000042 /* ProfanityFilter.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -62,6 +68,10 @@
 		E10000010000000000000111 /* AutocompletionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000111 /* AutocompletionEngineTests.swift */; };
 		E10000010000000000000112 /* AutocompletionAdaptiveStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000112 /* AutocompletionAdaptiveStoreTests.swift */; };
 		E10000010000000000000113 /* GhostTextOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000113 /* GhostTextOverlayTests.swift */; };
+		E10000010000000000000114 /* PowerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000114 /* PowerServiceTests.swift */; };
+		E10000010000000000000115 /* AIModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000115 /* AIModelManagerTests.swift */; };
+		E10000010000000000000116 /* AIInferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000116 /* AIInferenceTests.swift */; };
+		E10000010000000000000117 /* ProfanityFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000117 /* ProfanityFilterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -117,6 +127,12 @@
 		E1000002000000000000003A /* GhostTextOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostTextOverlayController.swift; sourceTree = "<group>"; };
 		E1000002000000000000003B /* GhostTextPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostTextPreviewView.swift; sourceTree = "<group>"; };
 		E1000002000000000000003C /* ExcludedAppsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcludedAppsSettingsView.swift; sourceTree = "<group>"; };
+		E1000002000000000000003D /* PowerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerService.swift; sourceTree = "<group>"; };
+		E1000002000000000000003E /* AIModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelManager.swift; sourceTree = "<group>"; };
+		E1000002000000000000003F /* AIInferenceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIInferenceEngine.swift; sourceTree = "<group>"; };
+		E10000020000000000000040 /* AIAssistantSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAssistantSettingsTab.swift; sourceTree = "<group>"; };
+		E10000020000000000000041 /* RecommendedAIModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedAIModel.swift; sourceTree = "<group>"; };
+		E10000020000000000000042 /* ProfanityFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfanityFilter.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -130,6 +146,10 @@
 		E10000020000000000000111 /* AutocompletionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000112 /* AutocompletionAdaptiveStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompletionAdaptiveStoreTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000113 /* GhostTextOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostTextOverlayTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000114 /* PowerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerServiceTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000115 /* AIModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelManagerTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000116 /* AIInferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIInferenceTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000117 /* ProfanityFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfanityFilterTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* LangSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LangSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -209,6 +229,7 @@
 				E10000020000000000000037 /* AutocompletionKeyRecorderView.swift */,
 				E1000002000000000000003B /* GhostTextPreviewView.swift */,
 				E1000002000000000000003C /* ExcludedAppsSettingsView.swift */,
+				E10000020000000000000040 /* AIAssistantSettingsTab.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -236,6 +257,10 @@
 				E10000020000000000000035 /* AutocompletionOverlayController.swift */,
 				E10000020000000000000039 /* AutocompletionAdaptiveStore.swift */,
 				E1000002000000000000003A /* GhostTextOverlayController.swift */,
+				E1000002000000000000003D /* PowerService.swift */,
+				E1000002000000000000003E /* AIModelManager.swift */,
+				E1000002000000000000003F /* AIInferenceEngine.swift */,
+				E10000020000000000000042 /* ProfanityFilter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -248,6 +273,7 @@
 				E10000020000000000000024 /* LayoutSwitchKey.swift */,
 				E10000020000000000000033 /* AutocompletionAcceptKey.swift */,
 				E10000020000000000000038 /* AutocompletionDisplayMode.swift */,
+				E10000020000000000000041 /* RecommendedAIModel.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -295,6 +321,10 @@
 				E10000020000000000000111 /* AutocompletionEngineTests.swift */,
 				E10000020000000000000112 /* AutocompletionAdaptiveStoreTests.swift */,
 				E10000020000000000000113 /* GhostTextOverlayTests.swift */,
+				E10000020000000000000114 /* PowerServiceTests.swift */,
+				E10000020000000000000115 /* AIModelManagerTests.swift */,
+				E10000020000000000000116 /* AIInferenceTests.swift */,
+				E10000020000000000000117 /* ProfanityFilterTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -439,6 +469,12 @@
 				E1000001000000000000003A /* GhostTextOverlayController.swift in Sources */,
 				E1000001000000000000003B /* GhostTextPreviewView.swift in Sources */,
 				E1000001000000000000003C /* ExcludedAppsSettingsView.swift in Sources */,
+				E1000001000000000000003D /* PowerService.swift in Sources */,
+				E1000001000000000000003E /* AIModelManager.swift in Sources */,
+				E1000001000000000000003F /* AIInferenceEngine.swift in Sources */,
+				E10000010000000000000040 /* AIAssistantSettingsTab.swift in Sources */,
+				E10000010000000000000041 /* RecommendedAIModel.swift in Sources */,
+				E10000010000000000000042 /* ProfanityFilter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +495,10 @@
 				E10000010000000000000111 /* AutocompletionEngineTests.swift in Sources */,
 				E10000010000000000000112 /* AutocompletionAdaptiveStoreTests.swift in Sources */,
 				E10000010000000000000113 /* GhostTextOverlayTests.swift in Sources */,
+				E10000010000000000000114 /* PowerServiceTests.swift in Sources */,
+				E10000010000000000000115 /* AIModelManagerTests.swift in Sources */,
+				E10000010000000000000116 /* AIInferenceTests.swift in Sources */,
+				E10000010000000000000117 /* ProfanityFilterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

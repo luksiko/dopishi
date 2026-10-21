@@ -149,4 +149,10 @@ final class KeyboardLayoutDetectorTests: XCTestCase {
             XCTAssertFalse(mode.description.isEmpty)
         }
     }
+
+    @MainActor
+    func testAutoCorrectionSwitchLayoutSetting() {
+        let settings = SettingsManager.shared
+        XCTAssertTrue(settings.autoCorrectionSwitchLayout)
+    }
 }
