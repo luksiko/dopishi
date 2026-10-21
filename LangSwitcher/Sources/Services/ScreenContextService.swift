@@ -40,9 +40,9 @@ final class ScreenContextService: ObservableObject {
     static let shared = ScreenContextService()
     
     // Bounds and limits
-    nonisolated static let maxDepth = 12
-    nonisolated static let maxVisitedElements = 120
-    nonisolated static let maxTimeBudgetSeconds = 0.035 // 35 ms
+    nonisolated static let maxDepth = 20
+    nonisolated static let maxVisitedElements = 250
+    nonisolated static let maxTimeBudgetSeconds = 0.150 // 150 ms background budget
     nonisolated static let defaultMaxMessages = 8
     nonisolated static let defaultMaxCharacters = 1000
     
@@ -101,9 +101,14 @@ final class ScreenContextService: ObservableObject {
         "send", "attach", "search", "close", "minimize", "zoom", "emoji", "stickers",
         "mute", "reply", "forward", "edit", "delete", "copy", "save", "ok", "cancel",
         "pinned message", "members", "read", "delivered", "typing", "online",
+        "copy message", "copy response", "read aloud", "good response", "bad response",
+        "more actions", "thought for", "sources", "context7",
         "отправить", "прикрепить", "поиск", "закрыть", "свернуть", "отмена", "удалить",
         "копировать", "ответить", "переслать", "изменено", "прочитано", "доставлено",
-        "в сети", "был(а) в сети", "печатает", "перейти к контенту", "сообщение"
+        "в сети", "был(а) в сети", "печатает", "перейти к контенту", "сообщение",
+        "скопировать", "скопировать сообщение", "скопировать ответ", "копировать ответ",
+        "прочитать вслух", "оценить ответ", "другие действия", "последний ответ",
+        "источники", "новая вкладка"
     ]
     
     // Web browser bundle identifiers for AXWebArea fast-path
@@ -117,7 +122,10 @@ final class ScreenContextService: ObservableObject {
         "com.operasoftware.OperaNext",
         "com.brave.Browser",
         "com.microsoft.edgemac",
-        "org.mozilla.firefox"
+        "org.mozilla.firefox",
+        "ru.yandex.desktop.yandex-browser",
+        "ru.yandex.desktop.browser",
+        "ru.yandex.browser"
     ]
     
     nonisolated static func isBrowserApp(bundleID: String) -> Bool {
@@ -134,7 +142,12 @@ final class ScreenContextService: ObservableObject {
         "com.apple.MobileSMS",
         "org.whispersystems.signal-desktop",
         "com.skype.skype",
-        "com.viber.osx"
+        "com.viber.osx",
+        "com.openai.codex",
+        "com.openai.chat",
+        "com.anthropic.claudedesktop",
+        "com.microsoft.teams",
+        "com.microsoft.teams2"
     ]
 
     nonisolated static func isChatApp(bundleID: String) -> Bool {
@@ -198,7 +211,7 @@ final class ScreenContextService: ObservableObject {
     nonisolated static func findWebAreaInWindow(_ window: AXUIElement) -> AXUIElement? {
         var queue: [(element: AXUIElement, depth: Int)] = [(window, 0)]
         var head = 0
-        while head < queue.count && head < 60 {
+        while head < queue.count && head < 80 {
             let (el, depth) = queue[head]
             head += 1
             var roleRef: CFTypeRef?
@@ -207,10 +220,47 @@ final class ScreenContextService: ObservableObject {
             if role == "AXWebArea" {
                 return el
             }
-            if ["AXToolbar", "AXTabGroup", "AXMenuBar", "AXButton"].contains(role) {
+            if ["AXToolbar", "AXTabGroup", "AXMenuBar", "AXButton", "AXSplitter"].contains(role) {
                 continue
             }
-            if depth < 8 {
+            if depth < 12 {
+                var childrenRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(el, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+                   let children = childrenRef as? [AXUIElement] {
+                    for c in children {
+                        queue.append((c, depth + 1))
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Locate primary conversation pane or article body inside a web area,
+    /// bypassing navigation sidebars, channels, and toolbars.
+    nonisolated static func findMainConversationContainer(in root: AXUIElement) -> AXUIElement? {
+        var queue: [(element: AXUIElement, depth: Int)] = [(root, 0)]
+        var head = 0
+        while head < queue.count && head < 60 {
+            let (el, depth) = queue[head]
+            head += 1
+            var r: CFTypeRef?
+            var d: CFTypeRef?
+            var idRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &r)
+            AXUIElementCopyAttributeValue(el, kAXRoleDescriptionAttribute as CFString, &d)
+            AXUIElementCopyAttributeValue(el, "AXDOMIdentifier" as CFString, &idRef)
+            let role = r as? String ?? ""
+            let desc = (d as? String ?? "").lowercased()
+            let domId = (idRef as? String ?? "").lowercased()
+            if desc == "main" || role == "AXLandmarkMain" || domId.contains("chat-panel") ||
+               domId == "conversation" || domId.contains("messages-container") {
+                return el
+            }
+            if ["AXToolbar", "AXTabGroup", "AXMenuBar", "AXButton", "AXSplitter"].contains(role) {
+                continue
+            }
+            if depth < 10 {
                 var childrenRef: CFTypeRef?
                 if AXUIElementCopyAttributeValue(el, kAXChildrenAttribute as CFString, &childrenRef) == .success,
                    let children = childrenRef as? [AXUIElement] {
@@ -224,12 +274,12 @@ final class ScreenContextService: ObservableObject {
     }
     
     // Privacy regexes
-    private static let creditCardRegex = try? NSRegularExpression(pattern: #"\b(?:\d[ -]*?){13,16}\b"#)
-    private static let emailRegex = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
-    private static let phoneRegex = try? NSRegularExpression(pattern: #"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3}[-.\s]?\d{2,4}\b"#)
-    private static let secretTokenRegex = try? NSRegularExpression(pattern: #"(?:ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})"#)
-    private static let timestampRegex = try? NSRegularExpression(pattern: #"^\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?$"#, options: .caseInsensitive)
-    private static let dateLabelRegex = try? NSRegularExpression(pattern: #"^(today|yesterday|сегодня|вчера|just now|только что)$"#, options: .caseInsensitive)
+    nonisolated private static let creditCardRegex = try? NSRegularExpression(pattern: #"\b(?:\d[ -]*?){13,16}\b"#)
+    nonisolated private static let emailRegex = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
+    nonisolated private static let phoneRegex = try? NSRegularExpression(pattern: #"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3}[-.\s]?\d{2,4}\b"#)
+    nonisolated private static let secretTokenRegex = try? NSRegularExpression(pattern: #"(?:ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})"#)
+    nonisolated private static let timestampRegex = try? NSRegularExpression(pattern: #"^\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?$"#, options: .caseInsensitive)
+    nonisolated private static let dateLabelRegex = try? NSRegularExpression(pattern: #"^(today|yesterday|сегодня|вчера|just now|только что)$"#, options: .caseInsensitive)
     
     private var consecutiveFailures = 0
     private var circuitBreakerUntil: Date?
@@ -293,6 +343,14 @@ final class ScreenContextService: ObservableObject {
         if trimmed.count == 1 { return true }
         if trimmed.allSatisfy(\.isNumber) { return true }
         if trimmed.allSatisfy({ $0.isPunctuation || $0.isSymbol }) { return true }
+        
+        // Dynamic thinking / action labels in chat UIs
+        if trimmed.hasPrefix("работал на протяжении") || trimmed.hasPrefix("thought for") ||
+           trimmed.hasPrefix("thinking for") || trimmed.hasPrefix("скопировать сообщение") ||
+           trimmed.hasPrefix("копировать ответ") || trimmed.hasPrefix("прочитано ") ||
+           trimmed.hasPrefix("доставлено ") {
+            return true
+        }
         return false
     }
     
@@ -598,18 +656,47 @@ final class ScreenContextService: ObservableObject {
         }
         
         let isChat = isChatApp(bundleID: bundleID)
-        if isChat && focusedRect == nil {
+        
+        // Locate root content node: if web app, prioritize AXWebArea and its main conversation container; if chat app, prioritize chat column container
+        var traversalRoot: AXUIElement = window
+        var isInsideConversationPane = false
+        
+        if let focused = focusedElement, let webArea = findWebAreaAncestor(of: focused) {
+            if let main = findMainConversationContainer(in: webArea) {
+                traversalRoot = main
+                isInsideConversationPane = true
+            } else {
+                traversalRoot = webArea
+            }
+        } else if let webArea = findWebAreaInWindow(window) {
+            if let main = findMainConversationContainer(in: webArea) {
+                traversalRoot = main
+                isInsideConversationPane = true
+            } else {
+                traversalRoot = webArea
+            }
+        } else if let focused = focusedElement, let f = focusedRect, isChat,
+                  let chatAncestor = findChatColumnAncestor(of: focused, focusedRect: f) {
+            traversalRoot = chatAncestor
+            isInsideConversationPane = true
+        }
+        
+        if isChat && focusedRect == nil && !isInsideConversationPane {
             return nil
         }
         
         let deadline = ProcessInfo.processInfo.systemUptime + maxTimeBudgetSeconds
         var visitedCount = 0
         var collectedItems: [(text: String, y: CGFloat, x: CGFloat, speaker: Speaker)] = []
+        var activeSpeaker: Speaker = .neutral
         
         // Compute column bounds for conversation text
         var columnMinX: CGFloat = 0
         var columnMaxX: CGFloat = 800
-        if let f = focusedRect, f.width > 20 {
+        if isInsideConversationPane, let containerFrame = elementFrame(traversalRoot) {
+            columnMinX = containerFrame.origin.x
+            columnMaxX = containerFrame.origin.x + containerFrame.width
+        } else if let f = focusedRect, f.width > 20 {
             if isChat {
                 columnMinX = f.origin.x - 10
                 columnMaxX = f.origin.x + f.width + 10
@@ -620,17 +707,6 @@ final class ScreenContextService: ObservableObject {
         } else if let winFrame = elementFrame(window) {
             columnMinX = winFrame.origin.x
             columnMaxX = winFrame.origin.x + winFrame.width
-        }
-        
-        // Locate root content node: if web app, prioritize AXWebArea; if chat app, prioritize chat column container
-        var traversalRoot: AXUIElement = window
-        if let focused = focusedElement, let webArea = findWebAreaAncestor(of: focused) {
-            traversalRoot = webArea
-        } else if isBrowserApp(bundleID: bundleID), let webArea = findWebAreaInWindow(window) {
-            traversalRoot = webArea
-        } else if let focused = focusedElement, let f = focusedRect, isChat,
-                  let chatAncestor = findChatColumnAncestor(of: focused, focusedRect: f) {
-            traversalRoot = chatAncestor
         }
         
         // If content root has a specific title and window title is missing or generic, refine it
@@ -674,6 +750,28 @@ final class ScreenContextService: ObservableObject {
                 }
             }
             
+            // Track explicit speaker headings (ChatGPT, Claude, web chats, forum quotes)
+            var valHRef: CFTypeRef?
+            var descHRef: CFTypeRef?
+            var titleHRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valHRef)
+            AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descHRef)
+            AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleHRef)
+            let headerText = [valHRef as? String, descHRef as? String, titleHRef as? String]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            
+            if headerText.contains("вы сказали") || headerText.contains("you said") || headerText.hasPrefix("вы:") || headerText.hasPrefix("you:") {
+                activeSpeaker = .outgoing
+            } else if headerText.contains("сказал:") || headerText.contains("said:") ||
+                      headerText.contains("chatgpt") || headerText.contains("claude") ||
+                      headerText.contains("assistant") || headerText.hasPrefix("цитата:") ||
+                      headerText.hasPrefix("quote:") {
+                activeSpeaker = .incoming
+            }
+            
             if textRoles.contains(role) {
                 var valueRef: CFTypeRef?
                 AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef)
@@ -702,20 +800,28 @@ final class ScreenContextService: ObservableObject {
                     if let f = focusedRect, f.width > 20, let elemFrame = frame {
                         if f.insetBy(dx: -2, dy: -2).intersects(elemFrame) {
                             acceptSpatial = false
-                        } else {
+                        } else if !isInsideConversationPane {
                             let elementMidX = elemFrame.origin.x + (elemFrame.width / 2.0)
                             let overlapsColumn = (elementMidX >= columnMinX) &&
                                                  (elementMidX <= columnMaxX) &&
                                                  (elemFrame.origin.x >= columnMinX - 15)
                             let isAbove = elemFrame.origin.y < f.origin.y + 4
                             acceptSpatial = overlapsColumn && isAbove
+                        } else {
+                            acceptSpatial = elemFrame.origin.y < f.origin.y + 4
                         }
                     }
                     
                     if acceptSpatial {
                         let yPos = frame?.origin.y ?? CGFloat(visitedCount)
                         let xPos = frame?.origin.x ?? 0
-                        let speaker = detectSpeaker(elementFrame: frame, columnMinX: columnMinX, columnMaxX: columnMaxX)
+                        var speaker = activeSpeaker
+                        if speaker == .neutral {
+                            speaker = detectSpeaker(elementFrame: frame, columnMinX: columnMinX, columnMaxX: columnMaxX)
+                        }
+                        if speaker == .neutral && (sanitized.hasPrefix("Цитата:") || sanitized.hasPrefix("Quote:")) {
+                            speaker = .incoming
+                        }
                         collectedItems.append((text: sanitized, y: yPos, x: xPos, speaker: speaker))
                     }
                 }
