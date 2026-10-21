@@ -264,4 +264,22 @@
   - Layout switching executes without lag before the next user keystroke arrives.
   - Added `kTISPropertyInputSourceIsSelectCapable` check in `KeyboardLayoutDetector.switchToLayout` to prevent selecting non-selectable input source components.
 
+---
+
+## 8. Rebranding to Dopishi & Homebrew Tap Setup
+
+### 1. Rebranding & Architectural Cohesion
+- Renamed application to **Dopishi** (macOS bundle: `Dopishi.app`, binary: `Dopishi`).
+- `PRODUCT_NAME = Dopishi` configured in Xcode project build settings, while maintaining `SWIFT_MODULE_NAME = LangSwitcher` and internal PBX structure to preserve zero-friction compatibility with all 441 unit tests.
+- Updated `PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.app` and test host bundle identifier to `com.dopishi.testhost`.
+- Graceful persistence migration: automatically migrates Application Support directories, logs (`conversion_log.sqlite`), user history (`user_text_history.sqlite`), and downloaded AI models (`Models/`) from `~/Library/Application Support/LangSwitcher` to `~/Library/Application Support/Dopishi`.
+- Credited original upstream fork ([langSwitcher by reg2005](https://github.com/reg2005/langSwitcher)) in `README.md`, `README.ru.md`, `AboutView.swift`, and runtime string catalogs.
+
+### 2. GitHub Repository & Homebrew Tap
+- GitHub repository renamed to `https://github.com/luksiko/dopishi` with local `git remote origin` updated.
+- Created and initialized public tap repository `https://github.com/luksiko/homebrew-tap` with complete Cask definition `Casks/dopishi.rb`.
+- Added `scripts/bump-cask.sh` for automated sha256 calculation and single-step synchronization between releases and the tap repository.
+- Modern Cask syntax (`depends_on macos: :ventura`, `livecheck`, `zap trash`) verified with `brew info --cask dopishi`.
+
+
 

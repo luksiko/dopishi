@@ -1,8 +1,8 @@
-# GEMINI.md — LangSwitcher Project Architecture & Developer Context
+# GEMINI.md — Dopishi Project Architecture & Developer Context
 
 ## Overview
 
-**LangSwitcher** is a lightweight, privacy-focused open-source macOS menu bar utility written in Swift 5. It automatically or on-demand converts text accidentally typed in the wrong keyboard layout (e.g. `ghbdtn` ⇄ `привет`, `руддщ` ⇄ `hello`) and supports single-key system layout switching and real-time auto-correction.
+**Dopishi** (formerly LangSwitcher, originally evolved from reg2005/langSwitcher) is a lightweight, privacy-focused open-source macOS menu bar utility written in Swift 5. It automatically or on-demand converts text accidentally typed in the wrong keyboard layout (e.g. `ghbdtn` ⇄ `привет`, `руддщ` ⇄ `hello`) and supports single-key system layout switching and real-time auto-correction.
 
 - **Platform**: macOS 13.0+ (Ventura or newer)
 - **Frameworks**: SwiftUI, AppKit, Carbon (`TIS`, `CGEvent`, Carbon HotKey APIs), ApplicationServices (`AXUIElement`), `NSSpellChecker`, direct C `sqlite3` API.

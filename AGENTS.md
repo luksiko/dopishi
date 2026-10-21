@@ -11,7 +11,7 @@ bash scripts/test.sh
 ```
 
 The script uses a complete ad-hoc signature and the separate
-`com.langswitcher.testhost` identifier, so the installed app can remain running.
+`com.dopishi.testhost` identifier, so the installed app can remain running.
 Do not disable code signing for the test host: LaunchServices can reject the
 resulting bundle before XCTest starts. The production app has
 `LSMultipleInstancesProhibited=true`, so using its identifier for tests also
@@ -76,9 +76,9 @@ LangSwitcher/Sources/Localization/
 
 ## Local Installation and Signing
 
-- Never update `/Applications/LangSwitcher.app` by replacing only `Contents/MacOS/LangSwitcher` or copying a bare linker-signed executable. This repeatedly broke Accessibility and both keyboard event taps during local development.
-- Prefer `LANGSWITCHER_SIGNING_IDENTITY="<stable certificate>" bash scripts/install-local.sh /path/to/built/LangSwitcher.app` for local updates. It stages/signs, checks the existing designated requirement, archives a ZIP backup, stops the installed process and replaces the complete bundle. Do not install ad-hoc builds over the working app.
-- For manual installation, build and stage the complete app bundle, then run `bash scripts/sign-app.sh /path/to/staged/LangSwitcher.app` before replacing the installed bundle. Stop the running app before replacement; preserve a recoverable backup. Install to `/Applications/LangSwitcher.app`, then relaunch that exact path.
-- The signing script must pass. `codesign --verify` alone is insufficient: a bare linker signature can verify while reporting `Info.plist=not bound`, `Sealed Resources=none`, or the wrong signing identifier (`LangSwitcher` instead of `com.langswitcher.app`).
-- Prefer the same Developer ID identity across releases (`LANGSWITCHER_SIGNING_IDENTITY`). Ad-hoc signatures do not guarantee permission persistence across rebuilds. If trust is lost, restore the existing app's Accessibility entry through System Settings and verify actual service startup; never edit the TCC database directly.
+- Never update `/Applications/Dopishi.app` by replacing only `Contents/MacOS/Dopishi` or copying a bare linker-signed executable. This repeatedly broke Accessibility and both keyboard event taps during local development.
+- Prefer `DOPISHI_SIGNING_IDENTITY="<stable certificate>" bash scripts/install-local.sh /path/to/built/Dopishi.app` for local updates. It stages/signs, checks the existing designated requirement, archives a ZIP backup, stops the installed process and replaces the complete bundle. Do not install ad-hoc builds over the working app.
+- For manual installation, build and stage the complete app bundle, then run `bash scripts/sign-app.sh /path/to/staged/Dopishi.app` before replacing the installed bundle. Stop the running app before replacement; preserve a recoverable backup. Install to `/Applications/Dopishi.app`, then relaunch that exact path.
+- The signing script must pass. `codesign --verify` alone is insufficient: a bare linker signature can verify while reporting `Info.plist=not bound`, `Sealed Resources=none`, or the wrong signing identifier (`Dopishi` instead of `com.dopishi.app`).
+- Prefer the same Developer ID identity across releases (`DOPISHI_SIGNING_IDENTITY`). Ad-hoc signatures do not guarantee permission persistence across rebuilds. If trust is lost, restore the existing app's Accessibility entry through System Settings and verify actual service startup; never edit the TCC database directly.
 - Do not report working auto-correction from the Accessibility toggle alone. Verify the active process and enabled keyboard taps; a real typing test is required to establish end-to-end correction.

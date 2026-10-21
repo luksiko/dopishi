@@ -1,22 +1,22 @@
-# LangSwitcher
+# Dopishi (Допиши)
 
 [English](README.md) | **Русский**
 
-**Бесплатный конвертер раскладки клавиатуры для macOS с открытым исходным кодом.**
+**Умный бесплатный конвертер раскладки клавиатуры и автоисправление для macOS с открытым исходным кодом.**
 
-Набрали текст не в той раскладке? Нажмите горячую клавишу — LangSwitcher мгновенно переведёт `ghbdtn` в `привет`. Больше не нужно перепечатывать.
+Набрали текст не в той раскладке? Нажмите горячую клавишу — Dopishi мгновенно переведёт `ghbdtn` в `привет`. Больше не нужно перепечатывать.
 
 Открытая альтернатива [Caramba Switcher](https://caramba-switcher.com/mac) и [Punto Switcher](https://yandex.ru/soft/punto/).
 
-[![Build](https://github.com/reg2005/langSwitcher/actions/workflows/build.yml/badge.svg)](https://github.com/reg2005/langSwitcher/actions/workflows/build.yml)
+[![Build](https://github.com/luksiko/dopishi/actions/workflows/build.yml/badge.svg)](https://github.com/luksiko/dopishi/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-brightgreen.svg)](https://www.apple.com/macos/)
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg)](https://swift.org/)
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/jaywcjlove/awesome-mac)
 
-> Если LangSwitcher вам полезен, поддержите проект — [задонатить](#пожертвования)! Любая помощь ценна!
+> **История проекта и благодарность:**
+> Dopishi создан на основе проекта [langSwitcher](https://github.com/reg2005/langSwitcher) от [reg2005](https://github.com/reg2005). Выражаем искреннюю благодарность автору за открытый код, заложенный фундамент и вдохновение.
 
-**[Документация](https://reg2005.github.io/langSwitcher/ru)** | **[Documentation (EN)](https://reg2005.github.io/langSwitcher/en)**
+> Если Dopishi вам полезен, поддержите проект — [задонатить](#пожертвования)! Любая помощь ценна!
 
 ## Демо
 
@@ -24,7 +24,7 @@ https://github.com/reg2005/langSwitcher/raw/main/screenshots/langSwitch.mp4
 
 ## Скриншот
 
-![Настройки LangSwitcher — вкладка General](screenshots/general.png)
+![Настройки Dopishi — вкладка General](screenshots/general.png)
 
 ## Возможности
 
@@ -54,22 +54,43 @@ https://github.com/reg2005/langSwitcher/raw/main/screenshots/langSwitch.mp4
 4. Текст заменяется на "привет"
 ```
 
-LangSwitcher маппит символы по **физическим позициям клавиш** на клавиатуре. Одна и та же клавиша даёт разные символы в зависимости от раскладки — LangSwitcher обращает этот маппинг.
+Dopishi маппит символы по **физическим позициям клавиш** на клавиатуре. Одна и та же клавиша даёт разные символы в зависимости от раскладки — Dopishi обращает этот маппинг.
 
-## Скачать
+## Установка
 
-### DMG (рекомендуется)
+### Homebrew (рекомендуется)
 
-Перейдите в [Releases](https://github.com/reg2005/langSwitcher/releases/latest) и скачайте:
+Установите Dopishi одной командой через [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask luksiko/tap/dopishi
+```
+
+Либо добавьте тап вручную:
+
+```bash
+brew tap luksiko/tap
+brew install --cask dopishi
+```
+
+Для последующего обновления:
+
+```bash
+brew upgrade --cask dopishi
+```
+
+### DMG (ручная загрузка)
+
+Перейдите в [Releases](https://github.com/luksiko/dopishi/releases/latest) и скачайте:
 
 | Архитектура | Файл |
 |---|---|
-| **Apple Silicon (M1/M2/M3/M4)** | `LangSwitcher-*-arm64.dmg` |
-| **Intel** | `LangSwitcher-*-x86_64.dmg` |
-| **Universal (обе)** | `LangSwitcher-*-universal.dmg` |
+| **Apple Silicon (M1/M2/M3/M4)** | `Dopishi-*-arm64.dmg` |
+| **Intel** | `Dopishi-*-x86_64.dmg` |
+| **Universal (обе)** | `Dopishi-*-universal.dmg` |
 
-1. Откройте DMG и перетащите **LangSwitcher** в **Программы**
-2. Запустите LangSwitcher
+1. Откройте DMG и перетащите **Dopishi** в **Программы**
+2. Запустите Dopishi
 3. Дайте разрешение **Accessibility** при запросе
 
 ### Сборка из исходников
@@ -83,17 +104,11 @@ LangSwitcher маппит символы по **физическим позиц�
 
 ```bash
 # Клонируйте репозиторий
-git clone https://github.com/reg2005/langSwitcher.git
-cd langSwitcher
+git clone https://github.com/luksiko/dopishi.git
+cd dopishi
 
 # Запустите тесты
-xcodebuild test \
-  -project LangSwitcher.xcodeproj \
-  -scheme LangSwitcher \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO
+bash scripts/test.sh
 
 # Соберите (универсальный бинарник)
 xcodebuild -project LangSwitcher.xcodeproj \
@@ -107,7 +122,7 @@ xcodebuild -project LangSwitcher.xcodeproj \
   CODE_SIGNING_ALLOWED=NO \
   build
 
-# Приложение: build/Build/Products/Release/LangSwitcher.app
+# Приложение: build/Build/Products/Release/Dopishi.app
 ```
 
 Или откройте `LangSwitcher.xcodeproj` в Xcode и нажмите `⌘R`.
@@ -132,7 +147,7 @@ xcodebuild -project LangSwitcher.xcodeproj \
 
 ### Меню-бар
 
-LangSwitcher живёт в строке меню с иконкой клавиатуры. Нажмите для:
+Dopishi живёт в строке меню с иконкой клавиатуры. Нажмите для:
 
 - Ручной конвертации выделенного текста
 - Просмотра активных раскладок
@@ -156,7 +171,7 @@ LangSwitcher живёт в строке меню с иконкой клавиа�
 
 Журнал конвертаций **отключён по умолчанию** ради приватности. Включить можно в **Settings -> General -> Conversion Logging**.
 
-При включении конвертации сохраняются в локальную базу SQLite (`~/Library/Application Support/LangSwitcher/conversion_log.sqlite`). Можно настроить максимальное количество записей (по умолчанию: 100, или 0 — без ограничений). Во вкладке **Log** можно:
+При включении конвертации сохраняются в локальную базу SQLite (`~/Library/Application Support/Dopishi/conversion_log.sqlite`). Можно настроить максимальное количество записей (по умолчанию: 100, или 0 — без ограничений). Во вкладке **Log** можно:
 
 - Просматривать все конвертации (вход -> выход, раскладки, режим, время)
 - Оценивать каждую как правильную или неправильную (три состояния: без оценки / правильно / неправильно)
@@ -167,7 +182,7 @@ LangSwitcher живёт в строке меню с иконкой клавиа�
 
 ## Поддерживаемые раскладки
 
-LangSwitcher определяет раскладки из **Системные настройки > Клавиатура > Источники ввода**. На данный момент:
+Dopishi определяет раскладки из **Системные настройки > Клавиатура > Источники ввода**. На данный момент:
 
 | Раскладка | Код языка | Физическая раскладка |
 |-----------|-----------|---------------------|
@@ -277,7 +292,7 @@ LangSwitcher/
 
 ## Разрешения
 
-LangSwitcher требует доступ **Accessibility** для:
+Dopishi требует доступ **Accessibility** для:
 - Чтения выделенного текста (через симуляцию `⌘C`)
 - Замены текста (через симуляцию `⌘V`)
 
@@ -290,7 +305,7 @@ LangSwitcher требует доступ **Accessibility** для:
 - Работает в фоне после выхода
 - Собирает аналитику или телеметрию
 
-**Журнал конвертаций отключён по умолчанию.** Если вы его включите, все данные хранятся локально в `~/Library/Application Support/LangSwitcher/`. Ничего никуда не отправляется.
+**Журнал конвертаций отключён по умолчанию.** Если вы его включите, все данные хранятся локально в `~/Library/Application Support/Dopishi/`. Ничего никуда не отправляется.
 
 ## Контрибьюты
 
@@ -300,7 +315,7 @@ LangSwitcher требует доступ **Accessibility** для:
 2. Добавьте новое статическое свойство в `LayoutCharacterMap` с маппингом символов
 3. Добавьте паттерн в массив `allMaps` (**порядок важен** — специфичные паттерны перед общими)
 4. Добавьте тесты в `LangSwitcherTests/LayoutMapperTests.swift`
-5. Запустите тесты: все 93+ должны проходить
+5. Запустите тесты: все 441+ должны проходить
 
 ```swift
 // Пример: добавление итальянской раскладки
@@ -317,7 +332,7 @@ static let italian: [Character: Character] = {
 
 ### Добавление нового языка (i18n)
 
-LangSwitcher использует собственную систему локализации — без `.lproj` / `.strings` файлов. Язык переключается в рантайме без перезапуска приложения.
+Dopishi использует собственную систему локализации — без `.lproj` / `.strings` файлов. Язык переключается в рантайме без перезапуска приложения.
 
 1. **Скопируйте английский шаблон**:
    ```bash
@@ -397,17 +412,11 @@ LangSwitcher использует собственную систему лока
 
 ```bash
 # Клонируйте
-git clone https://github.com/reg2005/langSwitcher.git
-cd langSwitcher
+git clone https://github.com/luksiko/dopishi.git
+cd dopishi
 
 # Запустите тесты (обязательно после каждого изменения)
-xcodebuild test \
-  -project LangSwitcher.xcodeproj \
-  -scheme LangSwitcher \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO
+bash scripts/test.sh
 
 # Откройте в Xcode
 open LangSwitcher.xcodeproj
@@ -417,7 +426,7 @@ open LangSwitcher.xcodeproj
 
 ## Пожертвования
 
-LangSwitcher — бесплатное ПО с открытым исходным кодом. Если приложение вам полезно, любая помощь приветствуется и помогает развивать проект. Спасибо за поддержку!
+Dopishi — бесплатное ПО с открытым исходным кодом. Если приложение вам полезно, любая помощь приветствуется и помогает развивать проект. Спасибо за поддержку!
 
 ### Для карт РФ
 
@@ -446,4 +455,5 @@ LangSwitcher — бесплатное ПО с открытым исходным 
 
 ## Благодарности
 
-Вдохновлён [Caramba Switcher](https://caramba-switcher.com/mac) и [Punto Switcher](https://yandex.ru/soft/punto/). Создан как бесплатная альтернатива с открытым кодом.
+- Создан на основе проекта [langSwitcher](https://github.com/reg2005/langSwitcher) от [reg2005](https://github.com/reg2005). Искренняя признательность и благодарность за создание начальной кодовой базы и вдохновение.
+- Вдохновлён [Caramba Switcher](https://caramba-switcher.com/mac) и [Punto Switcher](https://yandex.ru/soft/punto/). Создан как бесплатная альтернатива с открытым кодом.

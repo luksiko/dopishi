@@ -1,20 +1,22 @@
-# LangSwitcher
+# Dopishi
 
 [English](README.md) | [Русский](README.ru.md)
 
-**Open-source keyboard layout text converter for macOS.**
+**Smart, open-source keyboard layout text converter and auto-correction utility for macOS.**
 
-Typed text in the wrong keyboard layout? Select it, press a hotkey, and LangSwitcher instantly converts it to the correct layout. No more retyping `ghbdtn` when you meant `привет`.
+Typed text in the wrong keyboard layout? Select it, press a hotkey, and Dopishi instantly converts it to the correct layout. No more retyping `ghbdtn` when you meant `привет`.
 
 An open-source alternative to [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/).
 
-[![Build](https://github.com/reg2005/langSwitcher/actions/workflows/build.yml/badge.svg)](https://github.com/reg2005/langSwitcher/actions/workflows/build.yml)
+[![Build](https://github.com/luksiko/dopishi/actions/workflows/build.yml/badge.svg)](https://github.com/luksiko/dopishi/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-brightgreen.svg)](https://www.apple.com/macos/)
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg)](https://swift.org/)
-[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/jaywcjlove/awesome-mac)
 
-> If you find LangSwitcher useful, consider [supporting the project](#donate) — any contribution is appreciated!
+> **Origin & Gratitude:**
+> Dopishi was originally forked from [langSwitcher](https://github.com/reg2005/langSwitcher) by [reg2005](https://github.com/reg2005). We express our deepest gratitude to the original author for creating this great open-source foundation.
+
+> If you find Dopishi useful, consider [supporting the project](#donate) — any contribution is appreciated!
 
 **[Documentation](https://reg2005.github.io/langSwitcher/en)** | **[Документация (RU)](https://reg2005.github.io/langSwitcher/ru)**
 
@@ -54,22 +56,43 @@ https://github.com/reg2005/langSwitcher/raw/main/screenshots/langSwitch.mp4
 4. Text is replaced with "привет"
 ```
 
-LangSwitcher maps characters based on **physical key positions** on the keyboard. The same physical key produces different characters depending on the active layout — LangSwitcher reverses this mapping.
+Dopishi maps characters based on **physical key positions** on the keyboard. The same physical key produces different characters depending on the active layout — Dopishi reverses this mapping.
 
-## Download
+## Installation
 
-### DMG (Recommended)
+### Homebrew (Recommended)
 
-Go to [Releases](https://github.com/reg2005/langSwitcher/releases/latest) and download:
+Install Dopishi using [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask luksiko/tap/dopishi
+```
+
+Or add the tap first:
+
+```bash
+brew tap luksiko/tap
+brew install --cask dopishi
+```
+
+To update when a new version is released:
+
+```bash
+brew upgrade --cask dopishi
+```
+
+### DMG (Manual Download)
+
+Go to [Releases](https://github.com/luksiko/dopishi/releases/latest) and download:
 
 | Architecture | File |
 |---|---|
-| **Apple Silicon (M1/M2/M3/M4)** | `LangSwitcher-*-arm64.dmg` |
-| **Intel** | `LangSwitcher-*-x86_64.dmg` |
-| **Universal (both)** | `LangSwitcher-*-universal.dmg` |
+| **Apple Silicon (M1/M2/M3/M4)** | `Dopishi-*-arm64.dmg` |
+| **Intel** | `Dopishi-*-x86_64.dmg` |
+| **Universal (both)** | `Dopishi-*-universal.dmg` |
 
-1. Open the DMG and drag **LangSwitcher** to **Applications**
-2. Launch LangSwitcher
+1. Open the DMG and drag **Dopishi** to **Applications**
+2. Launch Dopishi
 3. Grant **Accessibility** permission when prompted
 
 ### Build from Source
@@ -83,8 +106,8 @@ Go to [Releases](https://github.com/reg2005/langSwitcher/releases/latest) and do
 
 ```bash
 # Clone the repository
-git clone https://github.com/reg2005/langSwitcher.git
-cd langSwitcher
+git clone https://github.com/luksiko/dopishi.git
+cd dopishi
 
 # Run tests
 bash scripts/test.sh
@@ -101,11 +124,11 @@ xcodebuild -project LangSwitcher.xcodeproj \
   CODE_SIGNING_ALLOWED=NO \
   build
 
-# The app is at build/Build/Products/Release/LangSwitcher.app
+# The app is at build/Build/Products/Release/Dopishi.app
 ```
 
 The test script builds an ad-hoc-signed host with the separate bundle identifier
-`com.langswitcher.testhost`. This lets tests run while the installed LangSwitcher
+`com.dopishi.testhost`. This lets tests run while the installed Dopishi
 is open and avoids LaunchServices launch errors from unsigned test bundles.
 Extra `xcodebuild` options can be passed after `bash scripts/test.sh`.
 
@@ -117,17 +140,17 @@ Use the same certificate for every local update. List available certificates wit
 `security find-identity -v -p codesigning`, then set its name or SHA-1 identity:
 
 ```bash
-export LANGSWITCHER_SIGNING_IDENTITY="Apple Development: your-account (TEAMID)"
-bash scripts/install-local.sh build/Build/Products/Release/LangSwitcher.app
+export DOPISHI_SIGNING_IDENTITY="Apple Development: your-account (TEAMID)"
+bash scripts/install-local.sh build/Build/Products/Release/Dopishi.app
 ```
 
 The installer stages and signs the complete bundle, verifies that it satisfies the
 installed certificate-signed app's designated requirement, stops the installed copy,
-and replaces `/Applications/LangSwitcher.app`. Recoverable ZIP backups are kept in
-`~/Library/Application Support/LangSwitcher/Backups`, so they do not appear as extra
+and replaces `/Applications/Dopishi.app`. Recoverable ZIP backups are kept in
+`~/Library/Application Support/Dopishi/Backups`, so they do not appear as extra
 launchable copies. If replacement fails after moving the old app, it is restored.
 The installer refuses ad-hoc signing. `scripts/sign-app.sh` also requires an explicit
-identity; temporary builds may explicitly use `LANGSWITCHER_SIGNING_IDENTITY=-`.
+identity; temporary builds may explicitly use `DOPISHI_SIGNING_IDENTITY=-`.
 
 Migrating from an ad-hoc build can require renewing Accessibility consent once.
 Consistent signing reduces subsequent permission resets, but macOS still controls
@@ -155,7 +178,7 @@ Development certificate is suitable for development on your own Mac.
 
 ### Menu Bar
 
-LangSwitcher lives in your menu bar with a keyboard icon. Click it to:
+Dopishi lives in your menu bar with a keyboard icon. Click it to:
 
 - Convert selected text manually
 - See active keyboard layouts
@@ -179,7 +202,7 @@ Access settings from the menu bar icon -> **Settings** (or `⌘,`):
 
 Conversion logging is **disabled by default** for your privacy. You can enable it in **Settings -> General -> Conversion Logging**.
 
-When enabled, conversions are saved to a local SQLite database (`~/Library/Application Support/LangSwitcher/conversion_log.sqlite`). You can configure the maximum number of stored entries (default: 100, or 0 for unlimited). In the **Log** tab you can:
+When enabled, conversions are saved to a local SQLite database (`~/Library/Application Support/Dopishi/conversion_log.sqlite`). You can configure the maximum number of stored entries (default: 100, or 0 for unlimited). In the **Log** tab you can:
 
 - Browse all past conversions (input -> output, layouts, mode, timestamp)
 - Rate each conversion as correct or incorrect (tri-state: unrated / correct / incorrect)
@@ -190,7 +213,7 @@ When enabled, conversions are saved to a local SQLite database (`~/Library/Appli
 
 ## Supported Layouts
 
-LangSwitcher detects layouts from your **System Settings > Keyboard > Input Sources**. Currently supported:
+Dopishi detects layouts from your **System Settings > Keyboard > Input Sources**. Currently supported:
 
 | Layout | Language Code | Physical Layout |
 |--------|--------------|-----------------|
@@ -300,7 +323,7 @@ Input: "ghbdtn" (typed on US layout when Russian was intended)
 
 ## Permissions
 
-LangSwitcher requires **Accessibility** access to:
+Dopishi requires **Accessibility** access to:
 - Read selected text (via simulated `⌘C`)
 - Replace text (via simulated `⌘V`)
 
@@ -313,7 +336,7 @@ The app does **not**:
 - Run in the background when quit
 - Collect any analytics or telemetry
 
-**Conversion logging is disabled by default.** When you enable it, all data is stored locally in `~/Library/Application Support/LangSwitcher/`. Nothing is ever uploaded or shared.
+**Conversion logging is disabled by default.** When you enable it, all data is stored locally in `~/Library/Application Support/Dopishi/`. Nothing is ever uploaded or shared.
 
 ## Contributing
 
@@ -323,7 +346,7 @@ Contributions are welcome! Here's how to add a new keyboard layout:
 2. Add a new static property to `LayoutCharacterMap` with the character mapping
 3. Add the pattern to `allMaps` array (**order matters** — specific patterns before generic ones)
 4. Add tests in `LangSwitcherTests/LayoutMapperTests.swift`
-5. Run tests: all 93+ must pass
+5. Run tests: all 441+ must pass
 
 ```swift
 // Example: adding Italian layout
@@ -340,7 +363,7 @@ static let italian: [Character: Character] = {
 
 ### Adding a New Language (i18n)
 
-LangSwitcher uses a custom localization system — no `.lproj` / `.strings` files. Language can be switched at runtime without restarting the app.
+Dopishi uses a custom localization system — no `.lproj` / `.strings` files. Language can be switched at runtime without restarting the app.
 
 1. **Copy the English template**:
    ```bash
@@ -420,8 +443,8 @@ Release builds can be signed with an Apple Developer ID certificate and notarize
 
 ```bash
 # Clone
-git clone https://github.com/reg2005/langSwitcher.git
-cd langSwitcher
+git clone https://github.com/luksiko/dopishi.git
+cd dopishi
 
 # Run tests (required after every code change)
 bash scripts/test.sh
@@ -434,7 +457,7 @@ See [AGENTS.md](AGENTS.md) for AI agent / contributor guidelines.
 
 ## Donate
 
-LangSwitcher is free and open-source. If you find it useful, any contribution is welcome and helps keep the project alive. Thank you for your support!
+Dopishi is free and open-source. If you find it useful, any contribution is welcome and helps keep the project alive. Thank you for your support!
 
 | Network | Address |
 |---------|---------|
@@ -457,4 +480,5 @@ LangSwitcher is free and open-source. If you find it useful, any contribution is
 
 ## Acknowledgments
 
-Inspired by [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/). Built as a free, open-source alternative.
+- Originally forked from [langSwitcher](https://github.com/reg2005/langSwitcher) created by [reg2005](https://github.com/reg2005). Sincere thanks and appreciation for creating the initial foundation and inspiring this project.
+- Inspired by [Caramba Switcher](https://caramba-switcher.com/mac) and [Punto Switcher](https://yandex.ru/soft/punto/). Built as a free, open-source alternative.
