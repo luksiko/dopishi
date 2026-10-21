@@ -382,6 +382,13 @@ final class TextConverter {
         let layouts = settingsManager.enabledLayouts
         guard layouts.count >= 2 else { return nil }
 
+        // Preserve code comments (VS Code, Xcode, JetBrains, terminal scripts)
+        if let (commentPrefix, remainder) = Self.extractCodeCommentPrefix(from: text) {
+            if let recovered = recoverLine(remainder) {
+                return ConversionResult(text: commentPrefix + recovered.text, targetLayoutID: recovered.targetLayoutID)
+            }
+        }
+
         let plan = ThoughtRecovery.decode(
             text,
             layoutIDs: layouts.map(\.id),
@@ -402,6 +409,18 @@ final class TextConverter {
         guard settingsManager.thoughtRecoveryEnabled else { return nil }
         let layouts = settingsManager.enabledLayouts
         guard layouts.count >= 2 else { return nil }
+        
+        if let (commentPrefix, remainder) = Self.extractCodeCommentPrefix(from: text),
+           let subPlan = recoveryPlan(for: remainder) {
+            let offsetReconstructed = commentPrefix + subPlan.reconstructed
+            return ThoughtRecovery.Plan(
+                original: text,
+                reconstructed: offsetReconstructed,
+                spans: subPlan.spans,
+                alternatives: subPlan.alternatives.map { commentPrefix + $0 }
+            )
+        }
+        
         return ThoughtRecovery.decode(
             text,
             layoutIDs: layouts.map(\.id),

@@ -456,7 +456,7 @@ final class ScreenContextService: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return true }
         if noiseLabels.contains(trimmed) { return true }
-        if TerminalPromptExtractor.isDividerLine(trimmed) || TerminalPromptExtractor.isStatusLine(trimmed) {
+        if TerminalPromptExtractor.isDividerLine(trimmed) {
             return true
         }
         
@@ -476,10 +476,7 @@ final class ScreenContextService: ObservableObject {
     }
     
     nonisolated static func sanitizeMessage(_ text: String) -> String? {
-        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let command = TerminalPromptExtractor.stripPromptPrefix(from: trimmed), !command.isEmpty {
-            trimmed = command
-        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return nil }
         
         let range = NSRange(location: 0, length: trimmed.utf16.count)
@@ -702,9 +699,9 @@ final class ScreenContextService: ObservableObject {
         }
         
         let timeoutNanos = UInt64((Self.maxTimeBudgetSeconds + 0.03) * 1_000_000_000)
-        let result = await withTaskGroup(of: ScreenContextResult?.self) { group -> ScreenContextResult? in
+        let outcome = await withTaskGroup(of: ExtractionTaskOutcome.self) { group -> ExtractionTaskOutcome in
             group.addTask(priority: .utility) {
-                Self.performExtraction(
+                let res = Self.performExtraction(
                     pid: pid,
                     bundleID: bundleID,
                     appName: appName,
@@ -712,27 +709,36 @@ final class ScreenContextService: ObservableObject {
                     maxCharacters: maxCharacters,
                     maxMessages: maxMessages
                 )
+                return .completed(res)
             }
             group.addTask(priority: .utility) {
                 try? await Task.sleep(nanoseconds: timeoutNanos)
-                return nil
+                return .timedOut
             }
-            let first = await group.next() ?? nil
+            let first = await group.next() ?? .timedOut
             group.cancelAll()
             return first
         }
         
-        self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
-        if result == nil {
+        switch outcome {
+        case .completed(let result):
+            consecutiveFailures = 0
+            circuitBreakerUntil = nil
+            self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
+            return result
+        case .timedOut:
             consecutiveFailures += 1
             if consecutiveFailures >= 3 {
                 circuitBreakerUntil = Date().addingTimeInterval(15)
             }
-        } else {
-            consecutiveFailures = 0
-            circuitBreakerUntil = nil
+            self.cache = CacheEntry(key: cacheKey, result: nil, timestamp: Date())
+            return nil
         }
-        return result
+    }
+    
+    private enum ExtractionTaskOutcome {
+        case completed(ScreenContextResult?)
+        case timedOut
     }
     
     // MARK: - Background Traversal Engine

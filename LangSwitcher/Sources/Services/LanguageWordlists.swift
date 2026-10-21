@@ -122,6 +122,18 @@ enum LanguageWordlists {
         return words(for: language).contains(normalized)
     }
 
+    /// Checks if `word` is present in any embedded language wordlist.
+    static func contains(word: String) -> Bool {
+        let normalized = word.lowercased()
+        guard !normalized.isEmpty else { return false }
+        for lang in Language.allCases {
+            if words(for: lang).contains(normalized) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Dictionary words of `language`, most frequent first (the embedded
     /// lists are frequency-ranked). Used to train the character n-gram
     /// tables of the span-level decoder.

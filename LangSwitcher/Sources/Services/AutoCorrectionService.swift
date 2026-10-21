@@ -1210,8 +1210,10 @@ final class AutoCorrectionService {
                 let layouts = settingsManager.enabledLayouts
                 let langs = layouts.map(\.languageCode)
 
-                if !spellCheckService.isValidWordInAnyLanguage(fixedWord, languages: langs) {
-                    NSLog("[LangSwitcher] AutoCorrection: '\(fixedWord)' not valid in spellchecker, skipping capital fix")
+                let inSpellChecker = spellCheckService.isValidWordInAnyLanguage(fixedWord, languages: langs)
+                let inWordlists = LanguageWordlists.contains(word: fixedWord)
+                if !inSpellChecker && !inWordlists {
+                    NSLog("[LangSwitcher] AutoCorrection: '\(fixedWord)' not valid in spellchecker or wordlists, skipping capital fix")
                     return
                 }
             }

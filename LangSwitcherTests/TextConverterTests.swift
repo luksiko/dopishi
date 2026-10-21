@@ -414,4 +414,12 @@ final class TextConverterTests: XCTestCase {
         let hashResult = converter.convertLineGreedy("    # ghbdtn")
         XCTAssertEqual(hashResult, "    # привет")
     }
+
+    func testRecoverLine_PreservesCodeComments() {
+        SettingsManager.shared.thoughtRecoveryEnabled = true
+        let slashResult = converter.recoverLine("// ghbdsn, я вже зробив rjvsn")
+        XCTAssertNotNil(slashResult)
+        XCTAssertTrue(slashResult!.text.hasPrefix("// "))
+        XCTAssertTrue(slashResult!.text.contains("зробив"))
+    }
 }

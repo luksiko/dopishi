@@ -38,6 +38,10 @@ final class ScreenContextServiceTests: XCTestCase {
         
         XCTAssertFalse(ScreenContextService.isUINoiseText("Привет, во сколько сегодня встреча?"))
         XCTAssertFalse(ScreenContextService.isUINoiseText("Can we reschedule the sync to 3 PM?"))
+        XCTAssertFalse(ScreenContextService.isUINoiseText("He took my advice and deployed it"))
+        XCTAssertFalse(ScreenContextService.isUINoiseText("I sent the invoice via email yesterday"))
+        XCTAssertFalse(ScreenContextService.isUINoiseText("Press enter to continue reading"))
+        XCTAssertFalse(ScreenContextService.isUINoiseText("Use ctrl+c to interrupt"))
     }
     
     func testTimestampAndDateFiltering() {
@@ -87,6 +91,13 @@ final class ScreenContextServiceTests: XCTestCase {
         // Plain text passes intact
         let plain = ScreenContextService.sanitizeMessage("Привет, готовимся к релизу?")
         XCTAssertEqual(plain, "Привет, готовимся к релизу?")
+        
+        // Blockquotes and dollar amounts are preserved
+        let quote = ScreenContextService.sanitizeMessage("> Цитата из переписки")
+        XCTAssertEqual(quote, "> Цитата из переписки")
+        
+        let price = ScreenContextService.sanitizeMessage("$ 100 за лицензию")
+        XCTAssertEqual(price, "$ 100 за лицензию")
     }
     
     // MARK: - Filter & Format Tests

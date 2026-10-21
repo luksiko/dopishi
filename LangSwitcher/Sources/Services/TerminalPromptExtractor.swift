@@ -32,9 +32,19 @@ struct TerminalPromptExtractor {
         "auto mode on", " = menu"
     ]
     
+    // Status regexes for CLI execution time and environment indicators
+    private static let timingIndicatorRegex = try? NSRegularExpression(pattern: #"\b(?:took\s+\d+(?:\.\d+)?\s*(?:ms|[smh])|\[\d+(?:\.\d+)?\s*(?:ms|[smh])\])\b"#, options: .caseInsensitive)
+    private static let viaEnvRegex = try? NSRegularExpression(pattern: #"\bvia\s+(?:python|node|ruby|go|rust|java|php|v?\d+\.\d+)"#, options: .caseInsensitive)
+    
     // Shell prompt regex: matches user@host:path$, (venv) $, git:(branch) $, etc.
     private static let shellPromptRegex: NSRegularExpression? = {
         let pattern = #"^(?:(?:\([A-Za-z0-9_.-]+\)\s*)?(?:[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:[^$#%]*|[^$#%\n]*git:\([^)]+\)|[A-Za-z0-9_.-]+:[^$#%]*)\s*[$#%]\s*|[$#%]\s+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    // Shell prompt search regex (anywhere in line, for pane column detection)
+    private static let shellPromptSearchRegex: NSRegularExpression? = {
+        let pattern = #"(?:(?:\([A-Za-z0-9_.-]+\)\s*)?(?:[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:[^$#%]*|[^$#%\n]*git:\([^)]+\)|[A-Za-z0-9_.-]+:[^$#%]*)\s*[$#%]\s*|[$#%]\s+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -159,7 +169,11 @@ struct TerminalPromptExtractor {
     
     /// Checks if a line looks like a shell prompt line.
     static func isShellPromptLine(_ line: String) -> Bool {
-        stripPromptPrefix(from: line) != nil
+        if stripPromptPrefix(from: line) != nil {
+            return true
+        }
+        let cleaned = cleanBorders(from: line)
+        return stripPromptPrefix(from: cleaned) != nil
     }
     
     /// Checks if a line is a box-drawing divider or separator.
@@ -181,8 +195,14 @@ struct TerminalPromptExtractor {
             }
         }
         
-        // Timing indicators like "took 1.2s", "via python 3.12"
-        if lower.contains(" took ") || lower.contains(" via ") || lower.hasPrefix("workspace-") {
+        let range = NSRange(location: 0, length: lower.utf16.count)
+        if let timingRegex = timingIndicatorRegex, timingRegex.firstMatch(in: lower, range: range) != nil {
+            return true
+        }
+        if let envRegex = viaEnvRegex, envRegex.firstMatch(in: lower, range: range) != nil {
+            return true
+        }
+        if lower.hasPrefix("workspace-") {
             return true
         }
         
@@ -191,17 +211,28 @@ struct TerminalPromptExtractor {
     
     // MARK: - Split Pane Helpers
     
-    /// Locates the column boundaries of a split pane enclosing the prompt arrow.
+    /// Locates the column boundaries of a split pane enclosing the prompt arrow or shell prompt.
     static func findPaneRange(for line: String) -> PaneRange? {
         let chars = Array(line)
-        guard let arrow = chars.indices.first(where: { i in
+        var promptCol: Int?
+        
+        if let arrow = chars.indices.first(where: { i in
             i < chars.count - 1 && arrowMarkers.contains(chars[i]) && chars[i + 1].isWhitespace
-        }) else {
+        }) {
+            promptCol = arrow
+        } else if let regex = shellPromptRegex {
+            let range = NSRange(location: 0, length: line.utf16.count)
+            if let match = regex.firstMatch(in: line, range: range) {
+                promptCol = match.range.location + match.range.length
+            }
+        }
+        
+        guard let col = promptCol else {
             return nil
         }
         
-        let leftBorder = (0..<arrow).reversed().first { paneBorders.contains(chars[$0]) }
-        let rightBorder = (arrow..<chars.count).first { paneBorders.contains(chars[$0]) }
+        let leftBorder = (0..<min(col, chars.count)).reversed().first { paneBorders.contains(chars[$0]) }
+        let rightBorder = (min(col, chars.count)..<chars.count).first { paneBorders.contains(chars[$0]) }
         
         guard leftBorder != nil || rightBorder != nil else {
             return nil

@@ -42,6 +42,10 @@ final class TerminalPromptExtractorTests: XCTestCase {
 
         XCTAssertFalse(TerminalPromptExtractor.isStatusLine("git commit -m 'feat: add status'"))
         XCTAssertFalse(TerminalPromptExtractor.isStatusLine("echo 'hello'"))
+        XCTAssertFalse(TerminalPromptExtractor.isStatusLine("I took the train home"))
+        XCTAssertFalse(TerminalPromptExtractor.isStatusLine("The package was sent via email yesterday"))
+        XCTAssertTrue(TerminalPromptExtractor.isStatusLine("node v20 via python 3.12"))
+        XCTAssertTrue(TerminalPromptExtractor.isStatusLine("test run took 450ms"))
     }
 
     func testParseTerminalBufferExtractsCleanCommandsAndOutput() {
@@ -76,5 +80,18 @@ final class TerminalPromptExtractorTests: XCTestCase {
         XCTAssertEqual(result.currentCommand, "ghbdtn")
         XCTAssertTrue(result.recentCommands.contains("git checkout main"))
         XCTAssertFalse(result.cleanedLines.contains(where: { $0.contains("vim README.md") }))
+    }
+
+    func testSplitPaneWithShellPrompt() {
+        let splitBuffer = """
+        │ alex@mac:~$ git status │ top - 21:00:00 up 10 days │
+        │ On branch main         │ Tasks: 412 total          │
+        │ alex@mac:~$ ghbdtn     │ %Cpu(s): 2.1 us           │
+        """
+        
+        let result = TerminalPromptExtractor.parseTerminalBuffer(splitBuffer)
+        XCTAssertEqual(result.currentCommand, "ghbdtn")
+        XCTAssertTrue(result.recentCommands.contains("git status"))
+        XCTAssertFalse(result.cleanedLines.contains(where: { $0.contains("Tasks: 412") }))
     }
 }
