@@ -47,7 +47,8 @@ final class AutocompletionEngine {
         enabledLayouts: [KeyboardLayout],
         maxSuggestions: Int = 4,
         includeCrossLayout: Bool = true,
-        allowProfanity: Bool = false
+        allowProfanity: Bool = false,
+        bundleID: String? = nil
     ) -> [AutocompletionCandidate] {
         let trimmed = partialWord.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
@@ -105,6 +106,25 @@ final class AutocompletionEngine {
                         isCrossLayout: false,
                         score: score
                     ))
+                }
+            }
+        }
+        
+        // 1.5. Check Per-App Custom Vocabulary (base: 1100, prioritizing application-specific terms)
+        if let bundleID = bundleID, let appSetting = SettingsManager.shared.perAppAISettings[bundleID] {
+            for term in appSetting.customVocabulary {
+                if term.lowercased().hasPrefix(lower) && term.lowercased() != lower {
+                    let formatted = formatCase(term, isCapitalized: isCapitalized)
+                    guard isCandidateAllowed(formatted) else { continue }
+                    if seenWords.insert(formatted.lowercased()).inserted {
+                        let score = calculateScore(base: 1100, word: term)
+                        results.append(AutocompletionCandidate(
+                            word: formatted,
+                            targetLayoutID: effectiveActiveLayoutID,
+                            isCrossLayout: false,
+                            score: score
+                        ))
+                    }
                 }
             }
         }

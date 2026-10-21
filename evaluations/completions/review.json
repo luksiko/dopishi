@@ -1,0 +1,497 @@
+{
+  "rubric": {
+    "2": "Useful: grammatical, fits context, no unsupported concrete claim",
+    "1": "Weak or underspecified continuation",
+    "0": "Absent, contradictory, malformed or unrelated",
+    "null": "Empty-input control, excluded from quality denominator"
+  },
+  "reviewer": "Codex qualitative inspection; exploratory, not independent human evaluation",
+  "scores": {
+    "baseline-qwen": [
+      {
+        "id": "ru-01",
+        "score": 2
+      },
+      {
+        "id": "ru-02",
+        "score": 2
+      },
+      {
+        "id": "ru-03",
+        "score": 0
+      },
+      {
+        "id": "ru-04",
+        "score": 0
+      },
+      {
+        "id": "ru-05",
+        "score": 0
+      },
+      {
+        "id": "ru-06",
+        "score": 2
+      },
+      {
+        "id": "ru-07",
+        "score": 0
+      },
+      {
+        "id": "ru-08",
+        "score": 0
+      },
+      {
+        "id": "ru-09",
+        "score": 2
+      },
+      {
+        "id": "ru-10",
+        "score": 1
+      },
+      {
+        "id": "ru-11",
+        "score": 1
+      },
+      {
+        "id": "ru-12",
+        "score": 0
+      },
+      {
+        "id": "ru-13",
+        "score": 0
+      },
+      {
+        "id": "ru-14",
+        "score": 0
+      },
+      {
+        "id": "ru-15",
+        "score": 0
+      },
+      {
+        "id": "ru-16",
+        "score": 2
+      },
+      {
+        "id": "ru-17",
+        "score": 0
+      },
+      {
+        "id": "ru-18",
+        "score": 0
+      },
+      {
+        "id": "ru-19",
+        "score": 0
+      },
+      {
+        "id": "ru-20",
+        "score": null
+      },
+      {
+        "id": "en-01",
+        "score": 2
+      },
+      {
+        "id": "en-02",
+        "score": 0
+      },
+      {
+        "id": "en-03",
+        "score": 2
+      },
+      {
+        "id": "en-04",
+        "score": 2
+      },
+      {
+        "id": "en-05",
+        "score": 1
+      },
+      {
+        "id": "en-06",
+        "score": 2
+      },
+      {
+        "id": "en-07",
+        "score": 2
+      },
+      {
+        "id": "en-08",
+        "score": 2
+      },
+      {
+        "id": "en-09",
+        "score": 0
+      },
+      {
+        "id": "en-10",
+        "score": 1
+      },
+      {
+        "id": "en-11",
+        "score": 1
+      },
+      {
+        "id": "en-12",
+        "score": 2
+      },
+      {
+        "id": "en-13",
+        "score": 2
+      },
+      {
+        "id": "en-14",
+        "score": 2
+      },
+      {
+        "id": "en-15",
+        "score": 1
+      },
+      {
+        "id": "en-16",
+        "score": 2
+      },
+      {
+        "id": "en-17",
+        "score": 2
+      },
+      {
+        "id": "en-18",
+        "score": 0
+      },
+      {
+        "id": "en-19",
+        "score": 0
+      },
+      {
+        "id": "en-20",
+        "score": null
+      }
+    ],
+    "updated-qwen": [
+      {
+        "id": "ru-01",
+        "score": 0
+      },
+      {
+        "id": "ru-02",
+        "score": 2
+      },
+      {
+        "id": "ru-03",
+        "score": 2
+      },
+      {
+        "id": "ru-04",
+        "score": 0
+      },
+      {
+        "id": "ru-05",
+        "score": 1
+      },
+      {
+        "id": "ru-06",
+        "score": 0
+      },
+      {
+        "id": "ru-07",
+        "score": 2
+      },
+      {
+        "id": "ru-08",
+        "score": 0
+      },
+      {
+        "id": "ru-09",
+        "score": 0
+      },
+      {
+        "id": "ru-10",
+        "score": 0
+      },
+      {
+        "id": "ru-11",
+        "score": 2
+      },
+      {
+        "id": "ru-12",
+        "score": 1
+      },
+      {
+        "id": "ru-13",
+        "score": 0
+      },
+      {
+        "id": "ru-14",
+        "score": 2
+      },
+      {
+        "id": "ru-15",
+        "score": 1
+      },
+      {
+        "id": "ru-16",
+        "score": 2
+      },
+      {
+        "id": "ru-17",
+        "score": 2
+      },
+      {
+        "id": "ru-18",
+        "score": 0
+      },
+      {
+        "id": "ru-19",
+        "score": 2
+      },
+      {
+        "id": "ru-20",
+        "score": null
+      },
+      {
+        "id": "en-01",
+        "score": 2
+      },
+      {
+        "id": "en-02",
+        "score": 0
+      },
+      {
+        "id": "en-03",
+        "score": 2
+      },
+      {
+        "id": "en-04",
+        "score": 0
+      },
+      {
+        "id": "en-05",
+        "score": 2
+      },
+      {
+        "id": "en-06",
+        "score": 2
+      },
+      {
+        "id": "en-07",
+        "score": 0
+      },
+      {
+        "id": "en-08",
+        "score": 0
+      },
+      {
+        "id": "en-09",
+        "score": 2
+      },
+      {
+        "id": "en-10",
+        "score": 0
+      },
+      {
+        "id": "en-11",
+        "score": 0
+      },
+      {
+        "id": "en-12",
+        "score": 0
+      },
+      {
+        "id": "en-13",
+        "score": 2
+      },
+      {
+        "id": "en-14",
+        "score": 2
+      },
+      {
+        "id": "en-15",
+        "score": 1
+      },
+      {
+        "id": "en-16",
+        "score": 0
+      },
+      {
+        "id": "en-17",
+        "score": 2
+      },
+      {
+        "id": "en-18",
+        "score": 0
+      },
+      {
+        "id": "en-19",
+        "score": 0
+      },
+      {
+        "id": "en-20",
+        "score": null
+      }
+    ],
+    "updated-gemma": [
+      {
+        "id": "ru-01",
+        "score": 2
+      },
+      {
+        "id": "ru-02",
+        "score": 2
+      },
+      {
+        "id": "ru-03",
+        "score": 2
+      },
+      {
+        "id": "ru-04",
+        "score": 0
+      },
+      {
+        "id": "ru-05",
+        "score": 1
+      },
+      {
+        "id": "ru-06",
+        "score": 2
+      },
+      {
+        "id": "ru-07",
+        "score": 2
+      },
+      {
+        "id": "ru-08",
+        "score": 2
+      },
+      {
+        "id": "ru-09",
+        "score": 2
+      },
+      {
+        "id": "ru-10",
+        "score": 2
+      },
+      {
+        "id": "ru-11",
+        "score": 2
+      },
+      {
+        "id": "ru-12",
+        "score": 2
+      },
+      {
+        "id": "ru-13",
+        "score": 0
+      },
+      {
+        "id": "ru-14",
+        "score": 0
+      },
+      {
+        "id": "ru-15",
+        "score": 1
+      },
+      {
+        "id": "ru-16",
+        "score": 1
+      },
+      {
+        "id": "ru-17",
+        "score": 2
+      },
+      {
+        "id": "ru-18",
+        "score": 0
+      },
+      {
+        "id": "ru-19",
+        "score": 0
+      },
+      {
+        "id": "ru-20",
+        "score": null
+      },
+      {
+        "id": "en-01",
+        "score": 2
+      },
+      {
+        "id": "en-02",
+        "score": 2
+      },
+      {
+        "id": "en-03",
+        "score": 2
+      },
+      {
+        "id": "en-04",
+        "score": 0
+      },
+      {
+        "id": "en-05",
+        "score": 2
+      },
+      {
+        "id": "en-06",
+        "score": 2
+      },
+      {
+        "id": "en-07",
+        "score": 2
+      },
+      {
+        "id": "en-08",
+        "score": 2
+      },
+      {
+        "id": "en-09",
+        "score": 2
+      },
+      {
+        "id": "en-10",
+        "score": 0
+      },
+      {
+        "id": "en-11",
+        "score": 1
+      },
+      {
+        "id": "en-12",
+        "score": 2
+      },
+      {
+        "id": "en-13",
+        "score": 2
+      },
+      {
+        "id": "en-14",
+        "score": 0
+      },
+      {
+        "id": "en-15",
+        "score": 1
+      },
+      {
+        "id": "en-16",
+        "score": 2
+      },
+      {
+        "id": "en-17",
+        "score": 2
+      },
+      {
+        "id": "en-18",
+        "score": 0
+      },
+      {
+        "id": "en-19",
+        "score": 2
+      },
+      {
+        "id": "en-20",
+        "score": null
+      }
+    ]
+  }
+}

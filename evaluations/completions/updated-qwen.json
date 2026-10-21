@@ -1,0 +1,207 @@
+{
+  "model": "/Users/alexeyvassilyev/Library/Application Support/LangSwitcher/Models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "baseline": false,
+  "results": [
+    {
+      "id": "ru-01",
+      "seconds": 0.8931139707565308,
+      "suggestion": "слово будет автоматически выбрано."
+    },
+    {
+      "id": "ru-02",
+      "seconds": 0.08309698104858398,
+      "suggestion": "сохранить его состояние."
+    },
+    {
+      "id": "ru-03",
+      "seconds": 0.07546305656433105,
+      "suggestion": "не null."
+    },
+    {
+      "id": "ru-04",
+      "seconds": 0.021052956581115723,
+      "suggestion": null
+    },
+    {
+      "id": "ru-05",
+      "seconds": 0.06002998352050781,
+      "suggestion": "тестирование."
+    },
+    {
+      "id": "ru-06",
+      "seconds": 0.04486501216888428,
+      "suggestion": null
+    },
+    {
+      "id": "ru-07",
+      "seconds": 0.05279898643493652,
+      "suggestion": "быстро."
+    },
+    {
+      "id": "ru-08",
+      "seconds": 0.06629502773284912,
+      "suggestion": "обновления."
+    },
+    {
+      "id": "ru-09",
+      "seconds": 0.020514965057373047,
+      "suggestion": null
+    },
+    {
+      "id": "ru-10",
+      "seconds": 0.03766798973083496,
+      "suggestion": null
+    },
+    {
+      "id": "ru-11",
+      "seconds": 0.08260500431060791,
+      "suggestion": "перенесу встречу."
+    },
+    {
+      "id": "ru-12",
+      "seconds": 0.06382405757904053,
+      "suggestion": "будет понятно."
+    },
+    {
+      "id": "ru-13",
+      "seconds": 0.06758499145507812,
+      "suggestion": null
+    },
+    {
+      "id": "ru-14",
+      "seconds": 0.04348301887512207,
+      "suggestion": "ния."
+    },
+    {
+      "id": "ru-15",
+      "seconds": 0.05673694610595703,
+      "suggestion": "наличие ошибок."
+    },
+    {
+      "id": "ru-16",
+      "seconds": 0.08583807945251465,
+      "suggestion": "отменен."
+    },
+    {
+      "id": "ru-17",
+      "seconds": 0.042793989181518555,
+      "suggestion": "локально."
+    },
+    {
+      "id": "ru-18",
+      "seconds": 0.022084951400756836,
+      "suggestion": null
+    },
+    {
+      "id": "ru-19",
+      "seconds": 0.056379079818725586,
+      "suggestion": "быть отображена."
+    },
+    {
+      "id": "ru-20",
+      "seconds": 5.0067901611328125e-06,
+      "suggestion": null
+    },
+    {
+      "id": "en-01",
+      "seconds": 0.05958402156829834,
+      "suggestion": "word."
+    },
+    {
+      "id": "en-02",
+      "seconds": 0.0356060266494751,
+      "suggestion": null
+    },
+    {
+      "id": "en-03",
+      "seconds": 0.04518401622772217,
+      "suggestion": "null."
+    },
+    {
+      "id": "en-04",
+      "seconds": 0.031178951263427734,
+      "suggestion": null
+    },
+    {
+      "id": "en-05",
+      "seconds": 0.043568968772888184,
+      "suggestion": "deployment."
+    },
+    {
+      "id": "en-06",
+      "seconds": 0.06478297710418701,
+      "suggestion": "access token."
+    },
+    {
+      "id": "en-07",
+      "seconds": 0.03760707378387451,
+      "suggestion": null
+    },
+    {
+      "id": "en-08",
+      "seconds": 0.05300402641296387,
+      "suggestion": "is closed."
+    },
+    {
+      "id": "en-09",
+      "seconds": 0.04452395439147949,
+      "suggestion": "pasta."
+    },
+    {
+      "id": "en-10",
+      "seconds": 0.034690022468566895,
+      "suggestion": null
+    },
+    {
+      "id": "en-11",
+      "seconds": 0.03974103927612305,
+      "suggestion": null
+    },
+    {
+      "id": "en-12",
+      "seconds": 0.04579603672027588,
+      "suggestion": "concise."
+    },
+    {
+      "id": "en-13",
+      "seconds": 0.05000901222229004,
+      "suggestion": "er."
+    },
+    {
+      "id": "en-14",
+      "seconds": 0.05206608772277832,
+      "suggestion": "es."
+    },
+    {
+      "id": "en-15",
+      "seconds": 0.0831000804901123,
+      "suggestion": "**validation**."
+    },
+    {
+      "id": "en-16",
+      "seconds": 0.05995500087738037,
+      "suggestion": null
+    },
+    {
+      "id": "en-17",
+      "seconds": 0.03386998176574707,
+      "suggestion": "local."
+    },
+    {
+      "id": "en-18",
+      "seconds": 0.02798604965209961,
+      "suggestion": null
+    },
+    {
+      "id": "en-19",
+      "seconds": 0.02335202693939209,
+      "suggestion": null
+    },
+    {
+      "id": "en-20",
+      "seconds": 4.0531158447265625e-06,
+      "suggestion": null
+    }
+  ],
+  "engine_sha256": "a75f88849a49d764ff2023d5af0901ab15fb479d80369008a341aa71a45756d8"
+}

@@ -194,3 +194,64 @@ extension GhostTextOverlayTests {
         XCTAssertFalse(ghost.isVisible)
     }
 }
+
+
+extension GhostTextOverlayTests {
+    func testLineWrapKeepsValidInsertionBoundsOnTheNewLine() {
+        let rect = AccessibilityService.resolveCaretBounds(selectedRange: CFRange(location: 10, length: 0),
+            primaryScreenMaxY: 200, rangeBounds: { range in
+                range.length == 0 ? CGRect(x: 10, y: 80, width: 1, height: 15)
+                    : CGRect(x: 50, y: 100, width: 8, height: 15)
+            }, markerBounds: { nil })
+        XCTAssertEqual(rect, CGRect(x: 10, y: 105, width: 1, height: 15))
+    }
+
+    func testFieldAnchorRemainsOnLeftMonitor() {
+        let screen = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
+        let frame = FieldAnchorOverlayController.badgeFrame(
+            fieldRect: CGRect(x: -1800, y: 200, width: 500, height: 100), visibleFrame: screen)
+        XCTAssertEqual(frame.minX, -1828)
+        XCTAssertEqual(frame.maxX, -1806)
+        XCTAssertTrue(screen.contains(frame))
+    }
+
+    func testFieldAnchorPositionedOutsideFieldToAvoidCoveringText() {
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        let field = CGRect(x: 100, y: 500, width: 400, height: 40)
+        let frame = FieldAnchorOverlayController.badgeFrame(fieldRect: field, visibleFrame: screen)
+        // Badge must be strictly to the left of the field to avoid overlapping text
+        XCTAssertLessThanOrEqual(frame.maxX, field.minX)
+        XCTAssertEqual(frame.maxX, field.minX - 6)
+    }
+
+    func testFieldAnchorHideCannotUndoImmediateReshow() async throws {
+        let anchor = FieldAnchorOverlayController()
+        defer { anchor.hide() }
+        anchor.show(fieldRect: CGRect(x: 100, y: 200, width: 500, height: 100))
+        anchor.hide()
+        XCTAssertFalse(anchor.isVisible)
+        anchor.show(fieldRect: CGRect(x: 150, y: 220, width: 500, height: 100))
+        try await Task.sleep(nanoseconds: 180_000_000)
+        XCTAssertTrue(anchor.isVisible)
+    }
+
+    func testTelegramCaretAdjustedDownwardsForContainerPadding() {
+        let rawCaret = CGRect(x: 500, y: 400, width: 1, height: 16)
+        let adjusted = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: "ru.keepcoder.Telegram")
+        // In Telegram, input container padding and baseline offset is 18 points downwards (smaller Y in Cocoa)
+        XCTAssertEqual(adjusted.origin.x, 500)
+        XCTAssertEqual(adjusted.origin.y, 400 - 18)
+        XCTAssertEqual(adjusted.width, 1)
+        XCTAssertEqual(adjusted.height, 16)
+    }
+
+    func testNonTelegramCaretRemainsUnchanged() {
+        let rawCaret = CGRect(x: 500, y: 400, width: 1, height: 16)
+        let chrome = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: "com.google.Chrome")
+        XCTAssertEqual(chrome, rawCaret)
+        let vscode = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: "com.microsoft.VSCode")
+        XCTAssertEqual(vscode, rawCaret)
+        let none = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: nil)
+        XCTAssertEqual(none, rawCaret)
+    }
+}

@@ -12,6 +12,11 @@ struct CaretContext: Equatable {
     let selectedText: String
     let caretLocation: Int
     let fullTextLength: Int
+
+    var hasUsablePredictionContext: Bool {
+        fullTextLength > 0 && caretLocation > 0 && selectedText.isEmpty
+            && !textBeforeCaret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 // MARK: - Accessibility Service
@@ -362,10 +367,10 @@ final class AccessibilityService {
         
         var rangeRef: CFTypeRef?
         var selectedRange = CFRange(location: 0, length: 0)
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-           let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID() {
-            _ = AXValueGetValue(rangeValue as! AXValue, .cfRange, &selectedRange)
-        }
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
+              let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID(),
+              AXValueGetValue(rangeValue as! AXValue, .cfRange, &selectedRange),
+              selectedRange.location >= 0, selectedRange.length >= 0 else { return nil }
         
         var selectedTextRef: CFTypeRef?
         var selectedText = ""
@@ -376,7 +381,10 @@ final class AccessibilityService {
         
         var valueRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
-           let fullText = valueRef as? String {
+           let fullText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string {
+            // Do not silently clamp a stale AX caret into a newer, shorter value.
+            guard selectedRange.location <= (fullText as NSString).length,
+                  selectedRange.length <= (fullText as NSString).length - selectedRange.location else { return nil }
             return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
                                          selection: selectedRange, selectedText: selectedText,
                                          maxSurroundingLength: maxSurroundingLength)
@@ -411,7 +419,9 @@ final class AccessibilityService {
         return CaretContext(fieldIdentifier: fieldIdentifier,
             textBeforeCaret: string.substring(with: NSRange(location: start, length: caret - start)),
             textAfterCaret: string.substring(with: NSRange(location: selectionEnd, length: end - selectionEnd)),
-            selectedText: selectedText, caretLocation: caret, fullTextLength: count)
+            selectedText: selectionEnd > caret
+                ? string.substring(with: NSRange(location: caret, length: selectionEnd - caret)) : selectedText,
+            caretLocation: caret, fullTextLength: count)
     }
 
     // MARK: - Caret Positioning
@@ -437,6 +447,19 @@ final class AccessibilityService {
                                               parameter: value)
             }, markerBounds: { self.selectedMarkerCaretBounds(element) })
         guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else { return nil }
+        let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return Self.adjustCaretForApp(caret: caret, bundleID: frontmostID)
+    }
+
+    /// App-specific coordinate corrections for applications with uncompensated container insets.
+    static func adjustCaretForApp(caret: CGRect, bundleID: String?) -> CGRect {
+        if bundleID == "ru.keepcoder.Telegram" {
+            // Telegram macOS reports text range AX bounds shifted upwards by 18 points
+            // due to uncompensated chat input container padding and baseline offset. Adjust Y downwards in Cocoa coordinates.
+            let lineOffset: CGFloat = 18.0
+            return CGRect(x: caret.origin.x, y: caret.origin.y - lineOffset,
+                          width: caret.width, height: caret.height)
+        }
         return caret
     }
 
@@ -568,13 +591,15 @@ final class AccessibilityService {
                                    rangeBounds: (CFRange) -> CGRect?, markerBounds: () -> CGRect?) -> CGRect? {
         if let range = selectedRange {
             guard range.location >= 0, range.length == 0 else { return nil }
-            var queries = [range]
-            if range.location > 0 { queries.append(CFRange(location: range.location - 1, length: 1)) }
-            for query in queries {
-                if let bounds = rangeBounds(query),
-                   let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
-                                                     precedingCharacter: query.length == 1) { return caret }
-            }
+            if let bounds = rangeBounds(range),
+               let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
+                                                 precedingCharacter: false) { return caret }
+            // A preceding character is only a fallback: at a line wrap its
+            // position legitimately differs from the current insertion point.
+            if range.location > 0,
+               let bounds = rangeBounds(CFRange(location: range.location - 1, length: 1)),
+               let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
+                                                 precedingCharacter: true) { return caret }
         }
         guard let bounds = markerBounds(), bounds.width <= 2 else { return nil }
         return normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false)
@@ -596,9 +621,8 @@ final class AccessibilityService {
 
     func captureReplacementTarget() -> ReplacementTarget? {
         guard let element = focusedTextElement(), let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        var settable = DarwinBoolean(false)
-        guard AXUIElementIsAttributeSettable(element, kAXSelectedTextRangeAttribute as CFString, &settable) == .success,
-              settable.boolValue else { return nil }
+        // Appending at the caret only needs a readable insertion point. Web
+        // editors can support paste while exposing AX selection as read-only.
         return ReplacementTarget(element: element, processID: app.processIdentifier)
     }
 
@@ -666,10 +690,96 @@ final class AccessibilityService {
         return result == .success
     }
 
+    /// Append without selecting/replacing existing text. Contenteditable fields
+    /// may expose a readable caret but no AXSelectedText or writable AX range.
+    func pasteContinuationAtCaret(_ text: String, target: ReplacementTarget,
+                                  onApplied: @escaping (Bool) -> Void) -> Bool {
+        pendingSelection?.cancel()
+        pendingPaste?.check(final: true)
+        guard !text.isEmpty, isCurrentReplacementTarget(target) else { return false }
+        let element = target.element
+        func caret() -> Int? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
+                  let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+            var range = CFRange()
+            guard AXValueGetValue(value as! AXValue, .cfRange, &range), range.length == 0 else { return nil }
+            return range.location
+        }
+        func value() -> String? {
+            var value: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
+            return (value as? String) ?? (value as? NSAttributedString)?.string
+        }
+        // Reading an empty range establishes an insertion point without the
+        // AXSelectedText setter/getter that native web editors can omit.
+        guard let originalCaret = caret() else {
+            NSLog("[LangSwitcher] Completion paste: no readable empty caret range")
+            return false
+        }
+        let original = value()
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else { return false }
+        let pasteboard = NSPasteboard.general
+        let saved = savePasteboard()
+        pasteboard.clearContents()
+        guard pasteboard.setString(text, forType: .string) else {
+            restorePasteboard(saved)
+            return false
+        }
+        pasteboard.setString("", forType: .init("org.nspasteboard.TransientType"))
+        pasteboard.setString("", forType: .init("org.nspasteboard.AutoGeneratedType"))
+        let revision = pasteboard.changeCount
+        let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
+            self.isCurrentReplacementTarget(target) && caret() == originalCaret
+                && (original == nil || value() == original)
+        }, post: { _ in
+            for event in [down, up] {
+                event.flags = .maskCommand
+                event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                event.post(tap: .cgAnnotatedSessionEventTap)
+            }
+        })
+        guard sent else {
+            if pasteboard.changeCount == revision { restorePasteboard(saved) }
+            return false
+        }
+        let receipt = PasteConfirmation(applied: {
+            Self.continuationWasApplied(original: original, observed: value(),
+                caretBefore: originalCaret, caretAfter: caret(), inserted: text)
+        }, finish: { [weak self] applied in
+            guard let self else { return }
+            self.pendingPaste = nil
+            if pasteboard.changeCount == revision {
+                if saved.isEmpty { pasteboard.clearContents() } else { self.restorePasteboard(saved) }
+            }
+            onApplied(applied)
+        })
+        pendingPaste = receipt
+        for attempt in 1...25 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(attempt) * 0.01) {
+                receipt.check(final: attempt == 25)
+            }
+        }
+        return true
+    }
+
+    static func continuationWasApplied(original: String?, observed: String?,
+                                       caretBefore: Int, caretAfter: Int?, inserted: String) -> Bool {
+        if let original, let observed {
+            return replacementWasApplied(original: original,
+                range: NSRange(location: caretBefore, length: 0), replacement: inserted,
+                observed: observed, allowFollowingInput: true)
+        }
+        return caretAfter == caretBefore + inserted.utf16.count
+    }
+
     /// Fallback for automatic word correction in editors with ignored AX setters.
     /// Re-read the text and focus before selecting anything; never send backspaces.
     func pasteVerifiedSuffix(_ expected: String, with replacement: String, target: ReplacementTarget,
-                             completion: @escaping (Bool) -> Void) {
+                             completion: @escaping (Bool) -> Void,
+                             onApplied: ((Bool) -> Void)? = nil) {
         // A stop/restart may have cancelled the old correction session while
         // its clipboard receipt is still pending. Finalize it before replacing it.
         pendingSelection?.cancel()
@@ -713,7 +823,7 @@ final class AccessibilityService {
             completion(false); return
         }
         var range = CFRange(location: plan.location, length: plan.length)
-        if original.length == 0 {
+        if Self.requiresSelectionWrite(original: original, replacementRange: plan) {
             guard let rangeValue = AXValueCreate(.cfRange, &range),
                   AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, rangeValue) == .success else {
                 completion(false); return
@@ -802,6 +912,7 @@ final class AccessibilityService {
             }, finish: { [weak self] applied in
                 guard let self else { return }
                 self.pendingPaste = nil
+                onApplied?(applied)
                 var observed: CFTypeRef?
                 AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &observed)
                 if !applied, observed as? String == text, self.isCurrentReplacementTarget(target) {
@@ -828,6 +939,10 @@ final class AccessibilityService {
                 selectionConfirmation.check(final: attempt == 20)
             }
         }
+    }
+
+    static func requiresSelectionWrite(original: CFRange, replacementRange: NSRange) -> Bool {
+        original.length == 0 && replacementRange.length > 0
     }
 
     static func dispatchVerifiedPaste(to processID: pid_t, verifySelection: () -> Bool,

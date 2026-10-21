@@ -49,7 +49,7 @@ struct SettingsView: View {
             Group {
                 switch selectedTab {
                 case 0:
-                    GeneralSettingsTab()
+                    GeneralSettingsTab(selectedTab: $selectedTab)
                         .environmentObject(settingsManager)
                         .environmentObject(l10n)
                 case 1:
@@ -84,6 +84,7 @@ struct SettingsView: View {
 // MARK: - General Settings
 
 struct GeneralSettingsTab: View {
+    @Binding var selectedTab: Int
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
     
@@ -200,34 +201,6 @@ struct GeneralSettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
-
-                    Picker(l10n.t("autocompletion.acceptKey"), selection: $settingsManager.autoCompletionAcceptKey) {
-                        ForEach(AutocompletionAcceptKey.allCases) { key in
-                            Text(key.displayName).tag(key)
-                        }
-                    }
-                    
-                    if settingsManager.autoCompletionAcceptKey == .custom {
-                        AutocompletionKeyRecorderView(
-                            keyCode: $settingsManager.autoCompletionCustomKeyCode,
-                            modifiers: $settingsManager.autoCompletionCustomModifiers
-                        )
-                    }
-
-                    Picker(l10n.t("autocompletion.acceptAllKey"), selection: $settingsManager.autoCompletionAcceptAllKey) {
-                        ForEach(AutocompletionAcceptAllKey.allCases) { key in
-                            Text(key.displayName).tag(key)
-                        }
-                    }
-                    
-                    if settingsManager.autoCompletionAcceptAllKey == .custom {
-                        AutocompletionKeyRecorderView(
-                            keyCode: $settingsManager.autoCompletionCustomAcceptAllKeyCode,
-                            modifiers: $settingsManager.autoCompletionCustomAcceptAllModifiers
-                        )
-                    }
-                    
-                    Toggle(l10n.t("autocompletion.useNumberShortcuts"), isOn: $settingsManager.autoCompletionUseNumberShortcuts)
                     
                     Toggle(l10n.t("autocompletion.includeCrossLayout"), isOn: $settingsManager.autoCompletionIncludeCrossLayout)
                     
@@ -259,6 +232,22 @@ struct GeneralSettingsTab: View {
                         Slider(value: $settingsManager.autoCompletionDelay, in: 0.0...0.30, step: 0.025)
                     }
                     .padding(.vertical, 2)
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.t("autocompletion.shortcutsLinkTitle"))
+                                .font(.subheadline)
+                            Text(l10n.t("autocompletion.shortcutsLinkDesc"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(l10n.t("autocompletion.configureShortcuts")) {
+                            selectedTab = 2
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
                     
                     Divider()
                         .padding(.vertical, 2)
@@ -408,9 +397,263 @@ struct HotkeySettingsTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Section 1: Single Key Layout Switch
+                // MARK: 1. Autocompletion Shortcuts
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(l10n.t("autocompletion.shortcutsSection"))
+                        .font(.headline)
+                    
+                    // Card 1: Complete next word
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(l10n.t("autocompletion.completeNextWord"))
+                                    .font(.subheadline)
+                                    .bold()
+                                Text(l10n.t("autocompletion.completeNextWordDesc"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Picker("", selection: $settingsManager.autoCompletionAcceptKey) {
+                                ForEach(AutocompletionAcceptKey.allCases) { key in
+                                    Text(key.displayName).tag(key)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 170)
+                        }
+                        
+                        if settingsManager.autoCompletionAcceptKey == .custom {
+                            AutocompletionKeyRecorderView(
+                                keyCode: $settingsManager.autoCompletionCustomKeyCode,
+                                modifiers: $settingsManager.autoCompletionCustomModifiers
+                            )
+                            .padding(.top, 4)
+                        }
+                        
+                        Divider()
+                            .padding(.vertical, 4)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(l10n.t("autocompletion.includeTrailingSpace"), isOn: $settingsManager.autoCompletionIncludeTrailingSpace)
+                            Text(l10n.t("autocompletion.includeTrailingSpaceDesc"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(l10n.t("autocompletion.acceptEntirePhrase"), isOn: $settingsManager.autoCompletionAcceptEntirePhrase)
+                            Text(l10n.t("autocompletion.acceptEntirePhraseDesc"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(l10n.t("autocompletion.includeTrailingPunctuation"), isOn: $settingsManager.autoCompletionIncludeTrailingPunctuation)
+                            Text(l10n.t("autocompletion.includeTrailingPunctuationDesc"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Card 2: Trigger full completion
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(l10n.t("autocompletion.triggerFullCompletion"))
+                                    .font(.subheadline)
+                                    .bold()
+                                Text(l10n.t("autocompletion.triggerFullCompletionDesc"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Picker("", selection: $settingsManager.autoCompletionAcceptAllKey) {
+                                ForEach(AutocompletionAcceptAllKey.allCases) { key in
+                                    Text(key.displayName).tag(key)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 170)
+                        }
+                        
+                        if settingsManager.autoCompletionAcceptAllKey == .custom {
+                            AutocompletionKeyRecorderView(
+                                keyCode: $settingsManager.autoCompletionCustomAcceptAllKeyCode,
+                                modifiers: $settingsManager.autoCompletionCustomAcceptAllModifiers
+                            )
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Card 3: When you press Escape
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(l10n.t("autocompletion.whenEscapePressed"))
+                                    .font(.subheadline)
+                                    .bold()
+                                Text(l10n.t("autocompletion.whenEscapePressedDesc"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Picker("", selection: $settingsManager.autoCompletionEscapeAction) {
+                                ForEach(AutocompletionEscapeAction.allCases) { action in
+                                    Text(action.displayName).tag(action)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 210)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Card 4: Force-activate completions
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(l10n.t("autocompletion.forceActivate"))
+                                .font(.subheadline)
+                                .bold()
+                            Text(l10n.t("autocompletion.forceActivateDesc"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        AutocompletionKeyRecorderView(
+                            title: "",
+                            keyCode: $settingsManager.autoCompletionForceActivateKeyCode,
+                            modifiers: $settingsManager.autoCompletionForceActivateModifiers,
+                            canClear: true,
+                            enabled: $settingsManager.autoCompletionForceActivateEnabled
+                        )
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Card 5: Temporarily toggle completions in current app
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(l10n.t("autocompletion.toggleCurrentApp"))
+                                .font(.subheadline)
+                                .bold()
+                            Text(l10n.t("autocompletion.toggleCurrentAppDesc"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        AutocompletionKeyRecorderView(
+                            title: "",
+                            keyCode: $settingsManager.autoCompletionToggleCurrentAppKeyCode,
+                            modifiers: $settingsManager.autoCompletionToggleCurrentAppModifiers,
+                            canClear: true,
+                            enabled: $settingsManager.autoCompletionToggleCurrentAppEnabled
+                        )
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Card 6: Toggle completions globally
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(l10n.t("autocompletion.toggleGlobally"))
+                                .font(.subheadline)
+                                .bold()
+                            Text(l10n.t("autocompletion.toggleGloballyDesc"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        AutocompletionKeyRecorderView(
+                            title: "",
+                            keyCode: $settingsManager.autoCompletionToggleGlobalKeyCode,
+                            modifiers: $settingsManager.autoCompletionToggleGlobalModifiers,
+                            canClear: true,
+                            enabled: $settingsManager.autoCompletionToggleGlobalEnabled
+                        )
+                    }
+                    .padding(12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Number shortcuts
+                    Toggle(l10n.t("autocompletion.useNumberShortcuts"), isOn: $settingsManager.autoCompletionUseNumberShortcuts)
+                        .padding(.horizontal, 4)
+                }
+
+                Divider()
+
+                // MARK: 2. Text Conversion Shortcut
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(l10n.t("hotkey.conversionSection"))
+                        .font(.headline)
+                    
+                    Text(l10n.t("hotkey.description"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack {
+                        Text(l10n.t("hotkey.current"))
+                        Spacer()
+                        Text(settingsManager.hotkeyDescription)
+                            .font(.system(.title3, design: .rounded))
+                            .bold()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(.blue.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    
+                    Toggle(l10n.t("hotkey.useDoubleShift"), isOn: $settingsManager.useDoubleShift)
+                        .toggleStyle(.switch)
+                    
+                    Text(l10n.t("hotkey.doubleShiftHint"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    if !settingsManager.useDoubleShift {
+                        Divider()
+                        
+                        Text(l10n.t("hotkey.customTitle"))
+                            .font(.subheadline)
+                            .bold()
+                        
+                        HotkeyRecorderView(
+                            keyCode: $settingsManager.hotkeyKeyCode,
+                            modifiers: Binding(
+                                get: { settingsManager.hotkeyModifierFlags },
+                                set: { settingsManager.hotkeyModifierFlags = $0 }
+                            )
+                        )
+                        .environmentObject(l10n)
+                    }
+                }
+                .padding(12)
+                .background(Color(NSColor.controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Divider()
+
+                // MARK: 3. Single Key Layout Switch
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(l10n.t("layoutSwitchKey.title"))
+                    Text(l10n.t("hotkey.layoutSwitchSection"))
                         .font(.headline)
                     
                     Text(l10n.t("layoutSwitchKey.description"))
@@ -435,56 +678,6 @@ struct HotkeySettingsTab: View {
                     Text(l10n.t("layoutSwitchKey.hint"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                }
-                
-                Divider()
-                
-                // Section 2: Text Conversion Shortcut
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(l10n.t("hotkey.title"))
-                        .font(.headline)
-                    
-                    Text(l10n.t("hotkey.description"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    // Current shortcut display
-                    HStack {
-                        Text(l10n.t("hotkey.current"))
-                        Spacer()
-                        Text(settingsManager.hotkeyDescription)
-                            .font(.system(.title3, design: .rounded))
-                            .bold()
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(.blue.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    
-                    // Double Shift toggle
-                    Toggle(l10n.t("hotkey.useDoubleShift"), isOn: $settingsManager.useDoubleShift)
-                        .toggleStyle(.switch)
-                    
-                    Text(l10n.t("hotkey.doubleShiftHint"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    if !settingsManager.useDoubleShift {
-                        Divider()
-                        
-                        Text(l10n.t("hotkey.customTitle"))
-                            .font(.subheadline)
-                            .bold()
-                        
-                        HotkeyRecorderView(
-                            keyCode: $settingsManager.hotkeyKeyCode,
-                            modifiers: Binding(
-                                get: { settingsManager.hotkeyModifierFlags },
-                                set: { settingsManager.hotkeyModifierFlags = $0 }
-                            )
-                        )
-                        .environmentObject(l10n)
-                    }
                 }
             }
             .padding()

@@ -62,12 +62,48 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertFalse(RecommendedAIModel.allModels.isEmpty)
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-0.5b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "smollm2-360m" }))
-        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-1.5b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "llama-3.2-1b" }))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-1.5b" }))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "gemma-2-2b" }))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "gemma-4-e2b" }))
+        let gemma4 = RecommendedAIModel.model(for: "gemma-4-e2b")
+        XCTAssertTrue(gemma4.downloadURL.absoluteString.contains("mradermacher/gemma-4-E2B-i1-GGUF"))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-3b" }))
         
         // Fallback for unknown model id
         let fallback = RecommendedAIModel.model(for: "non-existent-model")
         XCTAssertEqual(fallback.id, RecommendedAIModel.defaultModelID)
+    }
+    
+    func testRecommendedAIModelLocalizedSize() {
+        let qwen05 = RecommendedAIModel.model(for: "qwen2.5-0.5b")
+        let smollm = RecommendedAIModel.model(for: "smollm2-360m")
+        let qwen15 = RecommendedAIModel.model(for: "qwen2.5-1.5b")
+        let llama = RecommendedAIModel.model(for: "llama-3.2-1b")
+        
+        // English
+        XCTAssertEqual(qwen05.localizedSize(language: "en"), "~390 MB")
+        XCTAssertEqual(smollm.localizedSize(language: "en"), "~229 MB")
+        XCTAssertEqual(qwen15.localizedSize(language: "en"), "~986 MB")
+        XCTAssertEqual(llama.localizedSize(language: "en"), "~770 MB")
+        
+        // Russian
+        XCTAssertEqual(qwen05.localizedSize(language: "ru"), "~390 МБ")
+        XCTAssertEqual(smollm.localizedSize(language: "ru"), "~229 МБ")
+        XCTAssertEqual(qwen15.localizedSize(language: "ru"), "~986 МБ")
+        XCTAssertEqual(llama.localizedSize(language: "ru"), "~770 МБ")
+        
+        // Download button string formatting with model sizes
+        let l10n = LocalizationManager.shared
+        l10n.currentLanguage = "ru"
+        let ruButtonFormat = l10n.t("ai.model.downloadButton")
+        XCTAssertEqual(String(format: ruButtonFormat, smollm.localizedSize(using: l10n)), "Загрузить модель (~229 МБ)")
+        XCTAssertEqual(String(format: ruButtonFormat, qwen15.localizedSize(using: l10n)), "Загрузить модель (~986 МБ)")
+        XCTAssertEqual(String(format: ruButtonFormat, llama.localizedSize(using: l10n)), "Загрузить модель (~770 МБ)")
+        
+        l10n.currentLanguage = "en"
+        let enButtonFormat = l10n.t("ai.model.downloadButton")
+        XCTAssertEqual(String(format: enButtonFormat, smollm.localizedSize(using: l10n)), "Download Model (~229 MB)")
     }
     
     func testSwitchModelUpdatesState() {
@@ -78,6 +114,43 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertEqual(SettingsManager.shared.selectedModelId, "smollm2-360m")
     }
     
+    func testCustomModelSelectionAndLifecycle() {
+        let manager = AIModelManager(modelsDirectory: tempDirectory)
+        let customFile = tempDirectory.appendingPathComponent("gemma-4-E2B-Q4_C.gguf")
+        var dummyData = Data("GGUF".utf8)
+        dummyData.append(Data(count: 15_000_000 - dummyData.count)) // ~15 MB
+        FileManager.default.createFile(atPath: customFile.path, contents: dummyData)
+        
+        manager.selectCustomModel(path: customFile.path)
+        XCTAssertEqual(manager.currentModel.id, RecommendedAIModel.customModelID)
+        XCTAssertEqual(manager.currentModel.name, "gemma-4-E2B-Q4_C.gguf")
+        XCTAssertTrue(manager.currentModel.isCustom)
+        XCTAssertEqual(SettingsManager.shared.customModelPath, customFile.path)
+        XCTAssertEqual(SettingsManager.shared.selectedModelId, RecommendedAIModel.customModelID)
+        XCTAssertTrue(manager.isDownloaded(model: manager.currentModel))
+        XCTAssertEqual(manager.activeModelPath, customFile.path)
+        XCTAssertTrue(manager.state.isReady)
+        
+        // Disconnecting / deleting custom model clears path and restores default model
+        manager.deleteModel(model: manager.currentModel)
+        XCTAssertEqual(SettingsManager.shared.customModelPath, "")
+        XCTAssertEqual(manager.currentModel.id, RecommendedAIModel.defaultModelID)
+        // Verify user's original custom file on disk was NOT deleted
+        XCTAssertTrue(FileManager.default.fileExists(atPath: customFile.path))
+    }
+    
+    func testCustomModelWithNonGGUFContentsIsNotReady() {
+        let manager = AIModelManager(modelsDirectory: tempDirectory)
+        let file = tempDirectory.appendingPathComponent("private-model.gguf")
+        FileManager.default.createFile(atPath: file.path, contents: Data(count: 1_100_000))
+        manager.selectCustomModel(path: file.path)
+        XCTAssertFalse(manager.state.isReady)
+        XCTAssertFalse(manager.isDownloaded(model: manager.currentModel))
+        XCTAssertNil(manager.activeModelPath)
+        guard case .error = manager.state else { return XCTFail("Invalid GGUF should explain its format error") }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    }
+
     func testExtendedStatisticsTracking() {
         let settings = SettingsManager.shared
         settings.resetStatistics()

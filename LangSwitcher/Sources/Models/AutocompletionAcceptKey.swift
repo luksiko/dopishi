@@ -69,6 +69,7 @@ enum AutocompletionAcceptKey: String, CaseIterable, Identifiable, Codable {
 // MARK: - Autocompletion Accept All Key
 
 enum AutocompletionAcceptAllKey: String, CaseIterable, Identifiable, Codable {
+    case cmdSection = "cmdSection"
     case shiftTab = "shiftTab"
     case cmdReturn = "cmdReturn"
     case optionTab = "optionTab"
@@ -78,6 +79,7 @@ enum AutocompletionAcceptAllKey: String, CaseIterable, Identifiable, Codable {
     
     var defaultKeyCode: UInt16 {
         switch self {
+        case .cmdSection: return 0x0A                    // § or `
         case .shiftTab, .optionTab, .custom: return 0x30 // Tab
         case .cmdReturn: return 0x24                     // Return
         }
@@ -91,6 +93,7 @@ enum AutocompletionAcceptAllKey: String, CaseIterable, Identifiable, Codable {
     @MainActor
     func shortcutHint(customKeyCode: UInt16 = 0x30, customModifiers: UInt = 0) -> String {
         switch self {
+        case .cmdSection: return "⌘§"
         case .shiftTab: return "⇧⇥"
         case .cmdReturn: return "⌘↩"
         case .optionTab: return "⌥⇥"
@@ -99,5 +102,19 @@ enum AutocompletionAcceptAllKey: String, CaseIterable, Identifiable, Codable {
             let key = HotkeyManager.keyCodeToString(customKeyCode)
             return "\(mods)\(key)"
         }
+    }
+}
+
+// MARK: - Autocompletion Escape Action
+
+enum AutocompletionEscapeAction: String, CaseIterable, Identifiable, Codable {
+    case pauseFewSeconds = "pauseFewSeconds"
+    case dismissOnly = "dismissOnly"
+    
+    var id: String { rawValue }
+    
+    @MainActor
+    var displayName: String {
+        LocalizationManager.shared.t("autocompletion.escapeAction.\(rawValue)")
     }
 }

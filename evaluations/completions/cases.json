@@ -1,0 +1,282 @@
+[
+  {
+    "id": "ru-01",
+    "before": "После исправления Tab должен принимать только следующее слово. Уже введённый текст нельзя выделять или заменять. Теперь при нажатии Tab следующее ",
+    "rubric": "word acceptance",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-02",
+    "before": "Чтобы не потерять изменения, перед закрытием документа нужно ",
+    "rubric": "save changes",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-03",
+    "before": "Причина сбоя — отсутствующая проверка на null. Перед обращением к объекту нужно проверить, что он ",
+    "rubric": "null check",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-04",
+    "before": "Мы договорились встретиться завтра в десять. Напомни мне о встрече ",
+    "rubric": "meeting reminder",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-05",
+    "before": "Все 361 тест прошёл успешно. Можно отправлять изменения на ",
+    "rubric": "review",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-06",
+    "before": "Сервер вернул 401, потому что токен истёк. Нужно обновить ",
+    "rubric": "token",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-07",
+    "before": "Я добавил индекс, чтобы запрос к базе выполнялся ",
+    "rubric": "faster query",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-08",
+    "before": "Если интернет недоступен, изменения сохраняются локально и отправляются после ",
+    "rubric": "connection restored",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-09",
+    "before": "На ужин у нас паста. Пожалуйста, купи в магазине ",
+    "rubric": "ingredients",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-10",
+    "before": "Не забудь закрыть окно, потому что на улице ",
+    "rubric": "weather",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-11",
+    "before": "Мне нужно перенести встречу. Напиши коллеге, что я ",
+    "rubric": "reschedule",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-12",
+    "before": "Спасибо за помощь! Теперь всё ",
+    "rubric": "works",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-13",
+    "before": "Я исправил ошибку в обработке клавиатурных событ",
+    "rubric": "midword",
+    "buffer": "событ",
+    "after": ""
+  },
+  {
+    "id": "ru-14",
+    "before": "Пожалуйста, проверь новые измене",
+    "rubric": "midword",
+    "buffer": "измене",
+    "after": ""
+  },
+  {
+    "id": "ru-15",
+    "before": "В этом методе нужно добавить проверку на ",
+    "rubric": "technical term",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-16",
+    "before": "Мы отменили релиз: обнаружена потеря данных. Нельзя писать, что выпуск готов. В отчёте нужно объяснить причину отмены и дальнейшие действия. Мы отменили релиз: обнаружена потеря данных. Нельзя писать, что выпуск готов. В отчёте нужно объяснить причину отмены и дальнейшие действия. \nКраткий итог: релиз ",
+    "rubric": "release cancelled",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-17",
+    "before": "Наше приложение работает локально. Текст не отправляется в облако. Пользователь спрашивает о конфиденциальности. Наше приложение работает локально. Текст не отправляется в облако. Пользователь спрашивает о конфиденциальности. Наше приложение работает локально. Текст не отправляется в облако. Пользователь спрашивает о конфиденциальности. \nЕго сообщения остаются ",
+    "rubric": "privacy",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-18",
+    "before": "Вставь текст между словами, сохраняя продолжение. Я отправлю ",
+    "rubric": "middle insertion",
+    "buffer": "",
+    "after": " завтра утром."
+  },
+  {
+    "id": "ru-19",
+    "before": "😀 Проверка emoji: при вставке символов каретка должна ",
+    "rubric": "emoji",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "ru-20",
+    "before": "",
+    "rubric": "abstain",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-01",
+    "before": "The Tab key now accepts the next word without selecting existing text. Pressing Tab inserts the next ",
+    "rubric": "word acceptance",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-02",
+    "before": "To avoid losing your changes, please save the document before ",
+    "rubric": "save changes",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-03",
+    "before": "The crash happened because the object was null. Check that it is not ",
+    "rubric": "null check",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-04",
+    "before": "Our meeting starts at ten tomorrow. Please remind me ",
+    "rubric": "meeting reminder",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-05",
+    "before": "All 361 tests passed. The changes are ready for ",
+    "rubric": "review",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-06",
+    "before": "The server returned 401 because the token expired. We need to refresh the ",
+    "rubric": "token",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-07",
+    "before": "I added a database index to make the query ",
+    "rubric": "faster query",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-08",
+    "before": "Offline changes are saved locally and synchronized when the connection ",
+    "rubric": "connection restored",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-09",
+    "before": "We are making pasta tonight. Please buy some ",
+    "rubric": "ingredients",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-10",
+    "before": "Please close the window because it is ",
+    "rubric": "weather",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-11",
+    "before": "I need to reschedule our meeting. Tell my colleague that ",
+    "rubric": "reschedule",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-12",
+    "before": "Thanks for your help! Everything is now ",
+    "rubric": "works",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-13",
+    "before": "I fixed the bug in the keyboard event handl",
+    "rubric": "midword",
+    "buffer": "handl",
+    "after": ""
+  },
+  {
+    "id": "en-14",
+    "before": "Please review the latest chang",
+    "rubric": "midword",
+    "buffer": "chang",
+    "after": ""
+  },
+  {
+    "id": "en-15",
+    "before": "This method needs an additional check for ",
+    "rubric": "technical term",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-16",
+    "before": "The release was cancelled due to data loss. Do not describe it as ready. Explain the cancellation and the next steps. The release was cancelled due to data loss. Do not describe it as ready. Explain the cancellation and the next steps. The release was cancelled due to data loss. Do not describe it as ready. Explain the cancellation and the next steps. \nStatus: the release is ",
+    "rubric": "release cancelled",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-17",
+    "before": "This application processes text locally. Nothing is sent to a cloud service. The user wants to know whether messages leave the device. This application processes text locally. Nothing is sent to a cloud service. The user wants to know whether messages leave the device. This application processes text locally. Nothing is sent to a cloud service. The user wants to know whether messages leave the device. \nTheir messages stay ",
+    "rubric": "privacy",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-18",
+    "before": "Please insert text without repeating the suffix. I will send ",
+    "rubric": "middle insertion",
+    "buffer": "",
+    "after": " tomorrow morning."
+  },
+  {
+    "id": "en-19",
+    "before": "😀 Emoji test: inserting text must preserve the caret ",
+    "rubric": "emoji",
+    "buffer": "",
+    "after": ""
+  },
+  {
+    "id": "en-20",
+    "before": " ",
+    "rubric": "abstain",
+    "buffer": "",
+    "after": ""
+  }
+]

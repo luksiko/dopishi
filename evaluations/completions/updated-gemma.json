@@ -1,0 +1,207 @@
+{
+  "model": "/Users/alexeyvassilyev/Library/Application Support/app.cotypist.Cotypist/Models/gemma-4-E2B-i1-Q4_K_M.gguf",
+  "baseline": false,
+  "results": [
+    {
+      "id": "ru-01",
+      "seconds": 3.258108973503113,
+      "suggestion": "слово будет введено в"
+    },
+    {
+      "id": "ru-02",
+      "seconds": 0.6049150228500366,
+      "suggestion": "нажать кнопку «Сохранить»."
+    },
+    {
+      "id": "ru-03",
+      "seconds": 0.6437889337539673,
+      "suggestion": "не null."
+    },
+    {
+      "id": "ru-04",
+      "seconds": 0.6382750272750854,
+      "suggestion": null
+    },
+    {
+      "id": "ru-05",
+      "seconds": 0.6305010318756104,
+      "suggestion": "сервер."
+    },
+    {
+      "id": "ru-06",
+      "seconds": 0.6216989755630493,
+      "suggestion": "токен."
+    },
+    {
+      "id": "ru-07",
+      "seconds": 0.5772229433059692,
+      "suggestion": "быстрее."
+    },
+    {
+      "id": "ru-08",
+      "seconds": 0.6293079853057861,
+      "suggestion": "восстановления соединения."
+    },
+    {
+      "id": "ru-09",
+      "seconds": 0.7099740505218506,
+      "suggestion": "пасту. Или ты можешь"
+    },
+    {
+      "id": "ru-10",
+      "seconds": 0.6389279365539551,
+      "suggestion": "дождь."
+    },
+    {
+      "id": "ru-11",
+      "seconds": 0.6218160390853882,
+      "suggestion": "не смогу прийти."
+    },
+    {
+      "id": "ru-12",
+      "seconds": 0.7742600440979004,
+      "suggestion": "работает!"
+    },
+    {
+      "id": "ru-13",
+      "seconds": 0.597277045249939,
+      "suggestion": null
+    },
+    {
+      "id": "ru-14",
+      "seconds": 0.617434024810791,
+      "suggestion": null
+    },
+    {
+      "id": "ru-15",
+      "seconds": 0.6430250406265259,
+      "suggestion": "наличие в массиве элементов,"
+    },
+    {
+      "id": "ru-16",
+      "seconds": 0.6606860160827637,
+      "suggestion": "отменили, но не объяснили"
+    },
+    {
+      "id": "ru-17",
+      "seconds": 0.6541250944137573,
+      "suggestion": "в приложении."
+    },
+    {
+      "id": "ru-18",
+      "seconds": 5.4001808166503906e-05,
+      "suggestion": null
+    },
+    {
+      "id": "ru-19",
+      "seconds": 0.6715810298919678,
+      "suggestion": "быть закрыта."
+    },
+    {
+      "id": "ru-20",
+      "seconds": 7.987022399902344e-06,
+      "suggestion": null
+    },
+    {
+      "id": "en-01",
+      "seconds": 0.6950720548629761,
+      "suggestion": "word in the text,"
+    },
+    {
+      "id": "en-02",
+      "seconds": 0.6794089078903198,
+      "suggestion": "you close it."
+    },
+    {
+      "id": "en-03",
+      "seconds": 0.634369969367981,
+      "suggestion": "null before trying to"
+    },
+    {
+      "id": "en-04",
+      "seconds": 0.6599820852279663,
+      "suggestion": "of any issues you"
+    },
+    {
+      "id": "en-05",
+      "seconds": 0.6736310720443726,
+      "suggestion": "the next release."
+    },
+    {
+      "id": "en-06",
+      "seconds": 0.6411809921264648,
+      "suggestion": "token."
+    },
+    {
+      "id": "en-07",
+      "seconds": 0.5988800525665283,
+      "suggestion": "faster."
+    },
+    {
+      "id": "en-08",
+      "seconds": 0.7117900848388672,
+      "suggestion": "is restored."
+    },
+    {
+      "id": "en-09",
+      "seconds": 0.6454929113388062,
+      "suggestion": "fresh pasta and make"
+    },
+    {
+      "id": "en-10",
+      "seconds": 0.6939820051193237,
+      "suggestion": "not a valid URL."
+    },
+    {
+      "id": "en-11",
+      "seconds": 0.6195740699768066,
+      "suggestion": "I'll call her back"
+    },
+    {
+      "id": "en-12",
+      "seconds": 0.7062129974365234,
+      "suggestion": "working as expected."
+    },
+    {
+      "id": "en-13",
+      "seconds": 0.6312099695205688,
+      "suggestion": "er."
+    },
+    {
+      "id": "en-14",
+      "seconds": 0.6393439769744873,
+      "suggestion": null
+    },
+    {
+      "id": "en-15",
+      "seconds": 0.6396739482879639,
+      "suggestion": "the is_valid_email method."
+    },
+    {
+      "id": "en-16",
+      "seconds": 0.47769999504089355,
+      "suggestion": "cancelled due to data"
+    },
+    {
+      "id": "en-17",
+      "seconds": 0.6368060111999512,
+      "suggestion": "on the device. The"
+    },
+    {
+      "id": "en-18",
+      "seconds": 3.0040740966796875e-05,
+      "suggestion": null
+    },
+    {
+      "id": "en-19",
+      "seconds": 0.6335999965667725,
+      "suggestion": "position"
+    },
+    {
+      "id": "en-20",
+      "seconds": 8.940696716308594e-06,
+      "suggestion": null
+    }
+  ],
+  "engine_sha256": "a75f88849a49d764ff2023d5af0901ab15fb479d80369008a341aa71a45756d8"
+}

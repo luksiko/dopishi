@@ -1,5 +1,6 @@
 import XCTest
 import AppKit
+import SwiftUI
 @testable import LangSwitcher
 
 @MainActor
@@ -127,18 +128,36 @@ final class AutoCorrectionTests: XCTestCase {
     }
 
     func testUserReportedSentenceWords() {
-        let words = [
-            "ns", "cyjdf", "gthtcnfk", "gjnjve", "xnj", "z", "cvtybk",
-            "zpsr", "yf", "fyukbqcrbq", "f", ",jkmit", "yt", "cnfk", "vtyz", "bcghfdkznm"
+        let wordsWithExpected: [(input: String, expected: String)] = [
+            ("ns", "ты"),
+            ("cyjdf", "снова"),
+            ("gthtcnfk", "перестал"),
+            ("gjnjve", "потому"),
+            ("xnj", "что"),
+            ("cvtybk", "сменил"),
+            ("zpsr", "язык"),
+            ("yf", "на"),
+            ("fyukbqcrbq", "английский"),
+            (",jkmit", "больше"),
+            ("yt", "не"),
+            ("cnfk", "стал"),
+            ("vtyz", "меня"),
+            ("bcghfdkznm", "исправлять")
         ]
         
-        for w in words {
-            let looksWrong = textConverter.looksLikeWrongLayout(w)
-            let conv = textConverter.convertSelectedTextWithInfo(w)
-            let validRu = conv.map { spellCheckService.isValidWord($0.text, language: "ru") } ?? false
-            let validEn = spellCheckService.isValidWord(w, language: "en")
-            print("TEST_WORD [\(w)]: looksWrong=\(looksWrong), conv='\(conv?.text ?? "nil")', validRu=\(validRu), validEn=\(validEn)")
+        for item in wordsWithExpected {
+            XCTAssertTrue(textConverter.looksLikeWrongLayout(item.input), "Should detect wrong layout for '\(item.input)'")
+            let conv = textConverter.convertSelectedTextWithInfo(item.input)
+            XCTAssertEqual(conv?.text, item.expected, "Should convert '\(item.input)' to '\(item.expected)'")
+            if let converted = conv?.text {
+                XCTAssertTrue(spellCheckService.isValidWord(converted, language: "ru"), "'\(converted)' should be valid Russian")
+            }
         }
+        
+        // Comma key produces 'б' in Russian layout from ABC layout
+        let enabled = settingsManager.enabledLayouts.map(\.id)
+        XCTAssertTrue(CorrectionToken.isAlternativeLetter(",", source: "com.apple.keylayout.ABC", targets: enabled))
+        XCTAssertFalse(CorrectionToken.isAlternativeLetter(",", source: "com.apple.keylayout.RussianWin", targets: enabled))
     }
 }
 
@@ -255,11 +274,13 @@ final class ReplacementSessionTests: XCTestCase {
 final class AutocompletionRefreshTests: XCTestCase {
     private func makeService(popup: AutocompletionOverlayController,
                              ghost: GhostTextOverlayController,
-                             refresh: AutocompletionRefresh) -> AutoCorrectionService {
+                             refresh: AutocompletionRefresh,
+                             acceptanceHandler: AutoCorrectionService.AcceptanceHandler? = nil) -> AutoCorrectionService {
         let settings = SettingsManager.shared
         return AutoCorrectionService(settingsManager: settings,
             textConverter: TextConverter(settingsManager: settings),
-            overlayController: popup, ghostTextController: ghost, completionRefresh: refresh)
+            overlayController: popup, ghostTextController: ghost, completionRefresh: refresh,
+            acceptanceHandler: acceptanceHandler)
     }
 
     private func showSuggestions(_ popup: AutocompletionOverlayController,
@@ -283,6 +304,49 @@ final class AutocompletionRefreshTests: XCTestCase {
         XCTAssertNil(popup.selectedCandidate)
         XCTAssertFalse(ghost.isVisible)
         XCTAssertNil(ghost.currentCandidate)
+        let tab = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
+        tab.flags = []
+        XCTAssertFalse(service.interceptKeyIfOverlayVisible(event: tab))
+    }
+
+    func testFailedAcceptanceDoesNotConsumeShortcut() throws {
+        let settings = SettingsManager.shared
+        let savedAcceptKey = settings.autoCompletionAcceptKey
+        let savedAcceptAllKey = settings.autoCompletionAcceptAllKey
+        let savedNumberShortcuts = settings.autoCompletionUseNumberShortcuts
+        defer {
+            settings.autoCompletionAcceptKey = savedAcceptKey
+            settings.autoCompletionAcceptAllKey = savedAcceptAllKey
+            settings.autoCompletionUseNumberShortcuts = savedNumberShortcuts
+        }
+        settings.autoCompletionAcceptKey = .tab
+        settings.autoCompletionAcceptAllKey = .shiftTab
+        settings.autoCompletionUseNumberShortcuts = true
+
+        for (keyCode, flags) in [(UInt16(0x30), CGEventFlags()),
+                                 (UInt16(0x30), CGEventFlags.maskShift),
+                                 (UInt16(0x12), CGEventFlags())] {
+            let popup = AutocompletionOverlayController()
+            let ghost = GhostTextOverlayController()
+            let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh())
+            defer { service.stop() }
+            // Visible candidates with no captured replacement target model a stale
+            // presentation. Acceptance must fail without touching another editor.
+            showSuggestions(popup, ghost)
+            let key = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true))
+            key.flags = flags
+            XCTAssertFalse(service.interceptKeyIfOverlayVisible(event: key),
+                           "A failed insertion must leave the shortcut available to the editor")
+            XCTAssertFalse(popup.isVisible)
+            XCTAssertFalse(ghost.isVisible)
+        }
+    }
+
+    func testTabWithoutSuggestionPassesThrough() throws {
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh())
+        defer { service.stop() }
         let tab = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
         tab.flags = []
         XCTAssertFalse(service.interceptKeyIfOverlayVisible(event: tab))
@@ -793,5 +857,332 @@ extension AutoCorrectionTests {
         XCTAssertTrue(spellCheckService.isValidWord("РАСКЛАДКИ", language: "ru-RU"))
         XCTAssertFalse(spellCheckService.isValidWord("раскладкыыы", language: "ru"))
         XCTAssertFalse(spellCheckService.isValidWord("раскладки", language: "en"))
+    }
+
+    func testAutocompletionShortcutsAndEscapeSettings() {
+        // Test .cmdSection acceptAllKey matching
+        settingsManager.autoCompletionAcceptAllKey = .cmdSection
+        XCTAssertTrue(settingsManager.isAutocompletionAcceptAllKey(keyCode: 0x0A, flags: .maskCommand))
+        XCTAssertTrue(settingsManager.isAutocompletionAcceptAllKey(keyCode: 0x32, flags: .maskCommand))
+        XCTAssertFalse(settingsManager.isAutocompletionAcceptAllKey(keyCode: 0x0A, flags: []))
+        XCTAssertFalse(settingsManager.isAutocompletionAcceptAllKey(keyCode: 0x24, flags: .maskCommand))
+
+        // Test force-activate matching
+        settingsManager.autoCompletionForceActivateEnabled = true
+        settingsManager.autoCompletionForceActivateKeyCode = 0x0A
+        settingsManager.autoCompletionForceActivateModifiers = NSEvent.ModifierFlags.control.rawValue
+        XCTAssertTrue(settingsManager.isAutocompletionForceActivateKey(keyCode: 0x0A, flags: .maskControl))
+        XCTAssertFalse(settingsManager.isAutocompletionForceActivateKey(keyCode: 0x0A, flags: .maskCommand))
+        
+        settingsManager.autoCompletionForceActivateEnabled = false
+        XCTAssertFalse(settingsManager.isAutocompletionForceActivateKey(keyCode: 0x0A, flags: .maskControl))
+
+        // Test escape action setting
+        settingsManager.autoCompletionEscapeAction = .pauseFewSeconds
+        XCTAssertEqual(settingsManager.autoCompletionEscapeAction, .pauseFewSeconds)
+        settingsManager.autoCompletionEscapeAction = .dismissOnly
+        XCTAssertEqual(settingsManager.autoCompletionEscapeAction, .dismissOnly)
+
+        // Test trailing space and punctuation toggles
+        settingsManager.autoCompletionIncludeTrailingSpace = true
+        XCTAssertTrue(settingsManager.autoCompletionIncludeTrailingSpace)
+        settingsManager.autoCompletionIncludeTrailingSpace = false
+        XCTAssertFalse(settingsManager.autoCompletionIncludeTrailingSpace)
+
+        settingsManager.autoCompletionIncludeTrailingPunctuation = true
+        XCTAssertTrue(settingsManager.autoCompletionIncludeTrailingPunctuation)
+    }
+}
+
+@MainActor
+final class CompletionInsertionPlanTests: XCTestCase {
+    func testMidWordAcceptanceOnlyInsertsMissingTail() {
+        let plan = PhraseAcceptancePlan(buffer: "проек", continuationAnchor: nil, insertion: "проект ")
+        XCTAssertEqual(plan.appendingSuffix, "т ")
+    }
+
+    func testRepeatedTabPreservesWordBoundaryWithoutTrailingSpace() {
+        let plan = PhraseAcceptancePlan(buffer: "", continuationAnchor: "hello", insertion: "world")
+        XCTAssertEqual(plan.appendingSuffix, " world")
+    }
+
+    func testCrossLayoutCompletionRequiresVerifiedReplacement() {
+        let plan = PhraseAcceptancePlan(buffer: "ghbdtn", continuationAnchor: nil, insertion: "привет ")
+        XCTAssertNil(plan.appendingSuffix)
+    }
+
+    func testContinuationAfterAcceptedWordOnlyInsertsNextWord() {
+        let plan = PhraseAcceptancePlan(buffer: "", continuationAnchor: "hello ", insertion: "world ")
+        XCTAssertEqual(plan.appendingSuffix, "world ")
+    }
+}
+
+extension VerifiedPasteAndContinuationTests {
+    func testAppendingCompletionDoesNotRequireWritableAXSelection() {
+        XCTAssertFalse(AccessibilityService.requiresSelectionWrite(
+            original: CFRange(location: 5, length: 0), replacementRange: NSRange(location: 5, length: 0)))
+        XCTAssertTrue(AccessibilityService.requiresSelectionWrite(
+            original: CFRange(location: 5, length: 0), replacementRange: NSRange(location: 0, length: 5)))
+        XCTAssertFalse(AccessibilityService.requiresSelectionWrite(
+            original: CFRange(location: 0, length: 5), replacementRange: NSRange(location: 0, length: 5)))
+    }
+}
+
+extension VerifiedPasteAndContinuationTests {
+    func testContinuationReceiptAllowsTypingAfterPasteWithoutLosingRightContext() {
+        XCTAssertTrue(AccessibilityService.continuationWasApplied(original: "hello suffix",
+            observed: "hello world xsuffix", caretBefore: 6, caretAfter: 13, inserted: "world "))
+        XCTAssertFalse(AccessibilityService.continuationWasApplied(original: "hello suffix",
+            observed: "hello xsuffix", caretBefore: 6, caretAfter: 7, inserted: "world "))
+        XCTAssertFalse(AccessibilityService.continuationWasApplied(original: "hello suffix",
+            observed: "hello world xchanged", caretBefore: 6, caretAfter: 13, inserted: "world "))
+    }
+
+    func testUnconfirmedDispatchedPasteNeverReplaysAcceptanceShortcut() {
+        var outcomes: [CompletionPasteOutcome] = []
+        let receipt = PasteConfirmation(applied: { false }, finish: {
+            outcomes.append($0 ? .applied : .unconfirmed)
+        })
+        receipt.check(final: true)
+        receipt.check(final: true)
+        XCTAssertEqual(outcomes.count, 1)
+        XCTAssertFalse(outcomes[0].shouldReplayShortcut)
+        XCTAssertFalse(CompletionPasteOutcome.applied.shouldReplayShortcut)
+        XCTAssertTrue(CompletionPasteOutcome.notDispatched.shouldReplayShortcut)
+    }
+
+    func testWebContinuationCanConfirmThroughCaretWhenAXValueIsUnavailable() {
+        XCTAssertTrue(AccessibilityService.continuationWasApplied(original: nil, observed: nil,
+            caretBefore: 10, caretAfter: 17, inserted: "привет "))
+        XCTAssertFalse(AccessibilityService.continuationWasApplied(original: nil, observed: nil,
+            caretBefore: 10, caretAfter: 10, inserted: "привет "))
+        XCTAssertFalse(AccessibilityService.continuationWasApplied(original: "hello", observed: "hello",
+            caretBefore: 5, caretAfter: 11, inserted: " world"))
+        XCTAssertTrue(AccessibilityService.continuationWasApplied(original: "hello", observed: "hello world",
+            caretBefore: 5, caretAfter: 11, inserted: " world"))
+    }
+}
+
+
+extension AutocompletionRefreshTests {
+    func testHeldAcceptanceKeyIsConsumedUntilReleaseEvenAfterSuggestionDisappears() throws {
+        let settings = SettingsManager.shared
+        let saved = (settings.autoCompletionAcceptKey, settings.autoCompletionAcceptAllKey)
+        defer {
+            settings.autoCompletionAcceptKey = saved.0
+            settings.autoCompletionAcceptAllKey = saved.1
+        }
+        settings.autoCompletionAcceptKey = .tab
+        settings.autoCompletionAcceptAllKey = .shiftTab
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        var acceptances = 0
+        let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh(),
+            acceptanceHandler: { _, _, _, _ in acceptances += 1; return true })
+        defer { service.stop() }
+        for flags: CGEventFlags in [[], .maskShift] {
+            showSuggestions(popup, ghost)
+            let down = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
+            down.flags = flags
+            XCTAssertTrue(service.interceptCompletionKeyEvent(down))
+            popup.hide()
+            ghost.hide()
+            let repeated = try XCTUnwrap(down.copy())
+            repeated.setIntegerValueField(.keyboardEventAutorepeat, value: 1)
+            repeated.flags = [] // Modifier changes must not release ownership.
+            for _ in 0..<3 { XCTAssertTrue(service.interceptCompletionKeyEvent(repeated)) }
+            let up = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: false))
+            XCTAssertTrue(service.interceptCompletionKeyEvent(up))
+            XCTAssertFalse(service.interceptCompletionKeyEvent(down))
+            XCTAssertFalse(service.interceptCompletionKeyEvent(repeated))
+            XCTAssertFalse(service.interceptCompletionKeyEvent(up))
+        }
+        XCTAssertEqual(acceptances, 2)
+    }
+
+    func testVisibleGhostHonorsWordSettingAndRetainsFailureKey() throws {
+        let settings = SettingsManager.shared
+        let saved = (settings.autoCompletionAcceptKey, settings.autoCompletionAcceptAllKey,
+                     settings.autoCompletionAcceptEntirePhrase, settings.autoCompletionIncludeTrailingSpace)
+        defer {
+            settings.autoCompletionAcceptKey = saved.0
+            settings.autoCompletionAcceptAllKey = saved.1
+            settings.autoCompletionAcceptEntirePhrase = saved.2
+            settings.autoCompletionIncludeTrailingSpace = saved.3
+        }
+        settings.autoCompletionAcceptKey = .tab
+        settings.autoCompletionAcceptAllKey = .shiftTab
+        settings.autoCompletionIncludeTrailingSpace = false
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        var received: [(Bool, Bool, UInt16?)] = []
+        let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh(),
+            acceptanceHandler: { _, space, entire, failureEvent in
+                received.append((space, entire, failureEvent.map { UInt16($0.getIntegerValueField(.keyboardEventKeycode)) }))
+                return true
+            })
+        defer { service.stop() }
+        for entire in [false, true] {
+            settings.autoCompletionAcceptEntirePhrase = entire
+            showSuggestions(popup, ghost)
+            let tab = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
+            tab.flags = []
+            XCTAssertTrue(service.interceptKeyIfOverlayVisible(event: tab))
+            XCTAssertEqual(received.last?.0, false)
+            XCTAssertEqual(received.last?.1, entire)
+            XCTAssertEqual(received.last?.2, 0x30)
+        }
+        settings.autoCompletionAcceptEntirePhrase = false
+        showSuggestions(popup, ghost)
+        let full = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
+        full.flags = .maskShift
+        XCTAssertTrue(service.interceptKeyIfOverlayVisible(event: full))
+        XCTAssertEqual(received.last?.1, true)
+    }
+}
+
+@MainActor
+final class CompletionControlRegressionTests: XCTestCase {
+    func testGlobalToggleRetainsKeyboardMonitoringWhenTypingFeaturesAreOff() {
+        let settings = SettingsManager.shared
+        let saved = (settings.autoCorrectionEnabled, settings.autoCompletionEnabled, settings.autoCompletionToggleGlobalEnabled)
+        defer {
+            settings.autoCorrectionEnabled = saved.0
+            settings.autoCompletionEnabled = saved.1
+            settings.autoCompletionToggleGlobalEnabled = saved.2
+        }
+        settings.autoCorrectionEnabled = false
+        settings.autoCompletionEnabled = false
+        settings.autoCompletionToggleGlobalEnabled = true
+        XCTAssertTrue(settings.needsKeyboardMonitoring)
+        XCTAssertEqual(ServiceRecovery.action(enabled: settings.needsKeyboardMonitoring,
+            trusted: true, valid: true, running: true), .none)
+        settings.autoCompletionToggleGlobalEnabled = false
+        XCTAssertFalse(settings.needsKeyboardMonitoring)
+    }
+
+    func testRecordingEnablesShortcutIncludingUnmodifiedA() {
+        var code: UInt16 = 0
+        var modifiers: UInt = 0
+        var enabled = false
+        let recorder = AutocompletionKeyRecorderView(
+            keyCode: Binding(get: { code }, set: { code = $0 }),
+            modifiers: Binding(get: { modifiers }, set: { modifiers = $0 }),
+            canClear: true, enabled: Binding(get: { enabled }, set: { enabled = $0 }))
+        recorder.recordShortcut(keyCode: 0x0A, modifiers: NSEvent.ModifierFlags.control.rawValue)
+        XCTAssertTrue(enabled)
+        XCTAssertEqual(code, 0x0A)
+        enabled = false
+        recorder.recordShortcut(keyCode: 0, modifiers: 0)
+        XCTAssertTrue(enabled)
+        XCTAssertEqual(code, 0)
+        XCTAssertEqual(modifiers, 0)
+    }
+
+    func testPerAppPauseExpiresAndNeverChangesCorrectionExclusions() {
+        let exclusions = SettingsManager.shared.excludedAppBundleIDs
+        let now = Date(timeIntervalSince1970: 1000)
+        var pauses = CompletionAppPauses()
+        XCTAssertTrue(pauses.toggle(bundleID: "com.apple.Terminal", now: now))
+        XCTAssertTrue(pauses.isPaused(bundleID: "com.apple.Terminal", now: now.addingTimeInterval(299)))
+        XCTAssertFalse(pauses.isPaused(bundleID: "other.app", now: now))
+        XCTAssertFalse(pauses.isPaused(bundleID: "com.apple.Terminal", now: now.addingTimeInterval(300)))
+        XCTAssertFalse(pauses.toggle(bundleID: "com.apple.Terminal", now: now.addingTimeInterval(1)))
+        XCTAssertEqual(SettingsManager.shared.excludedAppBundleIDs, exclusions)
+    }
+
+    func testForcedInputKeepsCompletedWordsOutOfPrefix() {
+        let spaced = CompletionTypingContext(beforeCaret: "hello world ")
+        XCTAssertEqual(spaced.prefix, "")
+        XCTAssertEqual(spaced.previousWord, "world")
+        let typing = CompletionTypingContext(beforeCaret: "hello wor")
+        XCTAssertEqual(typing.prefix, "wor")
+        XCTAssertEqual(typing.previousWord, "hello")
+        XCTAssertEqual(CompletionTypingContext(beforeCaret: "hello.").prefix, "")
+        XCTAssertEqual(CompletionTypingContext(beforeCaret: "").prefix, "")
+    }
+
+    func testWordAcceptanceDefersAttachedPunctuationWithoutAddingSpace() {
+        let plan = CompletionAcceptanceText(candidate: "готово, продолжаем", typedPrefix: "гот",
+            entirePhrase: false, appendSpace: true, includePunctuation: false)
+        XCTAssertEqual(plan.insertion, "готово")
+        XCTAssertEqual(plan.remaining, ", продолжаем")
+        let punctuation = CompletionAcceptanceText(candidate: plan.remaining!, typedPrefix: "",
+            entirePhrase: false, appendSpace: true, includePunctuation: false)
+        XCTAssertEqual(punctuation.insertion, ", ")
+        XCTAssertEqual(punctuation.remaining, "продолжаем")
+        let tail = PhraseAcceptancePlan(buffer: "", continuationAnchor: plan.insertion, insertion: punctuation.insertion)
+        XCTAssertEqual(tail.appendingSuffix, ", ")
+    }
+
+    func testSingleWordPunctuationAlsoRespectsSetting() {
+        let plan = CompletionAcceptanceText(candidate: "done!", typedPrefix: "do",
+            entirePhrase: false, appendSpace: true, includePunctuation: false)
+        XCTAssertEqual(plan.insertion, "done")
+        XCTAssertEqual(plan.remaining, "!")
+    }
+
+    func testEnabledPunctuationAndFullPhraseKeepExpectedText() {
+        let word = CompletionAcceptanceText(candidate: "done, next", typedPrefix: "do",
+            entirePhrase: false, appendSpace: true, includePunctuation: true)
+        XCTAssertEqual(word.insertion, "done, ")
+        XCTAssertEqual(word.remaining, "next")
+        let full = CompletionAcceptanceText(candidate: "done, next", typedPrefix: "do",
+            entirePhrase: true, appendSpace: false, includePunctuation: false)
+        XCTAssertEqual(full.insertion, "done, next")
+        XCTAssertNil(full.remaining)
+    }
+}
+
+
+extension CompletionInsertionPlanTests {
+    func testRepeatedWordAcceptancePreservesBoundaryBeforeNumber() {
+        let first = CompletionAcceptanceText(candidate: "встреча 2026 года", typedPrefix: "встр",
+            entirePhrase: false, appendSpace: false, includePunctuation: true)
+        let second = CompletionAcceptanceText(candidate: first.remaining!, typedPrefix: "",
+            entirePhrase: false, appendSpace: false, includePunctuation: true)
+        let plan = PhraseAcceptancePlan(buffer: "", continuationAnchor: first.insertion, insertion: second.insertion)
+        XCTAssertEqual(plan.replacement, "встреча 2026")
+        XCTAssertEqual(plan.appendingSuffix, " 2026")
+    }
+
+    func testQuotedWordAndSymbolKeepWordBoundary() {
+        for token in ["\"hello\"", "_value", "😀"] {
+            let plan = PhraseAcceptancePlan(buffer: "", continuationAnchor: "next", insertion: token)
+            XCTAssertEqual(plan.appendingSuffix, " " + token)
+        }
+    }
+
+    func testDeferredPunctuationRemainsAttachedWhenTakingRemainder() {
+        let plan = PhraseAcceptancePlan(buffer: "", continuationAnchor: "готово", insertion: ", продолжаем")
+        XCTAssertEqual(plan.appendingSuffix, ", продолжаем")
+        let spaced = PhraseAcceptancePlan(buffer: "", continuationAnchor: "встреча ", insertion: "2026")
+        XCTAssertEqual(spaced.appendingSuffix, "2026")
+    }
+}
+
+
+extension CompletionInsertionPlanTests {
+    func testCompletedWordAcceptsPendingPunctuationInsteadOfEmptyPaste() {
+        for (candidate, appendSpace, expected) in [
+            ("работает, продолжаем", true, ", "),
+            ("работает, продолжаем", false, ","),
+            ("работает , продолжаем", true, ", "),
+            ("работает!", false, "!")
+        ] {
+            let text = CompletionAcceptanceText(candidate: candidate, typedPrefix: "работает",
+                entirePhrase: false, appendSpace: appendSpace, includePunctuation: false)
+            let plan = PhraseAcceptancePlan(buffer: "работает", continuationAnchor: nil, insertion: text.insertion)
+            XCTAssertEqual(plan.appendingSuffix, expected)
+            XCTAssertEqual(text.remaining, candidate.hasSuffix("продолжаем") ? "продолжаем" : nil)
+        }
+    }
+
+    func testPunctuationAfterIncompleteWordStillRequiresSeparateAcceptance() {
+        let text = CompletionAcceptanceText(candidate: "работает, продолжаем", typedPrefix: "работ",
+            entirePhrase: false, appendSpace: true, includePunctuation: false)
+        let plan = PhraseAcceptancePlan(buffer: "работ", continuationAnchor: nil, insertion: text.insertion)
+        XCTAssertEqual(plan.appendingSuffix, "ает")
+        XCTAssertEqual(text.remaining, ", продолжаем")
     }
 }

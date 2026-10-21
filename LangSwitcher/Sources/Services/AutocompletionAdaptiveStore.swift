@@ -95,6 +95,30 @@ final class AutocompletionAdaptiveStore: ObservableObject {
         pruneIfNeeded()
         saveData()
     }
+
+    /// Records an entire sequence of words from a typed sentence with a single save pass.
+    func recordSentenceWords(_ words: [String]) {
+        var prevWord: String? = nil
+        var changed = false
+        for word in words {
+            let clean = word.trimmingCharacters(in: .punctuationCharacters)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard clean.count >= 2 else { continue }
+            wordFrequencies[clean, default: 0] += 1
+            if let prev = prevWord, !prev.isEmpty {
+                var nextMap = bigramFrequencies[prev] ?? [:]
+                nextMap[clean, default: 0] += 1
+                bigramFrequencies[prev] = nextMap
+            }
+            prevWord = clean
+            changed = true
+        }
+        if changed {
+            pruneIfNeeded()
+            saveData()
+        }
+    }
     
     // Prune least frequent entries when capacity limits are exceeded
     func pruneIfNeeded() {

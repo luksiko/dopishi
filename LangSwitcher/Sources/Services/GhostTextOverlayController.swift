@@ -41,11 +41,17 @@ final class GhostTextOverlayController: NSObject {
         }
         
         guard let tv = textView else { return }
+        
+        if let caretHeight = caretRect?.height, caretHeight > 10, caretHeight < 40 {
+            tv.fontSize = max(12.0, min(16.0, caretHeight - 3))
+        } else {
+            tv.fontSize = 13.5
+        }
         tv.text = suffix
         let fittingSize = tv.idealSize()
         
-        // Position directly at the right edge of caret
-        var origin = CGPoint(x: caret.maxX + 1, y: caret.minY)
+        // Position directly at the right edge of caret with zero margin
+        var origin = CGPoint(x: caret.maxX, y: caret.minY + (caret.height - fittingSize.height) / 2)
         
         // Ensure within screen visible frame
         let screen = NSScreen.screens.first { s in
@@ -130,6 +136,7 @@ final class GhostTextOverlayController: NSObject {
 
 // MARK: - Native AppKit Ghost Text View
 // Ultra-lightweight native view: 0 SwiftUI constraints, 0 recursion, zero overhead.
+// Renders delicate inline completion ghost text matching native editor styling.
 private final class GhostTextView: NSView {
     var text: String = "" {
         didSet {
@@ -137,26 +144,30 @@ private final class GhostTextView: NSView {
         }
     }
     
-    private let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    var fontSize: CGFloat = 13.5 {
+        didSet {
+            font = NSFont.systemFont(ofSize: fontSize, weight: .regular)
+            needsDisplay = true
+        }
+    }
+    
+    private var font = NSFont.systemFont(ofSize: 13.5, weight: .regular)
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard !text.isEmpty else { return }
         
-        let bgPath = NSBezierPath(roundedRect: bounds, xRadius: 3, yRadius: 3)
-        NSColor.labelColor.withAlphaComponent(0.04).setFill()
-        bgPath.fill()
-        
+        // Delicate native ghost styling: zero background rectangle, matching ambient editor text
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.65)
+            .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.50)
         ]
         
         let textSize = (text as NSString).size(withAttributes: attrs)
         let textRect = NSRect(
-            x: 4,
+            x: 0,
             y: (bounds.height - textSize.height) / 2,
-            width: bounds.width - 8,
+            width: bounds.width,
             height: textSize.height
         )
         (text as NSString).draw(in: textRect, withAttributes: attrs)
@@ -167,6 +178,6 @@ private final class GhostTextView: NSView {
             .font: font
         ]
         let textSize = (text as NSString).size(withAttributes: attrs)
-        return CGSize(width: ceil(textSize.width) + 8, height: max(18, ceil(textSize.height) + 2))
+        return CGSize(width: ceil(textSize.width) + 2, height: max(16, ceil(textSize.height)))
     }
 }

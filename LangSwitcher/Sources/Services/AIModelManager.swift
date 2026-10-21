@@ -64,7 +64,10 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     }
     
     nonisolated func modelFileURL(for model: RecommendedAIModel) -> URL {
-        modelsDirectoryURL.appendingPathComponent(model.fileName)
+        if model.id == RecommendedAIModel.customModelID {
+            return URL(fileURLWithPath: model.fileName)
+        }
+        return modelsDirectoryURL.appendingPathComponent(model.fileName)
     }
     
     var modelFileURL: URL {
@@ -73,11 +76,26 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         return modelFileURL(for: model)
     }
     
+    /// A .gguf extension alone does not establish compatibility (some apps
+    /// store private/encrypted model data under that extension).
+    nonisolated static func hasGGUFHeader(at path: String) -> Bool {
+        guard let file = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? file.close() }
+        return (try? file.read(upToCount: 4)) == Data("GGUF".utf8)
+    }
+
     /// Switch active model
     func selectModel(_ model: RecommendedAIModel) {
         currentModel = model
         SettingsManager.shared.selectedModelId = model.id
         checkExistingModel()
+    }
+    
+    /// Select user's custom local GGUF file
+    func selectCustomModel(path: String) {
+        SettingsManager.shared.customModelPath = path
+        let custom = RecommendedAIModel.customModel(for: path)
+        selectModel(custom)
     }
     
     /// Path to current active model if downloaded and ready
@@ -88,21 +106,40 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         return modelPath(for: currentModel)
     }
     
-    /// Check whether a specific model is already downloaded
-    func isDownloaded(model: RecommendedAIModel) -> Bool {
-        let fileManager = FileManager.default
-        let path = modelFileURL(for: model).path
-        if fileManager.fileExists(atPath: path),
-           let attrs = try? fileManager.attributesOfItem(atPath: path),
-           let size = attrs[.size] as? Int64, size > 10_000_000 {
-            return true
+    /// Candidate paths on disk to search for model weights
+    private func candidatePaths(for model: RecommendedAIModel) -> [String] {
+        if model.id == RecommendedAIModel.customModelID {
+            let custom = SettingsManager.shared.customModelPath
+            return custom.isEmpty ? [] : [custom]
         }
-        // Also check repo models/ folder
+        var paths = [modelFileURL(for: model).path]
         if customModelsDirectory == nil {
             let cwdPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
                 .appendingPathComponent("models/\(model.fileName)").path
-            if fileManager.fileExists(atPath: cwdPath),
-               let attrs = try? fileManager.attributesOfItem(atPath: cwdPath),
+            paths.append(cwdPath)
+            
+            // Auto-detect existing local model from Cotypist or common local model caches
+            if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let cotypistPath = appSupport.appendingPathComponent("app.cotypist.Cotypist/Models/\(model.fileName)").path
+                paths.append(cotypistPath)
+            }
+        }
+        return paths
+    }
+
+    /// Check whether a specific model is already downloaded or accessible
+    func isDownloaded(model: RecommendedAIModel) -> Bool {
+        let fileManager = FileManager.default
+        let standardPath = modelFileURL(for: model).path
+        if fileManager.fileExists(atPath: standardPath),
+           let attrs = try? fileManager.attributesOfItem(atPath: standardPath),
+           let size = attrs[.size] as? Int64, size > (model.id == RecommendedAIModel.customModelID ? 1_000_000 : 10_000_000) {
+            return model.id == RecommendedAIModel.customModelID ? Self.hasGGUFHeader(at: standardPath) : true
+        }
+        for path in candidatePaths(for: model) {
+            if path != standardPath, fileManager.fileExists(atPath: path),
+               Self.hasGGUFHeader(at: path),
+               let attrs = try? fileManager.attributesOfItem(atPath: path),
                let size = attrs[.size] as? Int64, size > 10_000_000 {
                 return true
             }
@@ -113,15 +150,16 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     /// Get path to downloaded model file if available
     func modelPath(for model: RecommendedAIModel) -> String? {
         let fileManager = FileManager.default
-        let path = modelFileURL(for: model).path
-        if fileManager.fileExists(atPath: path) {
-            return path
+        let standardPath = modelFileURL(for: model).path
+        if fileManager.fileExists(atPath: standardPath) {
+            if model.id == RecommendedAIModel.customModelID {
+                return Self.hasGGUFHeader(at: standardPath) ? standardPath : nil
+            }
+            return standardPath
         }
-        if customModelsDirectory == nil {
-            let cwdPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appendingPathComponent("models/\(model.fileName)").path
-            if fileManager.fileExists(atPath: cwdPath) {
-                return cwdPath
+        for path in candidatePaths(for: model) {
+            if path != standardPath, fileManager.fileExists(atPath: path), Self.hasGGUFHeader(at: path) {
+                return path
             }
         }
         return nil
@@ -130,6 +168,24 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     /// Check whether the active model file exists on disk
     func checkExistingModel() {
         let fileManager = FileManager.default
+        
+        if currentModel.id == RecommendedAIModel.customModelID {
+            let customPath = SettingsManager.shared.customModelPath
+            if !customPath.isEmpty && fileManager.fileExists(atPath: customPath) {
+                guard Self.hasGGUFHeader(at: customPath) else {
+                    self.state = .error(message: LocalizationManager.shared.t("ai.model.invalidGGUF"))
+                    return
+                }
+                if let attrs = try? fileManager.attributesOfItem(atPath: customPath),
+                   let size = attrs[.size] as? Int64, size > 1_000_000 {
+                    self.state = .ready(modelPath: customPath, fileSize: size)
+                    return
+                }
+            }
+            self.state = .notDownloaded
+            return
+        }
+        
         let targetURL = modelFileURL(for: currentModel)
         
         // 1. Check primary Application Support path
@@ -163,6 +219,7 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     /// Start 1-click download of the model weights
     func startDownload(model: RecommendedAIModel? = nil) {
         let targetModel = model ?? currentModel
+        guard targetModel.id != RecommendedAIModel.customModelID else { return }
         if targetModel.id != currentModel.id {
             selectModel(targetModel)
         }
@@ -202,9 +259,18 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         checkExistingModel()
     }
     
-    /// Delete downloaded model weights
+    /// Delete downloaded model weights or disconnect custom model
     func deleteModel(model: RecommendedAIModel? = nil) {
         let targetModel = model ?? currentModel
+        if targetModel.id == RecommendedAIModel.customModelID {
+            let path = SettingsManager.shared.customModelPath
+            if AIInferenceEngine.shared.currentLoadedModelPath == path {
+                AIInferenceEngine.shared.stop()
+            }
+            SettingsManager.shared.customModelPath = ""
+            selectModel(RecommendedAIModel.model(for: RecommendedAIModel.defaultModelID))
+            return
+        }
         let path = modelFileURL(for: targetModel).path
         if AIInferenceEngine.shared.currentLoadedModelPath == path {
             AIInferenceEngine.shared.stop()

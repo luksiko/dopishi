@@ -1,0 +1,206 @@
+{
+  "model": "/Users/alexeyvassilyev/Library/Application Support/LangSwitcher/Models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "baseline": true,
+  "results": [
+    {
+      "id": "ru-01",
+      "seconds": 0.14909708499908447,
+      "suggestion": "слово должно быть добавлено."
+    },
+    {
+      "id": "ru-02",
+      "seconds": 0.10905897617340088,
+      "suggestion": "сохранить его в безопасное"
+    },
+    {
+      "id": "ru-03",
+      "seconds": 0.05208992958068848,
+      "suggestion": null
+    },
+    {
+      "id": "ru-04",
+      "seconds": 0.10823500156402588,
+      "suggestion": "и приготовьте необходимые вещи."
+    },
+    {
+      "id": "ru-05",
+      "seconds": 0.0884559154510498,
+      "suggestion": "этом же этапе."
+    },
+    {
+      "id": "ru-06",
+      "seconds": 0.07370305061340332,
+      "suggestion": "токен."
+    },
+    {
+      "id": "ru-07",
+      "seconds": 0.2497270107269287,
+      "suggestion": "Имейте индекс, чтобы запрос"
+    },
+    {
+      "id": "ru-08",
+      "seconds": 0.07834601402282715,
+      "suggestion": "сообщения."
+    },
+    {
+      "id": "ru-09",
+      "seconds": 0.0750809907913208,
+      "suggestion": "пасту."
+    },
+    {
+      "id": "ru-10",
+      "seconds": 0.07445502281188965,
+      "suggestion": "тепло."
+    },
+    {
+      "id": "ru-11",
+      "seconds": 0.06849706172943115,
+      "suggestion": "не могу."
+    },
+    {
+      "id": "ru-12",
+      "seconds": 0.09708106517791748,
+      "suggestion": "не будет сложностей."
+    },
+    {
+      "id": "ru-13",
+      "seconds": 0.1354389190673828,
+      "suggestion": "и убед myself that"
+    },
+    {
+      "id": "ru-14",
+      "seconds": 0.13074994087219238,
+      "suggestion": "посмотри на изменения."
+    },
+    {
+      "id": "ru-15",
+      "seconds": 0.17664003372192383,
+      "suggestion": "какое значение будет в"
+    },
+    {
+      "id": "ru-16",
+      "seconds": 0.2028369903564453,
+      "suggestion": "отменен, но дальнейшие действия"
+    },
+    {
+      "id": "ru-17",
+      "seconds": 0.13155007362365723,
+      "suggestion": "не отправлены в облако."
+    },
+    {
+      "id": "ru-18",
+      "seconds": 0.13234293460845947,
+      "suggestion": "и уведомлю вас о"
+    },
+    {
+      "id": "ru-19",
+      "seconds": 0.060205936431884766,
+      "suggestion": "отключаться."
+    },
+    {
+      "id": "ru-20",
+      "seconds": 2.5033950805664062e-05,
+      "suggestion": null
+    },
+    {
+      "id": "en-01",
+      "seconds": 0.1790010929107666,
+      "suggestion": "word without selecting existing"
+    },
+    {
+      "id": "en-02",
+      "seconds": 0.06023001670837402,
+      "suggestion": "ing to your computer."
+    },
+    {
+      "id": "en-03",
+      "seconds": 0.06839001178741455,
+      "suggestion": "null before using it."
+    },
+    {
+      "id": "en-04",
+      "seconds": 0.061086058616638184,
+      "suggestion": "to arrive on time."
+    },
+    {
+      "id": "en-05",
+      "seconds": 0.039733052253723145,
+      "suggestion": "testing."
+    },
+    {
+      "id": "en-06",
+      "seconds": 0.038815975189208984,
+      "suggestion": "token."
+    },
+    {
+      "id": "en-07",
+      "seconds": 0.036424994468688965,
+      "suggestion": "fast."
+    },
+    {
+      "id": "en-08",
+      "seconds": 0.042807936668395996,
+      "suggestion": "is established."
+    },
+    {
+      "id": "en-09",
+      "seconds": 0.03958892822265625,
+      "suggestion": "me."
+    },
+    {
+      "id": "en-10",
+      "seconds": 0.03569293022155762,
+      "suggestion": "open."
+    },
+    {
+      "id": "en-11",
+      "seconds": 0.18439197540283203,
+      "suggestion": "they should be notified"
+    },
+    {
+      "id": "en-12",
+      "seconds": 0.056478023529052734,
+      "suggestion": "in order."
+    },
+    {
+      "id": "en-13",
+      "seconds": 0.05617403984069824,
+      "suggestion": "ing."
+    },
+    {
+      "id": "en-14",
+      "seconds": 0.07650601863861084,
+      "suggestion": "e in the system."
+    },
+    {
+      "id": "en-15",
+      "seconds": 0.04139900207519531,
+      "suggestion": "validation."
+    },
+    {
+      "id": "en-16",
+      "seconds": 0.14164304733276367,
+      "suggestion": "cancelled due to data"
+    },
+    {
+      "id": "en-17",
+      "seconds": 0.050887107849121094,
+      "suggestion": "local."
+    },
+    {
+      "id": "en-18",
+      "seconds": 0.04594302177429199,
+      "suggestion": "e."
+    },
+    {
+      "id": "en-19",
+      "seconds": 0.09983611106872559,
+      "suggestion": null
+    },
+    {
+      "id": "en-20",
+      "seconds": 4.0531158447265625e-06,
+      "suggestion": null
+    }
+  ]
+}

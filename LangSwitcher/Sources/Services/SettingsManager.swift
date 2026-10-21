@@ -247,6 +247,64 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCompletionUseNumberShortcuts, forKey: Keys.autoCompletionUseNumberShortcuts) }
     }
 
+    /// Whether to include trailing space when accepting a single word. Default: true.
+    @Published var autoCompletionIncludeTrailingSpace: Bool {
+        didSet { defaults.set(autoCompletionIncludeTrailingSpace, forKey: Keys.autoCompletionIncludeTrailingSpace) }
+    }
+
+    /// Whether the primary accept key accepts the entire phrase. Default: false (next word).
+    @Published var autoCompletionAcceptEntirePhrase: Bool {
+        didSet { defaults.set(autoCompletionAcceptEntirePhrase, forKey: Keys.autoCompletionAcceptEntirePhrase) }
+    }
+
+    /// Whether to include trailing punctuation when accepting a single word. Default: true.
+    @Published var autoCompletionIncludeTrailingPunctuation: Bool {
+        didSet { defaults.set(autoCompletionIncludeTrailingPunctuation, forKey: Keys.autoCompletionIncludeTrailingPunctuation) }
+    }
+
+    /// Action when Escape is pressed while a suggestion is showing. Default: .pauseFewSeconds.
+    @Published var autoCompletionEscapeAction: AutocompletionEscapeAction {
+        didSet {
+            defaults.set(autoCompletionEscapeAction.rawValue, forKey: Keys.autoCompletionEscapeAction)
+        }
+    }
+
+    /// Shortcut to force-activate completions at cursor. Default: Control + Section/Grave.
+    @Published var autoCompletionForceActivateKeyCode: UInt16 {
+        didSet { defaults.set(Int(autoCompletionForceActivateKeyCode), forKey: Keys.autoCompletionForceActivateKeyCode) }
+    }
+    @Published var autoCompletionForceActivateModifiers: UInt {
+        didSet { defaults.set(autoCompletionForceActivateModifiers, forKey: Keys.autoCompletionForceActivateModifiers) }
+    }
+    @Published var autoCompletionForceActivateEnabled: Bool {
+        didSet { defaults.set(autoCompletionForceActivateEnabled, forKey: Keys.autoCompletionForceActivateEnabled) }
+    }
+
+    /// Shortcut to temporarily toggle completions in the current app. Default: Control + Option + Command + Section.
+    @Published var autoCompletionToggleCurrentAppKeyCode: UInt16 {
+        didSet { defaults.set(Int(autoCompletionToggleCurrentAppKeyCode), forKey: Keys.autoCompletionToggleCurrentAppKeyCode) }
+    }
+    @Published var autoCompletionToggleCurrentAppModifiers: UInt {
+        didSet { defaults.set(autoCompletionToggleCurrentAppModifiers, forKey: Keys.autoCompletionToggleCurrentAppModifiers) }
+    }
+    @Published var autoCompletionToggleCurrentAppEnabled: Bool {
+        didSet { defaults.set(autoCompletionToggleCurrentAppEnabled, forKey: Keys.autoCompletionToggleCurrentAppEnabled) }
+    }
+
+    /// Shortcut to toggle completions globally.
+    @Published var autoCompletionToggleGlobalKeyCode: UInt16 {
+        didSet { defaults.set(Int(autoCompletionToggleGlobalKeyCode), forKey: Keys.autoCompletionToggleGlobalKeyCode) }
+    }
+    @Published var autoCompletionToggleGlobalModifiers: UInt {
+        didSet { defaults.set(autoCompletionToggleGlobalModifiers, forKey: Keys.autoCompletionToggleGlobalModifiers) }
+    }
+    @Published var autoCompletionToggleGlobalEnabled: Bool {
+        didSet {
+            defaults.set(autoCompletionToggleGlobalEnabled, forKey: Keys.autoCompletionToggleGlobalEnabled)
+            NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+        }
+    }
+
     /// Whether cross-layout suggestions (e.g. ghbd -> привет) are included. Default: true.
     @Published var autoCompletionIncludeCrossLayout: Bool {
         didSet { defaults.set(autoCompletionIncludeCrossLayout, forKey: Keys.autoCompletionIncludeCrossLayout) }
@@ -272,6 +330,11 @@ final class SettingsManager: ObservableObject {
         }
     }
 
+    /// Whether a subtle floating indicator badge is shown in the top-left of the active text field. Default: true.
+    @Published var showFieldAnchorBadge: Bool {
+        didSet { defaults.set(showFieldAnchorBadge, forKey: Keys.showFieldAnchorBadge) }
+    }
+
     /// Whether AI is automatically disabled when running on battery power. Default: true.
     @Published var aiBatteryModeEnabled: Bool {
         didSet {
@@ -290,15 +353,38 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(aiDebounceDelay, forKey: Keys.aiDebounceDelay) }
     }
 
+    /// Whether to stream token generation progressively for lower Time-to-First-Token. Default: true.
+    @Published var aiStreamingEnabled: Bool {
+        didSet { defaults.set(aiStreamingEnabled, forKey: Keys.aiStreamingEnabled) }
+    }
+
     /// User-defined system instructions for the AI assistant.
     @Published var aiCustomInstructions: String {
         didSet { defaults.set(aiCustomInstructions, forKey: Keys.aiCustomInstructions) }
+    }
+
+    /// Whether writing history and style personalization is enabled. Default: true.
+    @Published var aiPersonalizationEnabled: Bool {
+        didSet { defaults.set(aiPersonalizationEnabled, forKey: Keys.aiPersonalizationEnabled) }
+    }
+
+    /// Per-application custom instructions, vocabulary, and toggles.
+    @Published var perAppAISettings: [String: AppAISettings] {
+        didSet { savePerAppAISettings() }
     }
 
     /// Currently active/selected model identifier. Default: "qwen2.5-0.5b".
     @Published var selectedModelId: String {
         didSet {
             defaults.set(selectedModelId, forKey: Keys.selectedModelId)
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
+    /// Path to user-specified local GGUF model file.
+    @Published var customModelPath: String {
+        didSet {
+            defaults.set(customModelPath, forKey: Keys.customModelPath)
             NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
         }
     }
@@ -404,12 +490,7 @@ final class SettingsManager: ObservableObject {
         case .rightArrow:
             return keyCode == 0x7C && nonModFlags.isEmpty
         case .custom:
-            if keyCode != autoCompletionCustomKeyCode { return false }
-            let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
-            let actualMods = UInt(flags.rawValue & relevantMask)
-            let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: autoCompletionCustomModifiers).intersection(.deviceIndependentFlagsMask)
-            let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
-            return actualNSEventMods == expectedNSEventMods
+            return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionCustomKeyCode, targetModifiers: autoCompletionCustomModifiers)
         }
     }
 
@@ -417,6 +498,12 @@ final class SettingsManager: ObservableObject {
     func isAutocompletionAcceptAllKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
         let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
         switch autoCompletionAcceptAllKey {
+        case .cmdSection:
+            let hasCmd = flags.contains(.maskCommand)
+            let otherMods = flags.intersection([.maskAlternate, .maskControl, .maskShift])
+            // 0x0A is § on ISO keyboards, 0x32 is ` / ~ on ANSI
+            let isSectionOrGrave = (keyCode == 0x0A || keyCode == 0x32)
+            return isSectionOrGrave && hasCmd && otherMods.isEmpty
         case .shiftTab:
             let hasShift = flags.contains(.maskShift)
             return keyCode == 0x30 && hasShift && nonModFlags.isEmpty
@@ -429,15 +516,43 @@ final class SettingsManager: ObservableObject {
             let otherMods = flags.intersection([.maskCommand, .maskControl, .maskShift])
             return keyCode == 0x30 && hasOpt && otherMods.isEmpty
         case .custom:
-            if keyCode != autoCompletionCustomAcceptAllKeyCode { return false }
-            let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
-            let actualMods = UInt(flags.rawValue & relevantMask)
-            let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: autoCompletionCustomAcceptAllModifiers).intersection(.deviceIndependentFlagsMask)
-            let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
-            return actualNSEventMods == expectedNSEventMods
+            return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionCustomAcceptAllKeyCode, targetModifiers: autoCompletionCustomAcceptAllModifiers)
         }
     }
+
+    /// Helper to match keyCode and modifier flags against recorded target shortcut
+    func matchKeyAndModifiers(keyCode: UInt16, flags: CGEventFlags, targetKeyCode: UInt16, targetModifiers: UInt) -> Bool {
+        guard keyCode == targetKeyCode else { return false }
+        let relevantMask: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskAlternate.rawValue | CGEventFlags.maskControl.rawValue | CGEventFlags.maskShift.rawValue
+        let actualMods = UInt(flags.rawValue & relevantMask)
+        let expectedNSEventMods = NSEvent.ModifierFlags(rawValue: targetModifiers).intersection(.deviceIndependentFlagsMask)
+        let actualNSEventMods = NSEvent.ModifierFlags(rawValue: actualMods).intersection(.deviceIndependentFlagsMask)
+        return actualNSEventMods == expectedNSEventMods
+    }
+
+    /// Determines whether the given event matches the force-activate completions shortcut
+    func isAutocompletionForceActivateKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        guard autoCompletionForceActivateEnabled else { return false }
+        return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionForceActivateKeyCode, targetModifiers: autoCompletionForceActivateModifiers)
+    }
+
+    /// Determines whether the given event matches the shortcut to toggle completions for current app
+    func isAutocompletionToggleCurrentAppKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        guard autoCompletionToggleCurrentAppEnabled else { return false }
+        return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionToggleCurrentAppKeyCode, targetModifiers: autoCompletionToggleCurrentAppModifiers)
+    }
+
+    /// Determines whether the given event matches the shortcut to toggle completions globally
+    func isAutocompletionToggleGlobalKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        guard autoCompletionToggleGlobalEnabled else { return false }
+        return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionToggleGlobalKeyCode, targetModifiers: autoCompletionToggleGlobalModifiers)
+    }
     
+    /// Keep the global toggle reachable even when both typing features are off.
+    var needsKeyboardMonitoring: Bool {
+        autoCorrectionEnabled || autoCompletionEnabled || autoCompletionToggleGlobalEnabled
+    }
+
     // MARK: - Excluded Apps Management
     
     func addExcludedApp(bundleID: String) {
@@ -452,6 +567,54 @@ final class SettingsManager: ObservableObject {
     func isAppExcluded(bundleID: String?) -> Bool {
         guard let bid = bundleID else { return false }
         return excludedAppBundleIDs.contains(bid)
+    }
+    
+    // MARK: - Per-App AI Settings Management
+    
+    func aiInstructions(for bundleID: String?, language: String? = nil) -> String {
+        var parts: [String] = []
+        let global = aiCustomInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !global.isEmpty {
+            parts.append(global)
+        }
+        if let bid = bundleID, let appSetting = perAppAISettings[bid] {
+            let appInst = appSetting.customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !appInst.isEmpty {
+                parts.append(appInst)
+            }
+            if !appSetting.customVocabulary.isEmpty {
+                let vocabList = appSetting.customVocabulary.joined(separator: ", ")
+                parts.append("Preferred terminology: \(vocabList)")
+            }
+        }
+        if aiPersonalizationEnabled, let bid = bundleID {
+            if let stylePrompt = UserTextHistoryStore.shared.stylePrompt(for: bid, language: language) {
+                parts.append(stylePrompt)
+            }
+        }
+        return parts.joined(separator: "\n")
+    }
+    
+    func isAIEnabled(for bundleID: String?) -> Bool {
+        guard isAIAllowed else { return false }
+        if let bid = bundleID, let appSetting = perAppAISettings[bid], !appSetting.isAIEnabled {
+            return false
+        }
+        return true
+    }
+    
+    func setAppAISettings(_ settings: AppAISettings) {
+        perAppAISettings[settings.bundleID] = settings
+    }
+    
+    func removeAppAISettings(bundleID: String) {
+        perAppAISettings.removeValue(forKey: bundleID)
+    }
+    
+    private func savePerAppAISettings() {
+        if let data = try? JSONEncoder().encode(perAppAISettings) {
+            defaults.set(data, forKey: Keys.perAppAISettings)
+        }
     }
     
     // MARK: - Keys
@@ -480,6 +643,19 @@ final class SettingsManager: ObservableObject {
         static let autoCompletionAcceptAllKey = "autoCompletionAcceptAllKey"
         static let autoCompletionCustomAcceptAllKeyCode = "autoCompletionCustomAcceptAllKeyCode"
         static let autoCompletionCustomAcceptAllModifiers = "autoCompletionCustomAcceptAllModifiers"
+        static let autoCompletionIncludeTrailingSpace = "autoCompletionIncludeTrailingSpace"
+        static let autoCompletionAcceptEntirePhrase = "autoCompletionAcceptEntirePhrase"
+        static let autoCompletionIncludeTrailingPunctuation = "autoCompletionIncludeTrailingPunctuation"
+        static let autoCompletionEscapeAction = "autoCompletionEscapeAction"
+        static let autoCompletionForceActivateKeyCode = "autoCompletionForceActivateKeyCode"
+        static let autoCompletionForceActivateModifiers = "autoCompletionForceActivateModifiers"
+        static let autoCompletionForceActivateEnabled = "autoCompletionForceActivateEnabled"
+        static let autoCompletionToggleCurrentAppKeyCode = "autoCompletionToggleCurrentAppKeyCode"
+        static let autoCompletionToggleCurrentAppModifiers = "autoCompletionToggleCurrentAppModifiers"
+        static let autoCompletionToggleCurrentAppEnabled = "autoCompletionToggleCurrentAppEnabled"
+        static let autoCompletionToggleGlobalKeyCode = "autoCompletionToggleGlobalKeyCode"
+        static let autoCompletionToggleGlobalModifiers = "autoCompletionToggleGlobalModifiers"
+        static let autoCompletionToggleGlobalEnabled = "autoCompletionToggleGlobalEnabled"
         static let autoCompletionMaxSuggestions = "autoCompletionMaxSuggestions"
         static let autoCompletionMinPrefixLength = "autoCompletionMinPrefixLength"
         static let autoCompletionUseNumberShortcuts = "autoCompletionUseNumberShortcuts"
@@ -494,11 +670,16 @@ final class SettingsManager: ObservableObject {
         static let recoveryCount = "recoveryCount"
         static let recoveryRevertCount = "recoveryRevertCount"
         static let aiPredictiveEnabled = "aiPredictiveEnabled"
+        static let showFieldAnchorBadge = "showFieldAnchorBadge"
         static let aiBatteryModeEnabled = "aiBatteryModeEnabled"
         static let aiMaxContinuationWords = "aiMaxContinuationWords"
         static let aiDebounceDelay = "aiDebounceDelay"
+        static let aiStreamingEnabled = "aiStreamingEnabled"
         static let aiCustomInstructions = "aiCustomInstructions"
+        static let aiPersonalizationEnabled = "aiPersonalizationEnabled"
+        static let perAppAISettings = "perAppAISettings"
         static let selectedModelId = "selectedModelId"
+        static let customModelPath = "customModelPath"
         static let savedCharactersCount = "savedCharactersCount"
         static let savedClicksCount = "savedClicksCount"
     }
@@ -550,6 +731,26 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionMaxSuggestions = defaults.object(forKey: Keys.autoCompletionMaxSuggestions) as? Int ?? 4
         self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
         self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true
+        self.autoCompletionIncludeTrailingSpace = defaults.object(forKey: Keys.autoCompletionIncludeTrailingSpace) as? Bool ?? true
+        self.autoCompletionAcceptEntirePhrase = defaults.object(forKey: Keys.autoCompletionAcceptEntirePhrase) as? Bool ?? false
+        self.autoCompletionIncludeTrailingPunctuation = defaults.object(forKey: Keys.autoCompletionIncludeTrailingPunctuation) as? Bool ?? true
+        let savedEscapeAction = defaults.string(forKey: Keys.autoCompletionEscapeAction)
+        self.autoCompletionEscapeAction = savedEscapeAction.flatMap { AutocompletionEscapeAction(rawValue: $0) } ?? .pauseFewSeconds
+        
+        let savedForceCode = defaults.object(forKey: Keys.autoCompletionForceActivateKeyCode) as? Int
+        self.autoCompletionForceActivateKeyCode = UInt16(savedForceCode ?? 0x0A) // 0x0A = § or 0x32 = `
+        self.autoCompletionForceActivateModifiers = defaults.object(forKey: Keys.autoCompletionForceActivateModifiers) as? UInt ?? NSEvent.ModifierFlags.control.rawValue
+        self.autoCompletionForceActivateEnabled = defaults.object(forKey: Keys.autoCompletionForceActivateEnabled) as? Bool ?? true
+        
+        let savedAppCode = defaults.object(forKey: Keys.autoCompletionToggleCurrentAppKeyCode) as? Int
+        self.autoCompletionToggleCurrentAppKeyCode = UInt16(savedAppCode ?? 0x0A)
+        self.autoCompletionToggleCurrentAppModifiers = defaults.object(forKey: Keys.autoCompletionToggleCurrentAppModifiers) as? UInt ?? (NSEvent.ModifierFlags.control.rawValue | NSEvent.ModifierFlags.option.rawValue | NSEvent.ModifierFlags.command.rawValue)
+        self.autoCompletionToggleCurrentAppEnabled = defaults.object(forKey: Keys.autoCompletionToggleCurrentAppEnabled) as? Bool ?? true
+        
+        let savedGlobalCode = defaults.object(forKey: Keys.autoCompletionToggleGlobalKeyCode) as? Int
+        self.autoCompletionToggleGlobalKeyCode = UInt16(savedGlobalCode ?? 0x00)
+        self.autoCompletionToggleGlobalModifiers = defaults.object(forKey: Keys.autoCompletionToggleGlobalModifiers) as? UInt ?? 0
+        self.autoCompletionToggleGlobalEnabled = defaults.object(forKey: Keys.autoCompletionToggleGlobalEnabled) as? Bool ?? false
         self.autoCompletionIncludeCrossLayout = defaults.object(forKey: Keys.autoCompletionIncludeCrossLayout) as? Bool ?? true
         self.autoCompletionSuggestProfanity = defaults.object(forKey: Keys.autoCompletionSuggestProfanity) as? Bool ?? false // Default: OFF
         let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
@@ -565,11 +766,21 @@ final class SettingsManager: ObservableObject {
         self.recoveryRevertCount = defaults.integer(forKey: Keys.recoveryRevertCount)
         
         self.aiPredictiveEnabled = defaults.object(forKey: Keys.aiPredictiveEnabled) as? Bool ?? true   // Default: ON
+        self.showFieldAnchorBadge = defaults.object(forKey: Keys.showFieldAnchorBadge) as? Bool ?? true // Default: ON
         self.aiBatteryModeEnabled = defaults.object(forKey: Keys.aiBatteryModeEnabled) as? Bool ?? true // Default: ON
         self.aiMaxContinuationWords = defaults.object(forKey: Keys.aiMaxContinuationWords) as? Int ?? 3  // Default: 3 words
         self.aiDebounceDelay = defaults.object(forKey: Keys.aiDebounceDelay) as? Double ?? 0.350        // Default: 350 ms
+        self.aiStreamingEnabled = defaults.object(forKey: Keys.aiStreamingEnabled) as? Bool ?? true     // Default: ON
         self.aiCustomInstructions = defaults.string(forKey: Keys.aiCustomInstructions) ?? ""
+        self.aiPersonalizationEnabled = defaults.object(forKey: Keys.aiPersonalizationEnabled) as? Bool ?? true // Default: ON
+        if let data = defaults.data(forKey: Keys.perAppAISettings),
+           let savedPerApp = try? JSONDecoder().decode([String: AppAISettings].self, from: data) {
+            self.perAppAISettings = savedPerApp
+        } else {
+            self.perAppAISettings = [:]
+        }
         self.selectedModelId = defaults.string(forKey: Keys.selectedModelId) ?? RecommendedAIModel.defaultModelID
+        self.customModelPath = defaults.string(forKey: Keys.customModelPath) ?? ""
         self.savedCharactersCount = defaults.integer(forKey: Keys.savedCharactersCount)
         self.savedClicksCount = defaults.integer(forKey: Keys.savedClicksCount)
         

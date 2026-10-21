@@ -50,7 +50,7 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # LLM Models
-models/
+/models/
 *.gguf
 
 # IDEs
