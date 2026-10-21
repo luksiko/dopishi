@@ -56,6 +56,9 @@ fi
 while IFS= read -r pid; do
     [[ -n "$pid" ]] && kill -TERM "$pid"
 done < <(pgrep -f '^/Applications/LangSwitcher[.]app/Contents/MacOS/LangSwitcher$' || true)
+while IFS= read -r pid; do
+    [[ -n "$pid" ]] && kill -TERM "$pid"
+done < <(pgrep -f '^/Applications/LangSwitcher[.]app/Contents/Helpers/llama-server' || true)
 for ((attempt = 0; attempt < 50; attempt++)); do
     if ! pgrep -f '^/Applications/LangSwitcher[.]app/Contents/MacOS/LangSwitcher$' >/dev/null; then
         break
