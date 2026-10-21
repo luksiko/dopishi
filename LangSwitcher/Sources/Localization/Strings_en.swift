@@ -400,6 +400,8 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         // ── Predictive Options ─────────────────────────────────────────
         "ai.predictive.streaming":               "Streaming Generation",
         "ai.predictive.streaming.desc":          "Displays words progressively as tokens are generated, reducing Time-to-First-Token (TTFT).",
+        "ai.predictive.screenContext":           "Chat & Window Context",
+        "ai.predictive.screenContext.desc":      "Inspects recent chat messages from the active window to suggest context-aware completions.",
 
         // ── Benchmark Profiler ─────────────────────────────────────────
         "ai.benchmark.title":                    "Speed & Quality Profiler",

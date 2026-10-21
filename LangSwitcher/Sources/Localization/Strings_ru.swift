@@ -399,6 +399,8 @@ LangSwitcher нуждается в разрешении универсально
         // ── Predictive Options ─────────────────────────────────────────
         "ai.predictive.streaming":               "Потоковая генерация",
         "ai.predictive.streaming.desc":          "Отображает слова по мере генерации токенов, значительно снижая задержку до первого слова (TTFT).",
+        "ai.predictive.screenContext":           "Контекст чатов и окон",
+        "ai.predictive.screenContext.desc":      "Учитывает последние сообщения из активного окна чата для точных подсказок.",
 
         // ── Benchmark Profiler ─────────────────────────────────────────
         "ai.benchmark.title":                    "Замер скорости и качества",

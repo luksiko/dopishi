@@ -59,6 +59,7 @@
 		E10000010000000000000044 /* AppAISettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000044 /* AppAISettings.swift */; };
 		E10000010000000000000045 /* AIModelProfiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000045 /* AIModelProfiler.swift */; };
 		E10000010000000000000046 /* UserTextHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000046 /* UserTextHistoryStore.swift */; };
+		E10000010000000000000047 /* ScreenContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000047 /* ScreenContextService.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -79,6 +80,7 @@
 		E10000010000000000000118 /* AIModelProfilerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000118 /* AIModelProfilerTests.swift */; };
 		E10000010000000000000119 /* PerAppAISettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000119 /* PerAppAISettingsTests.swift */; };
 		E10000010000000000000120 /* UserTextHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000120 /* UserTextHistoryTests.swift */; };
+		E10000010000000000000121 /* ScreenContextServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000121 /* ScreenContextServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -144,6 +146,7 @@
 		E10000020000000000000044 /* AppAISettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAISettings.swift; sourceTree = "<group>"; };
 		E10000020000000000000045 /* AIModelProfiler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelProfiler.swift; sourceTree = "<group>"; };
 		E10000020000000000000046 /* UserTextHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTextHistoryStore.swift; sourceTree = "<group>"; };
+		E10000020000000000000047 /* ScreenContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenContextService.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -164,6 +167,7 @@
 		E10000020000000000000118 /* AIModelProfilerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelProfilerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000119 /* PerAppAISettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerAppAISettingsTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000120 /* UserTextHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTextHistoryTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000121 /* ScreenContextServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenContextServiceTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* LangSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LangSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -278,6 +282,7 @@
 				E10000020000000000000043 /* FieldAnchorOverlayController.swift */,
 				E10000020000000000000045 /* AIModelProfiler.swift */,
 				E10000020000000000000046 /* UserTextHistoryStore.swift */,
+				E10000020000000000000047 /* ScreenContextService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -346,6 +351,7 @@
 				E10000020000000000000118 /* AIModelProfilerTests.swift */,
 				E10000020000000000000119 /* PerAppAISettingsTests.swift */,
 				E10000020000000000000120 /* UserTextHistoryTests.swift */,
+				E10000020000000000000121 /* ScreenContextServiceTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -500,6 +506,7 @@
 				E10000010000000000000044 /* AppAISettings.swift in Sources */,
 				E10000010000000000000045 /* AIModelProfiler.swift in Sources */,
 				E10000010000000000000046 /* UserTextHistoryStore.swift in Sources */,
+				E10000010000000000000047 /* ScreenContextService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -527,6 +534,7 @@
 				E10000010000000000000118 /* AIModelProfilerTests.swift in Sources */,
 				E10000010000000000000119 /* PerAppAISettingsTests.swift in Sources */,
 				E10000010000000000000120 /* UserTextHistoryTests.swift in Sources */,
+				E10000010000000000000121 /* ScreenContextServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -484,7 +484,7 @@ final class AccessibilityService {
         return rect.intersection(visible)
     }
 
-    private func focusedTextElement() -> AXUIElement? {
+    func focusedTextElement() -> AXUIElement? {
         prepareBrowserAccessibility()
         let system = AXUIElementCreateSystemWide()
         var value: CFTypeRef?

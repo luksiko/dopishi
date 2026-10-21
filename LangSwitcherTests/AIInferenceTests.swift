@@ -129,6 +129,37 @@ final class AIInferenceTests: XCTestCase {
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "null перед использованием объекта", context: "Проверить на ", wordBuffer: "", maxWords: 4), "null перед использованием объекта")
     }
 
+    func testRejectUnpromptedQuotedEntities() {
+        // Hallucinated quote like «Охотнике» when neither context nor screenContext has quotes
+        let result = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: " можно сказать о «Охотнике», ?",
+            context: "Что еще",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertNil(result, "Unprompted quoted entities must be rejected as hallucinations")
+    }
+
+    func testRejectEssayQuestionsOnShortInput() {
+        let result = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: " можно сказать о фильме",
+            context: "Что еще",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertNil(result, "Open-ended essay questions on short input must be rejected")
+    }
+
+    func testMalformedPunctuationCleanup() {
+        let result = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "хорошо, ?",
+            context: "Все будет ",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertEqual(result, "хорошо?")
+    }
+
     func testBaseModelMarkupAndRepeatedSuffixAreRemoved() {
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "<code>null</code>, чтобы избежать ошибки", context: "Проверка на ", wordBuffer: "", maxWords: 4), "null, чтобы избежать ошибки")
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "the report tomorrow morning.", context: "I will send ", wordBuffer: "", maxWords: 4, afterCaret: " tomorrow morning."), "the report")

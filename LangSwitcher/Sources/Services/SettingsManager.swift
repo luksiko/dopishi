@@ -358,6 +358,14 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(aiStreamingEnabled, forKey: Keys.aiStreamingEnabled) }
     }
 
+    /// Whether to extract screen context (recent chat messages / window text) for AI predictions. Default: true.
+    @Published var aiScreenContextEnabled: Bool {
+        didSet {
+            defaults.set(aiScreenContextEnabled, forKey: Keys.aiScreenContextEnabled)
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
     /// User-defined system instructions for the AI assistant.
     @Published var aiCustomInstructions: String {
         didSet { defaults.set(aiCustomInstructions, forKey: Keys.aiCustomInstructions) }
@@ -675,6 +683,7 @@ final class SettingsManager: ObservableObject {
         static let aiMaxContinuationWords = "aiMaxContinuationWords"
         static let aiDebounceDelay = "aiDebounceDelay"
         static let aiStreamingEnabled = "aiStreamingEnabled"
+        static let aiScreenContextEnabled = "aiScreenContextEnabled"
         static let aiCustomInstructions = "aiCustomInstructions"
         static let aiPersonalizationEnabled = "aiPersonalizationEnabled"
         static let perAppAISettings = "perAppAISettings"
@@ -771,6 +780,7 @@ final class SettingsManager: ObservableObject {
         self.aiMaxContinuationWords = defaults.object(forKey: Keys.aiMaxContinuationWords) as? Int ?? 3  // Default: 3 words
         self.aiDebounceDelay = defaults.object(forKey: Keys.aiDebounceDelay) as? Double ?? 0.350        // Default: 350 ms
         self.aiStreamingEnabled = defaults.object(forKey: Keys.aiStreamingEnabled) as? Bool ?? true     // Default: ON
+        self.aiScreenContextEnabled = defaults.object(forKey: Keys.aiScreenContextEnabled) as? Bool ?? true // Default: ON
         self.aiCustomInstructions = defaults.string(forKey: Keys.aiCustomInstructions) ?? ""
         self.aiPersonalizationEnabled = defaults.object(forKey: Keys.aiPersonalizationEnabled) as? Bool ?? true // Default: ON
         if let data = defaults.data(forKey: Keys.perAppAISettings),

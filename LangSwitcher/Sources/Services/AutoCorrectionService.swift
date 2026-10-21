@@ -260,6 +260,7 @@ final class AutoCorrectionService {
         aiDebounceTimer.cancel()
         wordBuffer = ""
         previousWord = nil
+        ScreenContextService.shared.invalidateCache()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.updateFieldAnchor()
         }
@@ -268,6 +269,7 @@ final class AutoCorrectionService {
     @objc private func handleAppDeactivated() {
         dismissAutocompletion(hideFieldAnchor: true)
         stopFieldAnchorPoll()
+        ScreenContextService.shared.invalidateCache()
     }
 
     /// Restart monitoring (e.g., when settings change).
@@ -293,6 +295,7 @@ final class AutoCorrectionService {
         snoozeFieldIdentifier = nil
         dismissSuggestionsOnly()
         aiDebounceTimer.cancel()
+        ScreenContextService.shared.invalidateCache()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.updateFieldAnchor()
         }
@@ -616,6 +619,7 @@ final class AutoCorrectionService {
     private func dismissAutocompletion(hideFieldAnchor: Bool = false) {
         dismissSuggestionsOnly()
         aiDebounceTimer.cancel()
+        ScreenContextService.shared.invalidateCache()
         if hideFieldAnchor {
             fieldAnchorController.hide()
             stopFieldAnchorPoll()
@@ -728,13 +732,36 @@ final class AutoCorrectionService {
             let currentLang = AIInferenceEngine.containsCyrillic(liveContext) ? "ru" : "en"
             let currentInstructions = self.settingsManager.aiInstructions(for: currentBundleID, language: currentLang)
 
+            var screenContextText: String?
+            var hasPendingQuestion = false
+            if self.settingsManager.aiScreenContextEnabled {
+                if let screenCtx = ScreenContextService.shared.extractScreenContext(
+                    frontmostApp: NSWorkspace.shared.frontmostApplication,
+                    focusedElement: self.accessibilityService.focusedTextElement(),
+                    excludedBundleIDs: Set(self.settingsManager.excludedAppBundleIDs)
+                ) {
+                    screenContextText = screenCtx.formattedContext
+                    hasPendingQuestion = screenCtx.hasPendingQuestion
+                }
+            }
+
+            var effectiveMaxWords = maxWords
+            let contextWordCount = liveContext.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").count
+            if screenContextText == nil && contextWordCount <= 1 {
+                // When there is zero dialogue context and the user has only typed a single word,
+                // keep continuation conservative to prevent ungrounded topic invention.
+                effectiveMaxWords = min(maxWords, self.wordBuffer.isEmpty ? 1 : 2)
+            }
+
             if self.settingsManager.aiStreamingEnabled {
                 let streamResult = await AIInferenceEngine.shared.predictContinuationStream(
                     context: liveContext,
                     afterCaret: String(caretContext.textAfterCaret.prefix(512)),
                     wordBuffer: self.wordBuffer,
-                    maxWords: maxWords,
-                    customInstructions: currentInstructions
+                    maxWords: effectiveMaxWords,
+                    customInstructions: currentInstructions,
+                    screenContext: screenContextText,
+                    hasPendingQuestion: hasPendingQuestion
                 ) { [weak self] partialSuffix in
                     guard let self else { return }
                     guard self.physicalInputRevision == captureRevision,
@@ -749,14 +776,18 @@ final class AutoCorrectionService {
                           let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
                           current == caretContext else { return }
                     self.presentAIPrediction(suffix: finalSuffix, activeLayoutID: activeLayoutID)
+                } else {
+                    self.dismissSuggestionsOnly()
                 }
             } else {
                 guard let suffix = await AIInferenceEngine.shared.predictContinuation(
                     context: liveContext,
                     afterCaret: String(caretContext.textAfterCaret.prefix(512)),
                     wordBuffer: self.wordBuffer,
-                    maxWords: maxWords,
-                    customInstructions: currentInstructions
+                    maxWords: effectiveMaxWords,
+                    customInstructions: currentInstructions,
+                    screenContext: screenContextText,
+                    hasPendingQuestion: hasPendingQuestion
                 ) else {
                     return
                 }

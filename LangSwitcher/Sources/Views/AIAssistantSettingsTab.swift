@@ -230,6 +230,13 @@ struct AIAssistantSettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     
+                    Toggle(l10n.t("ai.predictive.screenContext"), isOn: $settingsManager.aiScreenContextEnabled)
+                        .padding(.top, 6)
+                    
+                    Text(l10n.t("ai.predictive.screenContext.desc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
                     Toggle(l10n.t("ai.fieldAnchor.title"), isOn: $settingsManager.showFieldAnchorBadge)
                         .padding(.top, 6)
                     

@@ -22,10 +22,17 @@ enum AutoCorrectionGate {
     static let secureIdentifier = "AXSecureTextField"
     
     /// Apps where silent rewriting is dangerous even in plain fields
-    /// (shell commands must never be reinterpreted as prose).
+    /// (shell commands must never be reinterpreted as prose, password managers must never be inspected).
     static let defaultExcludedBundleIDs: Set<String> = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+        "dev.warp.Warp-Main",
+        "com.agilebits.onepassword7",
+        "com.1password.1password",
+        "com.bitwarden.desktop",
+        "org.keepassxc.keepassxc",
+        "com.apple.keychainaccess"
     ]
     
     /// True for password fields, via role or subrole.

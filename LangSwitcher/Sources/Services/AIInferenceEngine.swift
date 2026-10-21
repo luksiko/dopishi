@@ -181,8 +181,8 @@ final class AIInferenceEngine: ObservableObject {
         cachedUsesChatTemplate = true
     }
     
-    static let defaultSystemPromptEn = "Continue the text naturally with a few words. Keep its language and style. Do not explain."
-    static let defaultSystemPromptRu = "Продолжи текст естественно несколькими словами. Сохрани язык и стиль. Не добавляй пояснений."
+    static let defaultSystemPromptEn = "Continue the immediate thought naturally with a few words (up to 4 words). Maintain the existing context, language and style. Do not invent new unrelated topics, quotes, proper nouns or random questions. Do not explain."
+    static let defaultSystemPromptRu = "Продолжи начатую мысль естественно несколькими словами (до 4 слов). Сохраняй контекст, язык и стиль. Не придумывай новые несвязанные темы, имена, названия в кавычках или вопросы. Не добавляй пояснений."
     static var defaultSystemPrompt: String { defaultSystemPromptEn }
 
     static func containsCyrillic(_ text: String) -> Bool {
@@ -208,10 +208,26 @@ final class AIInferenceEngine: ObservableObject {
         return result.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: .regularExpression)
     }
 
-    static func completionMessages(context: String, afterCaret: String, instructions: String?) -> [[String: String]] {
+    static func completionMessages(
+        context: String,
+        afterCaret: String,
+        instructions: String?,
+        screenContext: String? = nil,
+        hasPendingQuestion: Bool = false
+    ) -> [[String: String]] {
+        let isCyrillic = containsCyrillic(activeParagraph(in: context))
+        var system = isCyrillic ? defaultSystemPromptRu : defaultSystemPromptEn
         let extra = instructions?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        var system = containsCyrillic(activeParagraph(in: context)) ? defaultSystemPromptRu : defaultSystemPromptEn
         if !extra.isEmpty { system += "\n" + extra }
+        if let screenContext = screenContext?.trimmingCharacters(in: .whitespacesAndNewlines), !screenContext.isEmpty {
+            system += "\n" + screenContext + "\nStay strictly grounded in the conversation context. Never introduce unrelated topics, books, or quotes."
+        }
+        if hasPendingQuestion {
+            let qaPrompt = isCyrillic
+                ? "Собеседник задал вопрос. Кратко и естественно ответь на него от первого лица в 2-4 слова."
+                : "The partner asked a question. Answer it concisely and naturally in first person in 2-4 words."
+            system += "\n" + qaPrompt
+        }
         if !afterCaret.isEmpty {
             let data = try! JSONSerialization.data(withJSONObject: ["after": afterCaret], options: [.sortedKeys])
             system += "\nInsert before the following existing suffix, without repeating it: " + String(decoding: data, as: UTF8.self)
@@ -301,7 +317,9 @@ final class AIInferenceEngine: ObservableObject {
         afterCaret: String = "",
         wordBuffer: String = "",
         maxWords: Int = 4,
-        customInstructions: String? = nil
+        customInstructions: String? = nil,
+        screenContext: String? = nil,
+        hasPendingQuestion: Bool = false
     ) async -> String? {
         await predictContinuationStream(
             context: context,
@@ -309,6 +327,8 @@ final class AIInferenceEngine: ObservableObject {
             wordBuffer: wordBuffer,
             maxWords: maxWords,
             customInstructions: customInstructions,
+            screenContext: screenContext,
+            hasPendingQuestion: hasPendingQuestion,
             onToken: nil
         )
     }
@@ -319,6 +339,8 @@ final class AIInferenceEngine: ObservableObject {
         wordBuffer: String = "",
         maxWords: Int = 4,
         customInstructions: String? = nil,
+        screenContext: String? = nil,
+        hasPendingQuestion: Bool = false,
         onToken: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> String? {
         guard !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, maxWords > 0 else { return nil }
@@ -344,7 +366,13 @@ final class AIInferenceEngine: ObservableObject {
             templateRequest.httpMethod = "POST"
             templateRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             templateRequest.httpBody = try? JSONSerialization.data(withJSONObject: [
-                "messages": Self.completionMessages(context: context, afterCaret: afterCaret, instructions: customInstructions)])
+                "messages": Self.completionMessages(
+                    context: context,
+                    afterCaret: afterCaret,
+                    instructions: customInstructions,
+                    screenContext: screenContext,
+                    hasPendingQuestion: hasPendingQuestion
+                )])
             do {
                 let (data, response) = try await session.data(for: templateRequest)
                 guard !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
@@ -400,7 +428,8 @@ final class AIInferenceEngine: ObservableObject {
                             context: context,
                             wordBuffer: healsWord ? "" : wordBuffer,
                             maxWords: maxWords,
-                            afterCaret: afterCaret
+                            afterCaret: afterCaret,
+                            screenContext: screenContext
                         ) {
                             let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                             if formatted != lastCleanedSuffix && !formatted.isEmpty {
@@ -429,7 +458,8 @@ final class AIInferenceEngine: ObservableObject {
                         context: context,
                         wordBuffer: healsWord ? "" : wordBuffer,
                         maxWords: maxWords,
-                        afterCaret: afterCaret
+                        afterCaret: afterCaret,
+                        screenContext: screenContext
                     ) {
                         let final = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                         lastCleanedSuffix = final
@@ -457,7 +487,8 @@ final class AIInferenceEngine: ObservableObject {
                     raw = healed
                 }
                 guard let cleaned = Self.cleanAndTrimContinuation(raw: raw, context: context,
-                    wordBuffer: healsWord ? "" : wordBuffer, maxWords: maxWords, afterCaret: afterCaret) else { return nil }
+                    wordBuffer: healsWord ? "" : wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
+                    screenContext: screenContext) else { return nil }
                 return context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
             } catch {
                 if !Task.isCancelled {
@@ -469,7 +500,14 @@ final class AIInferenceEngine: ObservableObject {
     }
 
     /// Clean generated content and extract accurate completion tail
-    static func cleanAndTrimContinuation(raw: String, context: String, wordBuffer: String, maxWords: Int, afterCaret: String = "") -> String? {
+    static func cleanAndTrimContinuation(
+        raw: String,
+        context: String,
+        wordBuffer: String,
+        maxWords: Int,
+        afterCaret: String = "",
+        screenContext: String? = nil
+    ) -> String? {
         guard maxWords > 0 else { return nil }
         var text = raw
         
@@ -526,6 +564,40 @@ final class AIInferenceEngine: ObservableObject {
         
         // Base checkpoints may emit web formatting. Preserve the words, not tags.
         text = strippingGeneratedMarkup(text)
+
+        // Clean up malformed punctuation combinations emitted by small models (e.g. ", ?", ", !", "» ,", "» , ?")
+        text = text.replacingOccurrences(of: ",\\s*\\?", with: "?", options: .regularExpression)
+        text = text.replacingOccurrences(of: ",\\s*!", with: "!", options: .regularExpression)
+        text = text.replacingOccurrences(of: ",\\s*\\.", with: ".", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\?\\s*,", with: "?", options: .regularExpression)
+        text = text.replacingOccurrences(of: "!\\s*,", with: "!", options: .regularExpression)
+        text = text.replacingOccurrences(of: "»\\s*,\\s*\\?", with: "»?", options: .regularExpression)
+
+        // Reject unprompted quoted entities/titles (e.g. «Охотнике») that were never in the prompt or screen context
+        let contextHasCyrillicQuotes = context.contains("«") || context.contains("»") || (screenContext?.contains("«") == true)
+        if !contextHasCyrillicQuotes && (text.contains("«") || text.contains("»")) {
+            return nil
+        }
+        let contextHasStraightQuotes = context.contains("\"") || (screenContext?.contains("\"") == true)
+        if !contextHasStraightQuotes && text.contains("\"") && !wordBuffer.contains("\"") {
+            return nil
+        }
+
+        // On short prefixes (<= 2 words), reject generic essay/discussion questions (e.g. "можно сказать о...", "вы думаете о...")
+        let trimmedWords = context.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
+        if trimmedWords.count <= 2 {
+            let lowerText = text.lowercased()
+            let essayPatterns = [
+                "можно сказать о", "вы думаете о", "ты думаешь о", "ваше мнение",
+                "известно о", "считаете по поводу", "скажете о", "can be said about",
+                "do you think about", "what is your opinion"
+            ]
+            for pattern in essayPatterns {
+                if lowerText.contains(pattern) {
+                    return nil
+                }
+            }
+        }
         // If generation ended inside a known HTML wrapper, abstain rather than
         // showing the tag. Attached generic arguments such as Array<b> stay intact.
         let danglingMarkup = "(?:^|\\s)</?(?:code|strong|em|b|i|u|s|span|p|div|a|pre)(?:\\s+[^<>]*?)?\\s*>"
