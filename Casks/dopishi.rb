@@ -1,6 +1,6 @@
 cask "dopishi" do
   version "1.3.0"
-  sha256 :no_check
+  sha256 "e818d9701705de89b462704a16ebb22e984b3d3919830c68bccfa723cd173053"
 
   url "https://github.com/luksiko/dopishi/releases/download/v#{version}/Dopishi-#{version}-universal.dmg"
   name "Dopishi"
@@ -13,7 +13,7 @@ cask "dopishi" do
   end
 
   auto_updates true
-  depends_on macos: :ventura
+  depends_on macos: ">= :ventura"
 
   app "Dopishi.app"
 
