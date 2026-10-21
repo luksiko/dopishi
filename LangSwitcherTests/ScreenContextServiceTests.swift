@@ -31,6 +31,10 @@ final class ScreenContextServiceTests: XCTestCase {
         XCTAssertTrue(ScreenContextService.isUINoiseText("42"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("!"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("..."))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("работает уже 7 мин 6 с"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("работал на протяжении 20 с"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("скопировать сообщение"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("копировать ответ"))
         
         XCTAssertFalse(ScreenContextService.isUINoiseText("Привет, во сколько сегодня встреча?"))
         XCTAssertFalse(ScreenContextService.isUINoiseText("Can we reschedule the sync to 3 PM?"))

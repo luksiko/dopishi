@@ -154,6 +154,78 @@ final class ScreenContextService: ObservableObject {
         chatBundleIDs.contains(bundleID)
     }
 
+    /// Bottom-Up Strategy:
+    /// Walks UP from the focused element (active text field / caret) to locate
+    /// the conversation message container directly adjacent to or enclosing the input field.
+    /// This bypasses traversing down through the window or WebArea hierarchy entirely.
+    nonisolated static func findBottomUpMessageContainer(from element: AXUIElement, focusedRect: CGRect?) -> AXUIElement? {
+        var current: AXUIElement = element
+        let elemFrame = focusedRect ?? elementFrame(element)
+        
+        for _ in 0..<18 {
+            var parentRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(current, kAXParentAttribute as CFString, &parentRef) == .success,
+                  let parent = parentRef, CFGetTypeID(parent) == AXUIElementGetTypeID() else {
+                break
+            }
+            let parentEl = parent as! AXUIElement
+            var roleRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(parentEl, kAXRoleAttribute as CFString, &roleRef)
+            let role = roleRef as? String ?? ""
+            if role == "AXWindow" { break }
+            
+            // Check children of this ancestor for a sibling message container
+            var childrenRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(parentEl, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+               let children = childrenRef as? [AXUIElement], children.count > 1 {
+                for sibling in children {
+                    if !CFEqual(sibling, current) {
+                        var sRoleRef: CFTypeRef?
+                        var sDescRef: CFTypeRef?
+                        var sIdRef: CFTypeRef?
+                        AXUIElementCopyAttributeValue(sibling, kAXRoleAttribute as CFString, &sRoleRef)
+                        AXUIElementCopyAttributeValue(sibling, kAXRoleDescriptionAttribute as CFString, &sDescRef)
+                        AXUIElementCopyAttributeValue(sibling, "AXDOMIdentifier" as CFString, &sIdRef)
+                        let sRole = sRoleRef as? String ?? ""
+                        let sDesc = (sDescRef as? String ?? "").lowercased()
+                        let sId = (sIdRef as? String ?? "").lowercased()
+                        
+                        // Check explicit roles or DOM IDs
+                        if sRole == "AXScrollArea" || sDesc.contains("message") || sId.contains("messages") ||
+                           sId.contains("conversation") || sId.contains("chat") {
+                            return sibling
+                        }
+                        
+                        // Check spatial alignment: if positioned above the input field and shares column width
+                        if let eFrame = elemFrame, let sFrame = elementFrame(sibling) {
+                            if sFrame.origin.y < eFrame.origin.y && sFrame.height >= 80 {
+                                let xOverlap = (sFrame.origin.x <= eFrame.origin.x + 80) &&
+                                               ((sFrame.origin.x + sFrame.width) >= (eFrame.origin.x + eFrame.width - 80))
+                                if xOverlap {
+                                    return sibling
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // If parent itself is identified as the conversation pane (e.g. main or chat panel)
+            var pDescRef: CFTypeRef?
+            var pIdRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(parentEl, kAXRoleDescriptionAttribute as CFString, &pDescRef)
+            AXUIElementCopyAttributeValue(parentEl, "AXDOMIdentifier" as CFString, &pIdRef)
+            let pDesc = (pDescRef as? String ?? "").lowercased()
+            let pId = (pIdRef as? String ?? "").lowercased()
+            if pDesc == "main" || role == "AXLandmarkMain" || pId.contains("chat-panel") {
+                return parentEl
+            }
+            
+            current = parentEl
+        }
+        return nil
+    }
+
     /// Walk up the parent hierarchy from the focused input field in chat apps
     /// to locate the active conversation column container, completely bypassing the left sidebar.
     nonisolated static func findChatColumnAncestor(of element: AXUIElement, focusedRect: CGRect) -> AXUIElement? {
@@ -345,10 +417,10 @@ final class ScreenContextService: ObservableObject {
         if trimmed.allSatisfy({ $0.isPunctuation || $0.isSymbol }) { return true }
         
         // Dynamic thinking / action labels in chat UIs
-        if trimmed.hasPrefix("работал на протяжении") || trimmed.hasPrefix("thought for") ||
-           trimmed.hasPrefix("thinking for") || trimmed.hasPrefix("скопировать сообщение") ||
-           trimmed.hasPrefix("копировать ответ") || trimmed.hasPrefix("прочитано ") ||
-           trimmed.hasPrefix("доставлено ") {
+        if trimmed.hasPrefix("работал на протяжении") || trimmed.hasPrefix("работает уже") ||
+           trimmed.hasPrefix("thought for") || trimmed.hasPrefix("thinking for") ||
+           trimmed.hasPrefix("скопировать сообщение") || trimmed.hasPrefix("копировать ответ") ||
+           trimmed.hasPrefix("прочитано ") || trimmed.hasPrefix("доставлено ") {
             return true
         }
         return false
@@ -657,11 +729,19 @@ final class ScreenContextService: ObservableObject {
         
         let isChat = isChatApp(bundleID: bundleID)
         
-        // Locate root content node: if web app, prioritize AXWebArea and its main conversation container; if chat app, prioritize chat column container
+        // Locate root content node:
+        // Priority 1: Bottom-up from focused input element (fastest: locates adjacent message list in 2-4ms)
+        // Priority 2: WebArea ancestor of focused element -> <main> conversation container
+        // Priority 3: WebArea in window -> <main> conversation container
+        // Priority 4: Chat column ancestor of focused element
+        // Priority 5: Fallback to full window
         var traversalRoot: AXUIElement = window
         var isInsideConversationPane = false
         
-        if let focused = focusedElement, let webArea = findWebAreaAncestor(of: focused) {
+        if let focused = focusedElement, let bottomUp = findBottomUpMessageContainer(from: focused, focusedRect: focusedRect) {
+            traversalRoot = bottomUp
+            isInsideConversationPane = true
+        } else if let focused = focusedElement, let webArea = findWebAreaAncestor(of: focused) {
             if let main = findMainConversationContainer(in: webArea) {
                 traversalRoot = main
                 isInsideConversationPane = true
@@ -831,7 +911,9 @@ final class ScreenContextService: ObservableObject {
                 var childrenRef: CFTypeRef?
                 if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
                    let children = childrenRef as? [AXUIElement] {
-                    for child in children {
+                    // For conversation containers, reverse top-level children so newest messages (at bottom) are visited first
+                    let orderedChildren = (isInsideConversationPane && depth <= 2) ? Array(children.reversed()) : children
+                    for child in orderedChildren {
                         queue.append((child, depth + 1))
                     }
                 }
