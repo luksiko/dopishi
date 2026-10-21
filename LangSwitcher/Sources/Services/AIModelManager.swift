@@ -197,16 +197,14 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
             }
         }
         
-        // 2. Check workspace models/ folder (convenience for development)
-        if customModelsDirectory == nil {
-            let cwdModelsURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appendingPathComponent("models/\(currentModel.fileName)")
-            if fileManager.fileExists(atPath: cwdModelsURL.path) {
-                if let attrs = try? fileManager.attributesOfItem(atPath: cwdModelsURL.path),
-                   let size = attrs[.size] as? Int64, size > 10_000_000 {
-                    self.state = .ready(modelPath: cwdModelsURL.path, fileSize: size)
-                    return
-                }
+        // 2. Check candidate paths (workspace models/ folder, Cotypist, other local caches)
+        for path in candidatePaths(for: currentModel) {
+            if path != targetURL.path, fileManager.fileExists(atPath: path),
+               Self.hasGGUFHeader(at: path),
+               let attrs = try? fileManager.attributesOfItem(atPath: path),
+               let size = attrs[.size] as? Int64, size > 10_000_000 {
+                self.state = .ready(modelPath: path, fileSize: size)
+                return
             }
         }
         
