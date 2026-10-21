@@ -154,6 +154,52 @@ final class ScreenContextService: ObservableObject {
         chatBundleIDs.contains(bundleID)
     }
 
+    // Terminal application bundle identifiers
+    nonisolated static let terminalBundleIDs: Set<String> = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+        "dev.warp.Warp-Main",
+        "dev.warp.Warp-Stable",
+        "io.alacritty",
+        "net.kovidgoyal.kitty",
+        "co.zeit.hyper",
+        "com.github.wez.wezterm"
+    ]
+
+    nonisolated static func isTerminalApp(bundleID: String) -> Bool {
+        terminalBundleIDs.contains(bundleID)
+    }
+
+    // Code editor bundle identifiers (VS Code, Cursor, Zed, JetBrains, Xcode)
+    nonisolated static let codeEditorBundleIDs: Set<String> = [
+        "com.microsoft.VSCode",
+        "com.microsoft.VSCodeInsiders",
+        "com.visualstudio.code.oss",
+        "com.vscodium",
+        "com.cursor.Cursor",
+        "com.exafunction.windsurf",
+        "dev.zed.Zed",
+        "com.sublimetext.4",
+        "com.sublimetext.3",
+        "com.jetbrains.intellij",
+        "com.jetbrains.intellij.ce",
+        "com.jetbrains.pycharm",
+        "com.jetbrains.pycharm.ce",
+        "com.jetbrains.webstorm",
+        "com.jetbrains.CLion",
+        "com.jetbrains.rider",
+        "com.jetbrains.goland",
+        "com.jetbrains.AppCode",
+        "com.jetbrains.datagrip",
+        "com.jetbrains.rubymine",
+        "com.apple.dt.Xcode"
+    ]
+
+    nonisolated static func isCodeEditorApp(bundleID: String) -> Bool {
+        codeEditorBundleIDs.contains(bundleID)
+    }
+
     /// Bottom-Up Strategy:
     /// Walks UP from the focused element (active text field / caret) to locate
     /// the conversation message container directly adjacent to or enclosing the input field.
@@ -410,6 +456,9 @@ final class ScreenContextService: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return true }
         if noiseLabels.contains(trimmed) { return true }
+        if TerminalPromptExtractor.isDividerLine(trimmed) || TerminalPromptExtractor.isStatusLine(trimmed) {
+            return true
+        }
         
         // Single characters, symbols, or pure digits
         if trimmed.count == 1 { return true }
@@ -427,7 +476,10 @@ final class ScreenContextService: ObservableObject {
     }
     
     nonisolated static func sanitizeMessage(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let command = TerminalPromptExtractor.stripPromptPrefix(from: trimmed), !command.isEmpty {
+            trimmed = command
+        }
         guard trimmed.count >= 2 else { return nil }
         
         let range = NSRange(location: 0, length: trimmed.utf16.count)
@@ -763,6 +815,31 @@ final class ScreenContextService: ObservableObject {
         
         if isChat && focusedRect == nil && !isInsideConversationPane {
             return nil
+        }
+        
+        // Fast path for terminal emulators: extract visible screen text and clean TUI/borders
+        if isTerminalApp(bundleID: bundleID) {
+            if let terminalText = extractElementText(traversalRoot) ?? extractElementText(window) {
+                let parsed = TerminalPromptExtractor.parseTerminalBuffer(terminalText)
+                if !parsed.cleanedLines.isEmpty {
+                    var items: [(text: String, y: CGFloat, x: CGFloat, speaker: Speaker)] = []
+                    for (index, line) in parsed.cleanedLines.suffix(maxMessages).enumerated() {
+                        let isCurrent = (line == parsed.currentCommand)
+                        let speaker: Speaker = isCurrent ? .outgoing : .incoming
+                        items.append((text: line, y: CGFloat(index * 20), x: 0, speaker: speaker))
+                    }
+                    if let result = filterAndFormat(
+                        attributedItems: items,
+                        windowTitle: windowTitle,
+                        appBundleID: bundleID,
+                        appName: appName,
+                        maxCharacters: maxCharacters,
+                        maxMessages: maxMessages
+                    ) {
+                        return result
+                    }
+                }
+            }
         }
         
         let deadline = ProcessInfo.processInfo.systemUptime + maxTimeBudgetSeconds

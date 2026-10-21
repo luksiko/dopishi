@@ -239,6 +239,30 @@ final class TextConverter {
     
     // MARK: - Greedy Phrase Conversion
     
+    /// Recognizes leading code comments (e.g. "// ", "/// ", "/* ", " * ", "# ", "-- ", "% ")
+    /// with optional indentation. Preserves the syntax marker intact so it won't be garbled by layout mapping.
+    static func extractCodeCommentPrefix(from line: String) -> (prefix: String, remainder: String)? {
+        let whitespace = line.prefix(while: { $0.isWhitespace })
+        let afterWhitespace = line.dropFirst(whitespace.count)
+        
+        let commentMarkers = ["///", "//", "/*", "*", "#", "--", "%"]
+        for marker in commentMarkers {
+            if afterWhitespace.hasPrefix(marker) {
+                let markerEnd = afterWhitespace.dropFirst(marker.count)
+                if markerEnd.isEmpty || markerEnd.first?.isWhitespace == true {
+                    let trailingSpaces = markerEnd.prefix(while: { $0.isWhitespace })
+                    let fullPrefixLength = whitespace.count + marker.count + trailingSpaces.count
+                    let prefix = String(line.prefix(fullPrefixLength))
+                    let remainder = String(line.dropFirst(fullPrefixLength))
+                    if !remainder.isEmpty {
+                        return (prefix, remainder)
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
     /// Given a line of text (from cursor to start of line), find the boundary where
     /// the wrong layout begins and return: (prefix to keep unchanged, suffix to convert).
     /// Returns nil if no wrong-layout portion found.
@@ -262,6 +286,13 @@ final class TextConverter {
     func findWrongLayoutBoundary(in text: String) -> (keep: String, convert: String)? {
         let layouts = settingsManager.enabledLayouts
         guard layouts.count >= 2 else { return nil }
+        
+        // Preserve code comments (VS Code, Xcode, JetBrains, terminal scripts)
+        if let (commentPrefix, remainder) = Self.extractCodeCommentPrefix(from: text) {
+            if let boundary = findWrongLayoutBoundary(in: remainder) {
+                return (keep: commentPrefix + boundary.keep, convert: boundary.convert)
+            }
+        }
         
         // Tokenize: split into words and separators, preserving order and whitespace
         let tokens = tokenize(text)

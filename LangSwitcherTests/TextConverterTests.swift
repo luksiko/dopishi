@@ -364,4 +364,54 @@ final class TextConverterTests: XCTestCase {
         XCTAssertNil(TextConverter.fixTwoInitialCapitals("A"))
         XCTAssertNil(TextConverter.fixTwoInitialCapitals("П"))
     }
+
+    // MARK: - Code Comments Preservation
+
+    func testExtractCodeCommentPrefix() {
+        let slashSlash = TextConverter.extractCodeCommentPrefix(from: "// hello")
+        XCTAssertEqual(slashSlash?.prefix, "// ")
+        XCTAssertEqual(slashSlash?.remainder, "hello")
+
+        let tripleSlash = TextConverter.extractCodeCommentPrefix(from: "    /// doc comment")
+        XCTAssertEqual(tripleSlash?.prefix, "    /// ")
+        XCTAssertEqual(tripleSlash?.remainder, "doc comment")
+
+        let hashComment = TextConverter.extractCodeCommentPrefix(from: "  # python comment")
+        XCTAssertEqual(hashComment?.prefix, "  # ")
+        XCTAssertEqual(hashComment?.remainder, "python comment")
+
+        let sqlComment = TextConverter.extractCodeCommentPrefix(from: "-- sql comment")
+        XCTAssertEqual(sqlComment?.prefix, "-- ")
+        XCTAssertEqual(sqlComment?.remainder, "sql comment")
+
+        // Non-comment lines must return nil
+        XCTAssertNil(TextConverter.extractCodeCommentPrefix(from: "let x = 10"))
+        XCTAssertNil(TextConverter.extractCodeCommentPrefix(from: "https://github.com"))
+        XCTAssertNil(TextConverter.extractCodeCommentPrefix(from: "//"))
+    }
+
+    func testFindWrongLayoutBoundary_PreservesCodeComments() {
+        let result = converter.findWrongLayoutBoundary(in: "// ghbdtn rfr ltkf")
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.keep, "// ")
+        XCTAssertEqual(result?.convert, "ghbdtn rfr ltkf")
+
+        let pythonResult = converter.findWrongLayoutBoundary(in: "    # ghbdtn")
+        XCTAssertNotNil(pythonResult)
+        XCTAssertEqual(pythonResult?.keep, "    # ")
+        XCTAssertEqual(pythonResult?.convert, "ghbdtn")
+
+        let mixedResult = converter.findWrongLayoutBoundary(in: "// Привет ghbdtn")
+        XCTAssertNotNil(mixedResult)
+        XCTAssertEqual(mixedResult?.keep, "// Привет ")
+        XCTAssertEqual(mixedResult?.convert, "ghbdtn")
+    }
+
+    func testConvertLineGreedy_PreservesCodeComments() {
+        let slashResult = converter.convertLineGreedy("// ghbdtn")
+        XCTAssertEqual(slashResult, "// привет")
+
+        let hashResult = converter.convertLineGreedy("    # ghbdtn")
+        XCTAssertEqual(hashResult, "    # привет")
+    }
 }
