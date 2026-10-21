@@ -853,21 +853,7 @@ final class ScreenContextService: ObservableObject {
             }
             
             if textRoles.contains(role) {
-                var valueRef: CFTypeRef?
-                AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef)
-                var rawText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string
-                
-                if rawText == nil || rawText?.isEmpty == true {
-                    var descRef: CFTypeRef?
-                    AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef)
-                    rawText = descRef as? String
-                }
-                
-                if rawText == nil || rawText?.isEmpty == true {
-                    var titleRef: CFTypeRef?
-                    AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleRef)
-                    rawText = titleRef as? String
-                }
+                let rawText = Self.extractElementText(element)
                 
                 if let text = rawText,
                    !isTimestampOrDate(text),
@@ -931,6 +917,62 @@ final class ScreenContextService: ObservableObject {
     }
     
     // MARK: - AX Helpers
+    
+    /// Safely extracts text from an accessibility element using:
+    /// 1. Parameterized visible character range (kAXVisibleCharacterRangeAttribute + kAXStringForRangeParameterizedAttribute),
+    ///    which is optimal for native AppKit NSTextView (TextEdit, Notes, Mail, Pages, Xcode).
+    /// 2. Direct kAXValueAttribute (plain text fields, static texts, web text nodes).
+    /// 3. kAXDescriptionAttribute (accessible labels, icons with descriptions).
+    /// 4. kAXTitleAttribute (window / element titles).
+    nonisolated static func extractElementText(_ element: AXUIElement) -> String? {
+        // 1. Try visible character range with parameterized string lookup (ideal for NSTextView / large documents)
+        var rangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXVisibleCharacterRangeAttribute as CFString, &rangeRef) == .success,
+           let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID() {
+            var cfRange = CFRange(location: 0, length: 0)
+            if AXValueGetValue(rangeValue as! AXValue, .cfRange, &cfRange), cfRange.length > 0 {
+                // Bound the range to avoid huge IPC allocations
+                let boundedLength = min(cfRange.length, 2500)
+                var queryRange = CFRange(location: cfRange.location, length: boundedLength)
+                if let boundedValue = AXValueCreate(.cfRange, &queryRange) {
+                    var strRef: CFTypeRef?
+                    if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, boundedValue, &strRef) == .success {
+                        if let s = strRef as? String, !s.isEmpty {
+                            return s
+                        } else if let attrStr = strRef as? NSAttributedString, !attrStr.string.isEmpty {
+                            return attrStr.string
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. Direct value attribute (strings, text fields, static texts)
+        var valueRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success {
+            if let str = valueRef as? String, !str.isEmpty {
+                return str
+            } else if let attrStr = valueRef as? NSAttributedString, !attrStr.string.isEmpty {
+                return attrStr.string
+            }
+        }
+        
+        // 3. Accessibility Description attribute
+        var descRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef) == .success,
+           let desc = descRef as? String, !desc.isEmpty {
+            return desc
+        }
+        
+        // 4. Accessibility Title attribute
+        var titleRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleRef) == .success,
+           let title = titleRef as? String, !title.isEmpty {
+            return title
+        }
+        
+        return nil
+    }
     
     nonisolated static func elementFrame(_ element: AXUIElement) -> CGRect? {
         var posRef: CFTypeRef?

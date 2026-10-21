@@ -299,6 +299,10 @@ final class CheckedTextReplacementTests: XCTestCase {
             selection: CFRange(location: text.utf16.count, length: 0), expected: "ghbdtn ")!
         XCTAssertEqual((text as NSString).replacingCharacters(in: range, with: "привет "), "👨‍👩‍👧‍👦  привет ")
     }
+    func testPressCopyMenuItemSafety() {
+        let system = AXUIElementCreateSystemWide()
+        XCTAssertFalse(AccessibilityService.pressCopyMenuItem(in: system))
+    }
 }
 
 final class ReplacementSessionTests: XCTestCase {

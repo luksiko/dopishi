@@ -362,4 +362,11 @@ final class ScreenContextServiceTests: XCTestCase {
         // With nil frontmostApp / excluded app in test host, safely returns nil
         XCTAssertNil(result)
     }
+
+    func testExtractElementTextSafety() {
+        // System wide element has no text roles or value attributes, extractElementText should return nil safely
+        let system = AXUIElementCreateSystemWide()
+        let result = ScreenContextService.extractElementText(system)
+        XCTAssertNil(result)
+    }
 }

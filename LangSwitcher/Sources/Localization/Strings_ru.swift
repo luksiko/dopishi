@@ -1,25 +1,25 @@
 import Foundation
 
 // MARK: - Russian Strings (Русский)
-// Перевод всех строк интерфейса LangSwitcher на русский язык.
+// Перевод всех строк интерфейса Dopishi на русский язык.
 
 enum Strings_ru {
 
     static let strings: [String: String] = [
 
         // ── Меню (StatusBarController) ──────────────────────────────
-        "menu.header":                   "⌨ LangSwitcher",
+        "menu.header":                   "⌨ Dopishi",
         "menu.convertText":              "Конвертировать текст",
         "menu.switchLayout":             "Переключить раскладку",
         "menu.activeLayouts":            "Активные раскладки:",
         "menu.conversions":              "Конвертаций:",
         "menu.settings":                 "Настройки...",
-        "menu.about":                    "О LangSwitcher",
-        "menu.quit":                     "Завершить LangSwitcher",
-        "menu.tooltip":                  "LangSwitcher — %@ для конвертации",
+        "menu.about":                    "О Dopishi",
+        "menu.quit":                     "Завершить Dopishi",
+        "menu.tooltip":                  "Dopishi — %@ для конвертации",
 
         // ── Окно настроек ───────────────────────────────────────────
-        "settings.windowTitle":          "Настройки LangSwitcher",
+        "settings.windowTitle":          "Настройки Dopishi",
         "settings.tab.general":          "Основные",
         "settings.tab.layouts":          "Раскладки",
         "settings.tab.hotkey":           "Горячая клавиша",
@@ -100,16 +100,16 @@ enum Strings_ru {
 
         // ── Вкладка «Разрешения» ────────────────────────────────────
         "permissions.title":             "Разрешения",
-        "permissions.description":       "LangSwitcher нуждается в доступе к функциям универсального доступа для чтения и замены выделенного текста в других приложениях.",
+        "permissions.description":       "Dopishi нуждается в доступе к функциям универсального доступа для чтения и замены выделенного текста в других приложениях.",
         "permissions.accessibilityTitle":"Доступ к универсальному доступу",
-        "permissions.granted":           "Предоставлен — LangSwitcher может конвертировать текст",
+        "permissions.granted":           "Предоставлен — Dopishi может конвертировать текст",
         "permissions.notGranted":        "Не предоставлен — включите в Системных настройках",
         "permissions.grantAccess":       "Предоставить доступ",
         "permissions.howToEnable":       "Как включить:",
         "permissions.step1":             "1. Откройте Системные настройки > Конфиденциальность > Универсальный доступ",
         "permissions.step2":             "2. Нажмите значок замка для внесения изменений",
-        "permissions.step3":             "3. Включите LangSwitcher в списке",
-        "permissions.step4":             "4. При необходимости перезапустите LangSwitcher",
+        "permissions.step3":             "3. Включите Dopishi в списке",
+        "permissions.step4":             "4. При необходимости перезапустите Dopishi",
         "permissions.openSettings":      "Открыть Системные настройки",
         "permissions.refreshStatus":     "Обновить статус",
 
@@ -143,8 +143,8 @@ enum Strings_ru {
         "log.disabledHint":              "Включите журнал выше, чтобы начать запись конвертаций.",
 
         // ── Окно «О программе» ──────────────────────────────────────
-        "about.windowTitle":             "О программе LangSwitcher",
-        "about.appName":                 "LangSwitcher",
+        "about.windowTitle":             "О программе Dopishi",
+        "about.appName":                 "Dopishi",
         "about.version":                 "Версия 1.3.0",
         "about.tagline":                 "Конвертер раскладки клавиатуры для macOS с открытым кодом",
         "about.howToUse":                "Как использовать:",
@@ -153,22 +153,23 @@ enum Strings_ru {
         "about.step3":                   "Текст автоматически конвертируется!",
         "about.github":                  "GitHub",
         "about.license":                 "Лицензия MIT",
+        "about.forkNotice":              "Форк langSwitcher от reg2005 с благодарностью",
 
         // ── Алерты (AppDelegate) ────────────────────────────────────
         "alert.accessibilityTitle":      "Требуется доступ к универсальному доступу",
         "alert.accessibilityMessage":    """
-LangSwitcher нуждается в разрешении универсального доступа для чтения и замены текста.
+Dopishi нуждается в разрешении универсального доступа для чтения и замены текста.
 
-Откройте Системные настройки → Конфиденциальность → Универсальный доступ и включите LangSwitcher.
+Откройте Системные настройки → Конфиденциальность → Универсальный доступ и включите Dopishi.
 
 При запуске из Xcode: добавьте собранное приложение из DerivedData или сам Xcode.
 
 Если разрешение уже предоставлено, но не работает:
-1. Удалите LangSwitcher из списка универсального доступа
+1. Удалите Dopishi из списка универсального доступа
 2. Добавьте заново
 3. Перезапустите приложение
 
-Также проверьте: Конфиденциальность → Мониторинг ввода — LangSwitcher может быть нужен и там.
+Также проверьте: Конфиденциальность → Мониторинг ввода — Dopishi может быть нужен и там.
 """,
         "alert.openSystemSettings":      "Открыть Системные настройки",
         "alert.continueAnyway":          "Продолжить",
@@ -317,7 +318,7 @@ LangSwitcher нуждается в разрешении универсально
         "permissions.otherCopy": "Другая копия",
         "permissions.revealCopy": "Показать в Finder",
         "permissions.instanceError": "Не удалось защититься от повторного запуска",
-        "permissions.instanceErrorDetail": "LangSwitcher завершится, чтобы не запускать несколько обработчиков клавиш. Проверьте доступ к папке приложения в Application Support.",
+        "permissions.instanceErrorDetail": "Dopishi завершится, чтобы не запускать несколько обработчиков клавиш. Проверьте доступ к папке приложения в Application Support.",
 
         // ── AI Assistant ─────────────────────────────────────────────
         "ai.title":                              "Локальный AI Помощник",

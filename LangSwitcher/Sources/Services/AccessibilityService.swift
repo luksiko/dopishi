@@ -60,10 +60,10 @@ final class AccessibilityService {
         let pasteboard = NSPasteboard.general
         let savedContents = savePasteboard()
         
-        // Copy selected text (⌘C)
+        // Copy selected text (try native AX menu action first, fallback to ⌘C)
         pasteboard.clearContents()
-        simulateCopy()
-        usleep(150_000) // 150ms — give target app time to process ⌘C
+        performCopy()
+        usleep(150_000) // 150ms — give target app time to process copy
         
         guard let selectedText = pasteboard.string(forType: .string),
               !selectedText.isEmpty else {
@@ -109,9 +109,9 @@ final class AccessibilityService {
         simulateSelectToLineStart()
         usleep(150_000) // 150ms
         
-        // Copy the selection
+        // Copy the selection (native AX menu copy first, fallback to ⌘C)
         pasteboard.clearContents()
-        simulateCopy()
+        performCopy()
         usleep(150_000) // 150ms
         
         guard let selectedText = pasteboard.string(forType: .string),
@@ -160,9 +160,9 @@ final class AccessibilityService {
         simulateSelectWordLeft()
         usleep(150_000) // 150ms — give target app time to process selection
         
-        // Copy the selection
+        // Copy the selection (native AX menu copy first, fallback to ⌘C)
         pasteboard.clearContents()
-        simulateCopy()
+        performCopy()
         usleep(150_000) // 150ms — give target app time to process ⌘C
         
         var selectedText = pasteboard.string(forType: .string) ?? ""
@@ -172,7 +172,7 @@ final class AccessibilityService {
             simulateSelectWordLeft()
             usleep(150_000)
             pasteboard.clearContents()
-            simulateCopy()
+            performCopy()
             usleep(150_000)
             selectedText = pasteboard.string(forType: .string) ?? ""
         }
@@ -236,6 +236,88 @@ final class AccessibilityService {
         postKeyEvent(virtualKey: virtualKey, keyDown: false, modifiers: modifiers)
     }
     
+    /// Attempts to trigger Copy via native AX menu action first; falls back to synthetic ⌘C.
+    private func performCopy() {
+        if pressCopyMenuItem() {
+            NSLog("[LangSwitcher] performCopy: successfully executed native AX copy menu action")
+        } else {
+            simulateCopy()
+        }
+    }
+
+    /// Triggers the frontmost application's "Edit -> Copy" menu item action via Accessibility API.
+    /// This bypasses synthetic keyboard simulation, avoiding modifier collisions and layout-dependent keys.
+    func pressCopyMenuItem() -> Bool {
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return false }
+        return Self.pressCopyMenuItem(in: AXUIElementCreateApplication(frontApp.processIdentifier))
+    }
+
+    /// Internal search for Edit -> Copy menu item in the given application element.
+    static func pressCopyMenuItem(in appElement: AXUIElement) -> Bool {
+        AXUIElementSetMessagingTimeout(appElement, 0.05)
+        
+        var menuBarRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXMenuBarAttribute as CFString, &menuBarRef) == .success,
+              let menuBar = menuBarRef, CFGetTypeID(menuBar) == AXUIElementGetTypeID() else {
+            return false
+        }
+        
+        var menuBarItemsRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(menuBar as! AXUIElement, kAXChildrenAttribute as CFString, &menuBarItemsRef) == .success,
+              let menuBarItems = menuBarItemsRef as? [AXUIElement] else {
+            return false
+        }
+        
+        // Scan menus (Edit is typically among the first 8 menus)
+        for menuBarItem in menuBarItems.prefix(8) {
+            var childrenRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(menuBarItem, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+                  let menus = childrenRef as? [AXUIElement] else {
+                continue
+            }
+            
+            for menu in menus {
+                var itemsRef: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(menu, kAXChildrenAttribute as CFString, &itemsRef) == .success,
+                      let items = itemsRef as? [AXUIElement] else {
+                    continue
+                }
+                
+                for item in items {
+                    // Check cmd key shortcut (Cmd+C)
+                    var cmdCharRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(item, "AXMenuItemCmdChar" as CFString, &cmdCharRef) == .success,
+                       let cmdChar = cmdCharRef as? String, cmdChar.lowercased() == "c" {
+                        var enabledRef: CFTypeRef?
+                        if AXUIElementCopyAttributeValue(item, kAXEnabledAttribute as CFString, &enabledRef) == .success,
+                           let isEnabled = enabledRef as? Bool, !isEnabled {
+                            // Copy menu is present but disabled -> nothing selected
+                            return false
+                        }
+                        return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                    }
+                    
+                    // Fallback: check localized title
+                    var titleRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &titleRef) == .success,
+                       let title = (titleRef as? String)?.lowercased() {
+                        if title == "copy" || title == "копировать" || title == "скопировать" ||
+                           title == "copier" || title == "kopieren" || title == "copiar" {
+                            var enabledRef: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(item, kAXEnabledAttribute as CFString, &enabledRef) == .success,
+                               let isEnabled = enabledRef as? Bool, !isEnabled {
+                                return false
+                            }
+                            return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false
+    }
+    
     private func simulateCopy() {
         NSLog("[LangSwitcher] Simulating ⌘C...")
         simulateKeystroke(virtualKey: 0x08, modifiers: .maskCommand) // C key
@@ -280,7 +362,7 @@ final class AccessibilityService {
         usleep(150_000)
 
         pasteboard.clearContents()
-        simulateCopy()
+        performCopy()
         usleep(150_000)
 
         guard let selectedText = pasteboard.string(forType: .string),
@@ -388,6 +470,39 @@ final class AccessibilityService {
             return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
                                          selection: selectedRange, selectedText: selectedText,
                                          maxSurroundingLength: maxSurroundingLength)
+        }
+        
+        // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
+        // use parameterized attribute kAXStringForRangeParameterizedAttribute around the caret.
+        let queryStart = max(0, selectedRange.location - maxSurroundingLength)
+        let queryLength = (selectedRange.location - queryStart) + selectedRange.length + maxSurroundingLength
+        var queryRange = CFRange(location: queryStart, length: queryLength)
+        if let rangeValue = AXValueCreate(.cfRange, &queryRange) {
+            var strRef: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, rangeValue, &strRef) == .success {
+                let chunk = (strRef as? String) ?? (strRef as? NSAttributedString)?.string
+                if let chunk = chunk, !chunk.isEmpty {
+                    let caretOffsetInChunk = min(selectedRange.location - queryStart, (chunk as NSString).length)
+                    let textBefore = (chunk as NSString).substring(to: caretOffsetInChunk)
+                    let selLengthInChunk = min(selectedRange.length, (chunk as NSString).length - caretOffsetInChunk)
+                    let textAfterStart = caretOffsetInChunk + selLengthInChunk
+                    let textAfter = textAfterStart <= (chunk as NSString).length
+                        ? (chunk as NSString).substring(from: textAfterStart)
+                        : ""
+                    let selText = selectedText.isEmpty && selLengthInChunk > 0
+                        ? (chunk as NSString).substring(with: NSRange(location: caretOffsetInChunk, length: selLengthInChunk))
+                        : selectedText
+                    
+                    return CaretContext(
+                        fieldIdentifier: fieldID,
+                        textBeforeCaret: textBefore,
+                        textAfterCaret: textAfter,
+                        selectedText: selText,
+                        caretLocation: selectedRange.location,
+                        fullTextLength: max(selectedRange.location + (chunk as NSString).length - caretOffsetInChunk, (chunk as NSString).length)
+                    )
+                }
+            }
         }
         
         return CaretContext(

@@ -35,7 +35,11 @@ final class ConversionLogStore: ObservableObject {
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first!
-        let dir = appSupport.appendingPathComponent("LangSwitcher", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("Dopishi", isDirectory: true)
+        let legacyDir = appSupport.appendingPathComponent("LangSwitcher", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) && FileManager.default.fileExists(atPath: legacyDir.path) {
+            try? FileManager.default.copyItem(at: legacyDir, to: dir)
+        }
         
         // Create directory if it doesn't exist
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

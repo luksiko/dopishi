@@ -27,14 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // The test host must not compete with the installed app or start monitors.
         guard NSClassFromString("XCTestCase") == nil else { return }
-        let identifier = Bundle.main.bundleIdentifier ?? "com.langswitcher.app"
+        let identifier = Bundle.main.bundleIdentifier ?? "com.dopishi.app"
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
             .filter {
                 $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
                     && $0.isFinishedLaunching && !$0.isTerminated
             }
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("LangSwitcher", isDirectory: true)
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = appSupport.appendingPathComponent("Dopishi", isDirectory: true)
+        let legacyDirectory = appSupport.appendingPathComponent("LangSwitcher", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directory.path) && FileManager.default.fileExists(atPath: legacyDirectory.path) {
+            try? FileManager.default.copyItem(at: legacyDirectory, to: directory)
+        }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let lock = try AppInstanceLock(url: directory.appendingPathComponent("instance.lock"))
@@ -549,7 +553,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let input = input, let output = output else { return }
         
         let content = UNMutableNotificationContent()
-        content.title = "LangSwitcher"
+        content.title = "Dopishi"
         content.body = "\(input) → \(output)"
         content.sound = nil // Sound is handled separately by playSounds setting
         
@@ -573,7 +577,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let activeLayout = KeyboardLayoutDetector.getCurrentLayout() ?? layout
         
         let content = UNMutableNotificationContent()
-        content.title = "LangSwitcher"
+        content.title = "Dopishi"
         content.body = l10n.t("notification.layoutSwitched").replacingOccurrences(of: "%@", with: activeLayout.displayName)
         content.sound = nil
         

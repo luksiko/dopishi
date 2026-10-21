@@ -60,7 +60,12 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
             return custom
         }
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("LangSwitcher/Models", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("Dopishi/Models", isDirectory: true)
+        let legacyDir = appSupport.appendingPathComponent("LangSwitcher/Models", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) && FileManager.default.fileExists(atPath: legacyDir.path) {
+            try? FileManager.default.copyItem(at: legacyDir, to: dir)
+        }
+        return dir
     }
     
     nonisolated func modelFileURL(for model: RecommendedAIModel) -> URL {
@@ -118,8 +123,10 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
                 .appendingPathComponent("models/\(model.fileName)").path
             paths.append(cwdPath)
             
-            // Auto-detect existing local model from Cotypist or common local model caches
+            // Auto-detect existing local model from legacy LangSwitcher, Cotypist or common local model caches
             if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let legacyPath = appSupport.appendingPathComponent("LangSwitcher/Models/\(model.fileName)").path
+                paths.append(legacyPath)
                 let cotypistPath = appSupport.appendingPathComponent("app.cotypist.Cotypist/Models/\(model.fileName)").path
                 paths.append(cotypistPath)
             }

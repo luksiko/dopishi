@@ -11,5 +11,5 @@ exec xcodebuild test \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=YES \
-  PRODUCT_BUNDLE_IDENTIFIER=com.langswitcher.testhost \
+  PRODUCT_BUNDLE_IDENTIFIER=com.dopishi.testhost \
   "$@"

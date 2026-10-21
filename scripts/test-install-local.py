@@ -11,12 +11,12 @@ SCRIPTS = Path(__file__).resolve().parent
 
 class LocalInstallTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="langswitcher-install-test-")
+        self.temp = tempfile.TemporaryDirectory(prefix="dopishi-install-test-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.apps = self.root / "Applications"
         self.apps.mkdir()
-        self.installed = self.apps / "LangSwitcher.app"
+        self.installed = self.apps / "Dopishi.app"
         self.installed.mkdir()
         (self.installed / "version").write_text("old")
         self.source = self.root / "source.app"
@@ -30,14 +30,15 @@ class LocalInstallTests(unittest.TestCase):
                         TEST_EVENTS=str(self.events))
         # Substitute only fixed installation paths, never exercise /Applications.
         source = (SCRIPTS / "install-local.sh").read_text()
-        self.assertIn('installed_app="/Applications/LangSwitcher.app"', source)
-        self.assertIn('mktemp -d /Applications/.LangSwitcher-install.XXXXXX', source)
+        self.assertIn('installed_app="/Applications/Dopishi.app"', source)
+        self.assertIn('mktemp -d /Applications/.Dopishi-install.XXXXXX', source)
         source = source.replace('/Applications/', str(self.apps) + '/')
         self.installer = self.root / "install-local.sh"
         self.installer.write_text(source)
+        self.tool(self.root / "embed-inference.sh", 'exit 0')
         self.tool(self.root / "sign-app.sh", 'echo sign >> "$TEST_EVENTS"; exit "${TEST_SIGN_EXIT:-0}"')
         self.tool(self.bin / "codesign", r'''if [[ "$*" == *--requirements* ]]; then
-  echo 'designated => identifier "com.langswitcher.app" and anchor apple generic'
+  echo 'designated => identifier "com.dopishi.app" and anchor apple generic'
 elif [[ "$*" == *--display* ]]; then
   echo "${TEST_SIGNATURE:-Authority=Test certificate}" >&2
 else
@@ -52,7 +53,7 @@ else
 fi''')
         self.tool(self.bin / "pgrep", 'exit 1')
         self.tool(self.bin / "open", 'echo open >> "$TEST_EVENTS"')
-        self.tool(self.bin / "mv", r'''if [[ "${TEST_FAIL_REPLACEMENT:-}" == 1 && "$2" == */.LangSwitcher-install.*/LangSwitcher.app ]]; then
+        self.tool(self.bin / "mv", r'''if [[ "${TEST_FAIL_REPLACEMENT:-}" == 1 && "$2" == */.Dopishi-install.*/Dopishi.app ]]; then
   exit 1
 fi
 exec /bin/mv "$@"''')
@@ -90,8 +91,8 @@ exec /bin/mv "$@"''')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.installed / "version").read_text(), "new")
         self.assertEqual(self.events.read_text().splitlines(), ["sign", "verify", "backup", "open"])
-        self.assertEqual(len(list((self.root / "Library/Application Support/LangSwitcher/Backups").glob("*.zip"))), 1)
-        self.assertFalse(list(self.apps.glob(".LangSwitcher-install.*")))
+        self.assertEqual(len(list((self.root / "Library/Application Support/Dopishi/Backups").glob("*.zip"))), 1)
+        self.assertFalse(list(self.apps.glob(".Dopishi-install.*")))
 
     def test_failed_replacement_restores_old_bundle(self):
         self.assertNotEqual(self.run_installer(TEST_FAIL_REPLACEMENT="1").returncode, 0)

@@ -148,12 +148,27 @@ final class SpellCheckService {
     /// Get spelling completions for a partial word.
     func completions(forPartialWord word: String, language: String) -> [String] {
         let lang = normalizeLanguage(language)
-        let completions = checker.completions(
+        var completions = checker.completions(
             forPartialWordRange: NSRange(location: 0, length: (word as NSString).length),
             in: word,
             language: lang,
             inSpellDocumentWithTag: 0
         )
+        if (completions == nil || completions?.isEmpty == true) {
+            let prefix = lang + "_"
+            for available in checker.availableLanguages {
+                if available.hasPrefix(prefix) {
+                    if let fallback = checker.completions(
+                        forPartialWordRange: NSRange(location: 0, length: (word as NSString).length),
+                        in: word,
+                        language: available,
+                        inSpellDocumentWithTag: 0
+                    ), !fallback.isEmpty {
+                        return fallback
+                    }
+                }
+            }
+        }
         return completions ?? []
     }
 }

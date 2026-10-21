@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grant Accessibility permission for LangSwitcher debug builds
+# Grant Accessibility permission for Dopishi debug builds
 # Run with: sudo bash scripts/grant-accessibility.sh
 #
 # This is needed because Xcode debug builds use ad-hoc signing,
@@ -8,10 +8,10 @@
 
 set -e
 
-BUNDLE_ID="com.langswitcher.app"
-APP_PATH="/Users/user/Library/Developer/Xcode/DerivedData/LangSwitcher-bvflroofntkuwqdehotvgnowagfq/Build/Products/Debug/LangSwitcher.app"
+BUNDLE_ID="com.dopishi.app"
+APP_PATH="${1:-/Applications/Dopishi.app}"
 
-echo "=== LangSwitcher Accessibility Permission Setup ==="
+echo "=== Dopishi Accessibility Permission Setup ==="
 echo ""
 
 # Step 1: Reset existing permissions for our bundle ID
@@ -55,7 +55,7 @@ if [ "$RESULT" = "2" ]; then
     echo ""
     echo "✅ SUCCESS: Accessibility permission granted for ${BUNDLE_ID}"
     echo ""
-    echo "Now restart LangSwitcher (stop and re-run from Xcode)."
+    echo "Now restart Dopishi (stop and re-run from Xcode)."
 else
     echo ""
     echo "❌ FAILED: Could not verify permission was set."
@@ -65,7 +65,7 @@ else
     echo "  2. Click '+' and navigate to:"
     echo "     ${APP_PATH}"
     echo "  3. Or drag-and-drop the .app file into the list"
-    echo "  4. Restart LangSwitcher"
+    echo "  4. Restart Dopishi"
 fi
 
 echo ""

@@ -9,18 +9,18 @@ enum Strings_en {
     static let strings: [String: String] = [
 
         // ── Menu (StatusBarController) ──────────────────────────────
-        "menu.header":                   "⌨ LangSwitcher",
+        "menu.header":                   "⌨ Dopishi",
         "menu.convertText":              "Convert Text",
         "menu.switchLayout":             "Switch Keyboard Layout",
         "menu.activeLayouts":            "Active Layouts:",
         "menu.conversions":              "Conversions:",
         "menu.settings":                 "Settings...",
-        "menu.about":                    "About LangSwitcher",
-        "menu.quit":                     "Quit LangSwitcher",
-        "menu.tooltip":                  "LangSwitcher — %@ to convert",
+        "menu.about":                    "About Dopishi",
+        "menu.quit":                     "Quit Dopishi",
+        "menu.tooltip":                  "Dopishi — %@ to convert",
 
         // ── Settings Window ─────────────────────────────────────────
-        "settings.windowTitle":          "LangSwitcher Settings",
+        "settings.windowTitle":          "Dopishi Settings",
         "settings.tab.general":          "General",
         "settings.tab.layouts":          "Layouts",
         "settings.tab.hotkey":           "Hotkey",
@@ -101,16 +101,16 @@ enum Strings_en {
 
         // ── Permissions Tab ─────────────────────────────────────────
         "permissions.title":             "Permissions",
-        "permissions.description":       "LangSwitcher needs Accessibility access to read and replace selected text in other applications.",
+        "permissions.description":       "Dopishi needs Accessibility access to read and replace selected text in other applications.",
         "permissions.accessibilityTitle":"Accessibility Access",
-        "permissions.granted":           "Granted — LangSwitcher can convert text",
+        "permissions.granted":           "Granted — Dopishi can convert text",
         "permissions.notGranted":        "Not granted — Please enable in System Settings",
         "permissions.grantAccess":       "Grant Access",
         "permissions.howToEnable":       "How to enable:",
         "permissions.step1":             "1. Open System Settings > Privacy & Security > Accessibility",
         "permissions.step2":             "2. Click the lock icon to make changes",
-        "permissions.step3":             "3. Enable LangSwitcher in the list",
-        "permissions.step4":             "4. Restart LangSwitcher if needed",
+        "permissions.step3":             "3. Enable Dopishi in the list",
+        "permissions.step4":             "4. Restart Dopishi if needed",
         "permissions.openSettings":      "Open System Settings",
         "permissions.refreshStatus":     "Refresh Status",
 
@@ -144,8 +144,8 @@ enum Strings_en {
         "log.disabledHint":              "Enable logging above to start recording conversions.",
 
         // ── About Window ────────────────────────────────────────────
-        "about.windowTitle":             "About LangSwitcher",
-        "about.appName":                 "LangSwitcher",
+        "about.windowTitle":             "About Dopishi",
+        "about.appName":                 "Dopishi",
         "about.version":                 "Version 1.3.0",
         "about.tagline":                 "Open-source keyboard layout text converter for macOS",
         "about.howToUse":                "How to use:",
@@ -154,22 +154,23 @@ enum Strings_en {
         "about.step3":                   "Text is automatically converted!",
         "about.github":                  "GitHub",
         "about.license":                 "MIT License",
+        "about.forkNotice":              "Forked with gratitude from langSwitcher by reg2005",
 
         // ── Alerts (AppDelegate) ────────────────────────────────────
         "alert.accessibilityTitle":      "Accessibility Access Required",
         "alert.accessibilityMessage":    """
-LangSwitcher needs Accessibility permission to read and replace text.
+Dopishi needs Accessibility permission to read and replace text.
 
-Go to System Settings → Privacy & Security → Accessibility and enable LangSwitcher.
+Go to System Settings → Privacy & Security → Accessibility and enable Dopishi.
 
 If running from Xcode: add the built app from DerivedData or add Xcode itself.
 
 If you already granted permission but it still doesn't work:
-1. Remove LangSwitcher from the Accessibility list
+1. Remove Dopishi from the Accessibility list
 2. Re-add it
 3. Restart the app
 
-Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to be listed there too.
+Also check: Privacy & Security → Input Monitoring — Dopishi may need to be listed there too.
 """,
         "alert.openSystemSettings":      "Open System Settings",
         "alert.continueAnyway":          "Continue Anyway",
@@ -268,11 +269,11 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "autocompletion.escapeAction.pauseFewSeconds": "Pause completions for a few seconds",
         "autocompletion.escapeAction.dismissOnly": "Dismiss suggestion only",
         "autocompletion.forceActivate":          "Force-activate completions",
-        "autocompletion.forceActivateDesc":      "In some cases, LangSwitcher can't automatically detect that you have started typing. Invoke this shortcut to take matters into your own hands!",
+        "autocompletion.forceActivateDesc":      "In some cases, Dopishi can't automatically detect that you have started typing. Invoke this shortcut to take matters into your own hands!",
         "autocompletion.toggleCurrentApp":       "Temporarily toggle completions in the current app",
         "autocompletion.toggleCurrentAppDesc":   "Quickly turns completions off for a few minutes in the current application, or back on if they're currently disabled.",
         "autocompletion.toggleGlobally":         "Toggle completions globally",
-        "autocompletion.toggleGloballyDesc":     "Disables completions everywhere until you press the shortcut again. Useful when you want LangSwitcher to stay out of the way entirely for a while.",
+        "autocompletion.toggleGloballyDesc":     "Disables completions everywhere until you press the shortcut again. Useful when you want Dopishi to stay out of the way entirely for a while.",
         "autocompletion.configureShortcuts":     "Configure Shortcuts...",
         "autocompletion.shortcutsLinkTitle":     "Autocompletion Shortcuts",
         "autocompletion.shortcutsLinkDesc":      "Shortcuts for accepting words, full completion, and quick controls are now located in the Shortcuts tab.",
@@ -318,7 +319,7 @@ Also check: Privacy & Security → Input Monitoring — LangSwitcher may need to
         "permissions.otherCopy": "Other copy",
         "permissions.revealCopy": "Show in Finder",
         "permissions.instanceError": "Could not protect against duplicate launch",
-        "permissions.instanceErrorDetail": "LangSwitcher will quit to avoid running multiple keyboard monitors. Check access to its Application Support folder.",
+        "permissions.instanceErrorDetail": "Dopishi will quit to avoid running multiple keyboard monitors. Check access to its Application Support folder.",
 
         // ── AI Assistant ─────────────────────────────────────────────
         "ai.title":                              "Local AI Assistant",

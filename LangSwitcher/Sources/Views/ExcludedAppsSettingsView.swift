@@ -102,7 +102,7 @@ struct ExcludedAppsSettingsView: View {
     }
     
     private func refreshRunningApps() {
-        let currentBundleID = Bundle.main.bundleIdentifier ?? "com.langswitcher.app"
+        let currentBundleID = Bundle.main.bundleIdentifier ?? "com.dopishi.app"
         runningApps = NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != currentBundleID }
             .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }

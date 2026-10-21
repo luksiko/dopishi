@@ -2,9 +2,9 @@
 # Install a complete, consistently signed bundle; keep backups outside LaunchServices scans.
 set -euo pipefail
 
-source_app="${1:?Usage: bash scripts/install-local.sh /path/to/built/LangSwitcher.app}"
+source_app="${1:?Usage: bash scripts/install-local.sh /path/to/built/Dopishi.app}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-identity="${LANGSWITCHER_SIGNING_IDENTITY:-}"
+identity="${LANGSWITCHER_SIGNING_IDENTITY:-${DOPISHI_SIGNING_IDENTITY:-}}"
 if [[ -z "$identity" || "$identity" == "-" ]]; then
     echo "Local updates require LANGSWITCHER_SIGNING_IDENTITY with a stable signing certificate." >&2
     exit 1
@@ -14,9 +14,10 @@ if [[ ! -d "$source_app/Contents/MacOS" ]]; then
     exit 1
 fi
 
-installed_app="/Applications/LangSwitcher.app"
-backup_dir="$HOME/Library/Application Support/LangSwitcher/Backups"
-staging_dir="$(mktemp -d /Applications/.LangSwitcher-install.XXXXXX)"
+installed_app="/Applications/Dopishi.app"
+legacy_installed_app="/Applications/LangSwitcher.app"
+backup_dir="$HOME/Library/Application Support/Dopishi/Backups"
+staging_dir="$(mktemp -d /Applications/.Dopishi-install.XXXXXX)"
 cleanup() {
     result=$?
     # Restore the old bundle if replacement failed after moving it aside.
@@ -29,9 +30,9 @@ cleanup() {
 trap cleanup EXIT
 
 # Sign and verify before touching the installed application or its process.
-ditto "$source_app" "$staging_dir/LangSwitcher.app"
-bash "$script_dir/embed-inference.sh" "$staging_dir/LangSwitcher.app"
-bash "$script_dir/sign-app.sh" "$staging_dir/LangSwitcher.app"
+ditto "$source_app" "$staging_dir/Dopishi.app"
+bash "$script_dir/embed-inference.sh" "$staging_dir/Dopishi.app"
+bash "$script_dir/sign-app.sh" "$staging_dir/Dopishi.app"
 if [[ -d "$installed_app" ]]; then
     # Require the same designated identity for certificate-signed updates.
     # Migration from ad-hoc signing needs fresh Accessibility consent once.
@@ -42,36 +43,45 @@ if [[ -d "$installed_app" ]]; then
             echo "Cannot read the installed application's signing requirement." >&2
             exit 1
         fi
-        codesign --verify --strict -R "=$requirement" "$staging_dir/LangSwitcher.app"
+        codesign --verify --strict -R "=$requirement" "$staging_dir/Dopishi.app"
     else
         echo "Migrating from ad-hoc signing: renew Accessibility consent after this installation."
     fi
     mkdir -p "$backup_dir"
-    backup="$backup_dir/LangSwitcher-$(date +%Y%m%d-%H%M%S)-$$.app.zip"
+    backup="$backup_dir/Dopishi-$(date +%Y%m%d-%H%M%S)-$$.app.zip"
     ditto -c -k --sequesterRsrc --keepParent "$installed_app" "$backup"
     echo "Backup: $backup"
+fi
+if [[ ! -d "$installed_app" && -d "$legacy_installed_app" ]]; then
+    mkdir -p "$backup_dir"
+    backup="$backup_dir/LangSwitcher-migration-$(date +%Y%m%d-%H%M%S)-$$.app.zip"
+    ditto -c -k --sequesterRsrc --keepParent "$legacy_installed_app" "$backup"
+    echo "Legacy backup: $backup"
 fi
 
 # Stop only the installed copy, never unrelated development/test hosts.
 while IFS= read -r pid; do
     [[ -n "$pid" ]] && kill -TERM "$pid"
-done < <(pgrep -f '^/Applications/LangSwitcher[.]app/Contents/MacOS/LangSwitcher$' || true)
+done < <(pgrep -f '^/Applications/(Dopishi|LangSwitcher)[.]app/Contents/MacOS/(Dopishi|LangSwitcher)$' || true)
 while IFS= read -r pid; do
     [[ -n "$pid" ]] && kill -TERM "$pid"
-done < <(pgrep -f '^/Applications/LangSwitcher[.]app/Contents/Helpers/llama-server' || true)
+done < <(pgrep -f '^/Applications/(Dopishi|LangSwitcher)[.]app/Contents/Helpers/llama-server' || true)
 for ((attempt = 0; attempt < 50; attempt++)); do
-    if ! pgrep -f '^/Applications/LangSwitcher[.]app/Contents/MacOS/LangSwitcher$' >/dev/null; then
+    if ! pgrep -f '^/Applications/(Dopishi|LangSwitcher)[.]app/Contents/MacOS/(Dopishi|LangSwitcher)$' >/dev/null; then
         break
     fi
     sleep 0.2
 done
-if pgrep -f '^/Applications/LangSwitcher[.]app/Contents/MacOS/LangSwitcher$' >/dev/null; then
-    echo "LangSwitcher has not quit; installation cancelled." >&2
+if pgrep -f '^/Applications/(Dopishi|LangSwitcher)[.]app/Contents/MacOS/(Dopishi|LangSwitcher)$' >/dev/null; then
+    echo "Dopishi has not quit; installation cancelled." >&2
     exit 1
 fi
 if [[ -e "$installed_app" ]]; then
     mv -- "$installed_app" "$staging_dir/previous.app"
 fi
-mv -- "$staging_dir/LangSwitcher.app" "$installed_app"
+mv -- "$staging_dir/Dopishi.app" "$installed_app"
+if [[ -d "$legacy_installed_app" ]]; then
+    rm -rf -- "$legacy_installed_app"
+fi
 open "$installed_app"
 echo "Installed and launched: $installed_app"

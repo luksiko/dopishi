@@ -137,7 +137,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         
         switch settingsManager.statusBarIconStyle {
         case .keyboardIcon:
-            let image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "LangSwitcher")
+            let image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Dopishi")
             image?.isTemplate = true
             button.image = image
         case .languageBadge:
@@ -197,7 +197,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         
         // Header
-        let headerItem = NSMenuItem(title: "LangSwitcher", action: nil, keyEquivalent: "")
+        let headerItem = NSMenuItem(title: "Dopishi", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.boldSystemFont(ofSize: 13)

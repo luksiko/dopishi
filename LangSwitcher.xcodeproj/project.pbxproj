@@ -168,7 +168,7 @@
 		E10000020000000000000119 /* PerAppAISettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerAppAISettingsTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000120 /* UserTextHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTextHistoryTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000121 /* ScreenContextServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenContextServiceTests.swift; sourceTree = "<group>"; };
-		E10000030000000000000001 /* LangSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LangSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
 		E10000030000000000000101 /* LangSwitcherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LangSwitcherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -322,7 +322,7 @@
 		E10000050000000000000010 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E10000030000000000000001 /* LangSwitcher.app */,
+				E10000030000000000000001 /* Dopishi.app */,
 				E10000030000000000000101 /* LangSwitcherTests.xctest */,
 			);
 			name = Products;
@@ -372,8 +372,8 @@
 			dependencies = (
 			);
 			name = LangSwitcher;
-			productName = LangSwitcher;
-			productReference = E10000030000000000000001 /* LangSwitcher.app */;
+			productName = Dopishi;
+			productReference = E10000030000000000000001 /* Dopishi.app */;
 			productType = "com.apple.product-type.application";
 		};
 		E10000060000000000000101 /* LangSwitcherTests */ = {
@@ -680,15 +680,16 @@
 				INFOPLIST_FILE = LangSwitcher/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2025 LangSwitcher Contributors. MIT License.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2025-2026 Dopishi Contributors. MIT License.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.app;
+				PRODUCT_NAME = Dopishi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_MODULE_NAME = LangSwitcher;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -708,15 +709,16 @@
 				INFOPLIST_FILE = LangSwitcher/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2025 LangSwitcher Contributors. MIT License.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2025-2026 Dopishi Contributors. MIT License.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.app;
+				PRODUCT_NAME = Dopishi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_MODULE_NAME = LangSwitcher;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -730,11 +732,11 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LangSwitcher.app/Contents/MacOS/LangSwitcher";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dopishi.app/Contents/MacOS/Dopishi";
 			};
 			name = Debug;
 		};
@@ -747,11 +749,11 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.langswitcher.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LangSwitcher.app/Contents/MacOS/LangSwitcher";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dopishi.app/Contents/MacOS/Dopishi";
 			};
 			name = Release;
 		};

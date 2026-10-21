@@ -108,7 +108,7 @@ struct PermissionsView: View {
 
     private func refresh() {
         hasAccessibility = AccessibilityService.hasAccessibilityPermission
-        let identifier = Bundle.main.bundleIdentifier ?? "com.langswitcher.app"
+        let identifier = Bundle.main.bundleIdentifier ?? "com.dopishi.app"
         let registered = NSWorkspace.shared.urlsForApplications(withBundleIdentifier: identifier)
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).compactMap(\.bundleURL)
         copies = ServiceStatus.uniqueCopies([Bundle.main.bundleURL] + registered + running)

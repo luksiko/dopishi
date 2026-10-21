@@ -38,19 +38,26 @@ struct AboutView: View {
             
             Divider()
             
-            HStack {
-                Link(l10n.t("about.github"), destination: URL(string: "https://github.com/reg2005/langSwitcher")!)
-                    .font(.caption)
+            VStack(spacing: 6) {
+                HStack {
+                    Link(l10n.t("about.github"), destination: URL(string: "https://github.com/luksiko/dopishi")!)
+                        .font(.caption)
+                    
+                    Text("•")
+                        .foregroundStyle(.secondary)
+                    
+                    Text(l10n.t("about.license"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 
-                Text("•")
+                Text(l10n.t("about.forkNotice"))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                
-                Text(l10n.t("about.license"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .padding(24)
-        .frame(width: 350, height: 380)
+        .frame(width: 350, height: 400)
     }
 }

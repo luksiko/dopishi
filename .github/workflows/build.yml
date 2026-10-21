@@ -142,7 +142,7 @@ jobs:
 
     - name: Sign app bundle
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         if [ "$CODESIGN_ENABLED" = "true" ]; then
           echo "=== Signing with Developer ID ==="
           codesign --force --options runtime --deep \
@@ -158,27 +158,27 @@ jobs:
 
     - name: Verify app bundle
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         echo "=== App bundle contents ==="
         ls -la "$APP_PATH/Contents/"
         ls -la "$APP_PATH/Contents/MacOS/"
         echo "=== Binary info ==="
-        file "$APP_PATH/Contents/MacOS/LangSwitcher"
+        file "$APP_PATH/Contents/MacOS/Dopishi"
         echo "=== Binary size ==="
         du -sh "$APP_PATH"
 
     - name: Create DMG (arm64)
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        DMG_NAME="LangSwitcher-${VERSION}-arm64.dmg"
+        DMG_NAME="Dopishi-${VERSION}-arm64.dmg"
 
         mkdir -p dmg_contents
         cp -R "$APP_PATH" dmg_contents/
         ln -s /Applications dmg_contents/Applications
 
-        hdiutil create -volname "LangSwitcher" \
+        hdiutil create -volname "Dopishi" \
           -srcfolder dmg_contents \
           -ov -format UDZO \
           "$DMG_NAME"
@@ -191,10 +191,10 @@ jobs:
 
     - name: Create ZIP with ditto
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "LangSwitcher-${VERSION}-arm64.zip"
+        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Dopishi-${VERSION}-arm64.zip"
 
     - name: Notarize DMG
       if: env.CODESIGN_ENABLED == 'true' && env.NOTARIZE_ENABLED == 'true'
@@ -219,14 +219,14 @@ jobs:
     - name: Upload arm64 DMG
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-arm64-dmg
+        name: Dopishi-arm64-dmg
         path: "*.dmg"
         if-no-files-found: error
 
     - name: Upload arm64 ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-arm64-zip
+        name: Dopishi-arm64-zip
         path: "*.zip"
         if-no-files-found: error
 
@@ -309,7 +309,7 @@ jobs:
 
     - name: Sign app bundle
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         if [ "$CODESIGN_ENABLED" = "true" ]; then
           codesign --force --options runtime --deep -s "$CODESIGN_IDENTITY" "$APP_PATH"
         else
@@ -320,16 +320,16 @@ jobs:
 
     - name: Create DMG (x86_64)
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        DMG_NAME="LangSwitcher-${VERSION}-x86_64.dmg"
+        DMG_NAME="Dopishi-${VERSION}-x86_64.dmg"
 
         mkdir -p dmg_contents
         cp -R "$APP_PATH" dmg_contents/
         ln -s /Applications dmg_contents/Applications
 
-        hdiutil create -volname "LangSwitcher" \
+        hdiutil create -volname "Dopishi" \
           -srcfolder dmg_contents -ov -format UDZO "$DMG_NAME"
 
         if [ "$CODESIGN_ENABLED" = "true" ]; then
@@ -339,10 +339,10 @@ jobs:
 
     - name: Create ZIP with ditto
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "LangSwitcher-${VERSION}-x86_64.zip"
+        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Dopishi-${VERSION}-x86_64.zip"
 
     - name: Notarize DMG
       if: env.CODESIGN_ENABLED == 'true' && env.NOTARIZE_ENABLED == 'true'
@@ -363,14 +363,14 @@ jobs:
     - name: Upload x86_64 DMG
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-x86_64-dmg
+        name: Dopishi-x86_64-dmg
         path: "*.dmg"
         if-no-files-found: error
 
     - name: Upload x86_64 ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-x86_64-zip
+        name: Dopishi-x86_64-zip
         path: "*.zip"
         if-no-files-found: error
 
@@ -453,7 +453,7 @@ jobs:
 
     - name: Sign app bundle
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         if [ "$CODESIGN_ENABLED" = "true" ]; then
           codesign --force --options runtime --deep -s "$CODESIGN_IDENTITY" "$APP_PATH"
         else
@@ -464,16 +464,16 @@ jobs:
 
     - name: Create DMG (universal)
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        DMG_NAME="LangSwitcher-${VERSION}-universal.dmg"
+        DMG_NAME="Dopishi-${VERSION}-universal.dmg"
 
         mkdir -p dmg_contents
         cp -R "$APP_PATH" dmg_contents/
         ln -s /Applications dmg_contents/Applications
 
-        hdiutil create -volname "LangSwitcher" \
+        hdiutil create -volname "Dopishi" \
           -srcfolder dmg_contents -ov -format UDZO "$DMG_NAME"
 
         if [ "$CODESIGN_ENABLED" = "true" ]; then
@@ -483,10 +483,10 @@ jobs:
 
     - name: Create ZIP with ditto
       run: |
-        APP_PATH="build/Build/Products/Release/LangSwitcher.app"
+        APP_PATH="build/Build/Products/Release/Dopishi.app"
         VERSION="${GITHUB_REF_NAME:-dev}"
         VERSION="${VERSION#v}"
-        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "LangSwitcher-${VERSION}-universal.zip"
+        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Dopishi-${VERSION}-universal.zip"
 
     - name: Notarize DMG
       if: env.CODESIGN_ENABLED == 'true' && env.NOTARIZE_ENABLED == 'true'
@@ -507,14 +507,14 @@ jobs:
     - name: Upload Universal DMG
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-universal-dmg
+        name: Dopishi-universal-dmg
         path: "*.dmg"
         if-no-files-found: error
 
     - name: Upload Universal ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: LangSwitcher-universal-zip
+        name: Dopishi-universal-zip
         path: "*.zip"
         if-no-files-found: error
 
@@ -544,30 +544,36 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        name: "LangSwitcher ${{ github.ref_name }}"
+        name: "Dopishi ${{ github.ref_name }}"
         body: |
-          ## LangSwitcher ${{ github.ref_name }}
+          ## Dopishi ${{ github.ref_name }}
 
           ### Downloads
 
           | Architecture | DMG (recommended) | ZIP |
           |---|---|---|
-          | **Apple Silicon** (M1/M2/M3/M4) | `LangSwitcher-*-arm64.dmg` | `LangSwitcher-*-arm64.zip` |
-          | **Intel** (x86_64) | `LangSwitcher-*-x86_64.dmg` | `LangSwitcher-*-x86_64.zip` |
-          | **Universal** (both) | `LangSwitcher-*-universal.dmg` | `LangSwitcher-*-universal.zip` |
+          | **Apple Silicon** (M1/M2/M3/M4) | `Dopishi-*-arm64.dmg` | `Dopishi-*-arm64.zip` |
+          | **Intel** (x86_64) | `Dopishi-*-x86_64.dmg` | `Dopishi-*-x86_64.zip` |
+          | **Universal** (both) | `Dopishi-*-universal.dmg` | `Dopishi-*-universal.zip` |
 
-          ### Installation
+          ### Homebrew
+
+          ```bash
+          brew install --cask luksiko/tap/dopishi
+          ```
+
+          ### Manual Installation
 
           **DMG (recommended):**
           1. Download the `.dmg` file for your Mac architecture
-          2. Open the DMG and drag LangSwitcher to Applications
-          3. Launch LangSwitcher from Applications
+          2. Open the DMG and drag Dopishi to Applications
+          3. Launch Dopishi from Applications
 
           **ZIP:**
           1. Download the `.zip` file for your Mac architecture
-          2. Double-click to extract `LangSwitcher.app`
+          2. Double-click to extract `Dopishi.app`
           3. Drag to Applications
-          4. If macOS says "damaged", run: `xattr -cr /Applications/LangSwitcher.app`
+          4. If macOS says "damaged", run: `xattr -cr /Applications/Dopishi.app`
 
           **After first launch:**
           - Grant **Accessibility** permission when prompted (System Settings -> Privacy & Security -> Accessibility)
@@ -604,14 +610,14 @@ jobs:
         echo "$ASC_KEY_CONTENT" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
 
         # Find the universal ZIP and extract the .app
-        UNIVERSAL_ZIP=$(ls flat_release/LangSwitcher-*-universal.zip)
+        UNIVERSAL_ZIP=$(ls flat_release/Dopishi-*-universal.zip)
         mkdir -p /tmp/testflight_app
         ditto -x -k "$UNIVERSAL_ZIP" /tmp/testflight_app/
         APP_PATH=$(find /tmp/testflight_app -name "*.app" -maxdepth 2 | head -1)
 
         echo "=== Creating .pkg for TestFlight ==="
         VERSION="${GITHUB_REF_NAME#v}"
-        PKG_NAME="LangSwitcher-${VERSION}.pkg"
+        PKG_NAME="Dopishi-${VERSION}.pkg"
 
         productbuild --component "$APP_PATH" /Applications \
           --sign "$INSTALLER_IDENTITY" \
