@@ -56,6 +56,30 @@ final class AIInferenceTests: XCTestCase {
         XCTAssertFalse(messages.description.contains("<|im_start|>"))
     }
 
+    func testMessagesIncludeAppAndWindowTitleContext() {
+        let ruMessages = AIInferenceEngine.completionMessages(
+            context: "Привет, как дела с",
+            afterCaret: "",
+            instructions: nil,
+            appName: "Slack",
+            windowTitle: "#general — Dev Team"
+        )
+        let ruSystem = ruMessages[0]["content"] ?? ""
+        XCTAssertTrue(ruSystem.contains("Активное приложение: Slack."))
+        XCTAssertTrue(ruSystem.contains("Контекст/тема окна: \"#general — Dev Team\"."))
+
+        let enMessages = AIInferenceEngine.completionMessages(
+            context: "const user = await db.",
+            afterCaret: "",
+            instructions: nil,
+            appName: "Visual Studio Code",
+            windowTitle: "auth.ts — backend"
+        )
+        let enSystem = enMessages[0]["content"] ?? ""
+        XCTAssertTrue(enSystem.contains("Active application: Visual Studio Code."))
+        XCTAssertTrue(enSystem.contains("Window context: \"auth.ts — backend\"."))
+    }
+
     func testWordHealingAcceptsOnlyTheTypedPrefix() {
         XCTAssertEqual(AIInferenceEngine.healedContinuation(" handler correctly", wordBuffer: "handl"), "er correctly")
         XCTAssertEqual(AIInferenceEngine.healedContinuation(" событий", wordBuffer: "событ"), "ий")

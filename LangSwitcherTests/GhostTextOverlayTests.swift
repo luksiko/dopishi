@@ -721,4 +721,76 @@ extension GhostTextOverlayTests {
         XCTAssertEqual(service.activeGhostState?.remainingSuffix, "eautiful world")
         XCTAssertEqual(ghost.currentSuffix, "eautiful world")
     }
+
+    func testCaretStabilizationDoesNotJumpBackwardsOnStaleAnchor() async throws {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let candidate = AutocompletionCandidate(word: "world", targetLayoutID: "com.apple.keylayout.US")
+        let initialAnchor = CGRect(x: 100, y: 200, width: 2, height: 16)
+        ghost.show(candidate: candidate, suffix: "orld", caretRect: initialAnchor)
+
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.lastCaretRect, initialAnchor)
+        let initialX = ghost.panelFrame?.origin.x ?? 0
+        XCTAssertEqual(initialX, 102, accuracy: 0.5)
+
+        // Simulate keystroke: AX still reports initialAnchor (stale) for 1 call, then advances to x: 108
+        var pollCalls = 0
+        let freshAnchor = CGRect(x: 108, y: 200, width: 2, height: 16)
+        ghost.show(candidate: candidate, suffix: "rld", caretRect: initialAnchor, caretProvider: {
+            pollCalls += 1
+            return pollCalls == 1 ? initialAnchor : freshAnchor
+        })
+
+        // Suffix updated immediately in text view without moving panel backwards
+        XCTAssertEqual(ghost.currentSuffix, "rld")
+
+        // Wait for poll task to resolve fresh anchor
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(ghost.lastCaretRect, freshAnchor)
+        let resolvedX = ghost.panelFrame?.origin.x ?? 0
+        XCTAssertEqual(resolvedX, 110, accuracy: 0.5)
+    }
+
+    func testCaretStabilizationResolvesWhenInitialCaretIsNil() async throws {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let candidate = AutocompletionCandidate(word: "smooth", targetLayoutID: "com.apple.keylayout.US")
+        let targetAnchor = CGRect(x: 150, y: 300, width: 2, height: 16)
+        var pollCalls = 0
+
+        ghost.show(candidate: candidate, suffix: "mooth", caretRect: nil, caretProvider: {
+            pollCalls += 1
+            return pollCalls > 1 ? targetAnchor : nil
+        })
+
+        XCTAssertFalse(ghost.isVisible)
+
+        try await Task.sleep(nanoseconds: 60_000_000)
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.lastCaretRect, targetAnchor)
+        XCTAssertEqual(ghost.panelFrame?.origin.x ?? 0, 152, accuracy: 0.5)
+    }
+
+    func testHideCancelsActiveCaretStabilizationPoll() async throws {
+        let ghost = GhostTextOverlayController()
+        let candidate = AutocompletionCandidate(word: "cancel", targetLayoutID: "com.apple.keylayout.US")
+
+        var pollCalls = 0
+        ghost.show(candidate: candidate, suffix: "ancel", caretRect: nil, caretProvider: {
+            pollCalls += 1
+            return nil
+        })
+
+        ghost.hide()
+        XCTAssertNil(ghost.pendingCaretAnchor)
+        XCTAssertFalse(ghost.isVisible)
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let finalCalls = pollCalls
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(pollCalls, finalCalls, "Poll task should have ceased execution after hide()")
+    }
 }

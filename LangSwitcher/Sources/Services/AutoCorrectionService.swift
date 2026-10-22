@@ -544,7 +544,12 @@ final class AutoCorrectionService {
         let currentCaret = accessibilityService.caretScreenRect() ?? state.caretRect
         let displayMode = settingsManager.autoCompletionDisplayMode
         if displayMode == .ghostText || displayMode == .both {
-            ghostTextController.show(candidate: updatedCandidate, suffix: state.remainingSuffix, caretRect: currentCaret)
+            ghostTextController.show(
+                candidate: updatedCandidate,
+                suffix: state.remainingSuffix,
+                caretRect: currentCaret,
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+            )
         }
 
         if (displayMode == .popup || displayMode == .both) && overlayController.isVisible {
@@ -674,7 +679,12 @@ final class AutoCorrectionService {
             if let caret = accessibilityService.caretScreenRect(), let state = activeGhostState {
                 activeGhostState?.caretRect = caret
                 if let candidate = ghostTextController.currentCandidate {
-                    ghostTextController.show(candidate: candidate, suffix: state.remainingSuffix, caretRect: caret)
+                    ghostTextController.show(
+                        candidate: candidate,
+                        suffix: state.remainingSuffix,
+                        caretRect: caret,
+                        caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                    )
                 }
             }
             if let target = accessibilityService.captureReplacementTarget() {
@@ -963,6 +973,9 @@ final class AutoCorrectionService {
             }
 
             let hasContext = screenContextText != nil
+            let windowInfo = self.accessibilityService.activeWindowContext()
+            let appName = windowInfo.appName
+            let windowTitle = windowInfo.windowTitle
 
             if self.settingsManager.aiStreamingEnabled {
                 let streamResult = await AIInferenceEngine.shared.predictContinuationStream(
@@ -972,7 +985,9 @@ final class AutoCorrectionService {
                     maxWords: effectiveMaxWords,
                     customInstructions: currentInstructions,
                     screenContext: screenContextText,
-                    hasPendingQuestion: hasPendingQuestion
+                    hasPendingQuestion: hasPendingQuestion,
+                    appName: appName,
+                    windowTitle: windowTitle
                 ) { [weak self] partialSuffix in
                     guard let self else { return }
                     guard self.currentAIRequestId == requestId else { return }
@@ -1040,7 +1055,9 @@ final class AutoCorrectionService {
                     maxWords: effectiveMaxWords,
                     customInstructions: currentInstructions,
                     screenContext: screenContextText,
-                    hasPendingQuestion: hasPendingQuestion
+                    hasPendingQuestion: hasPendingQuestion,
+                    appName: appName,
+                    windowTitle: windowTitle
                 ) else {
                     guard self.currentAIRequestId == requestId else { return }
                     if self.accessibilityService.focusedFieldIdentifier() != fieldID {
@@ -1191,7 +1208,12 @@ final class AutoCorrectionService {
         )
 
         if displayMode == .ghostText || displayMode == .both {
-            ghostTextController.show(candidate: aiCandidate, suffix: effectiveRemainingSuffix, caretRect: liveCaret)
+            ghostTextController.show(
+                candidate: aiCandidate,
+                suffix: effectiveRemainingSuffix,
+                caretRect: liveCaret,
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+            )
         }
 
         if displayMode == .popup || displayMode == .both {
@@ -1314,7 +1336,12 @@ final class AutoCorrectionService {
                topCandidate.word.count > wordBuffer.count {
                 let suffixIndex = topCandidate.word.index(topCandidate.word.startIndex, offsetBy: wordBuffer.count)
                 let suffix = String(topCandidate.word[suffixIndex...])
-                ghostTextController.show(candidate: topCandidate, suffix: suffix, caretRect: caretRect)
+                ghostTextController.show(
+                    candidate: topCandidate,
+                    suffix: suffix,
+                    caretRect: caretRect,
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                )
             } else {
                 ghostTextController.hide()
             }

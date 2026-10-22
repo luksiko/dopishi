@@ -7,14 +7,14 @@ struct ConversionLogView: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
     @State private var showClearConfirmation = false
-    
+
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .short
         f.timeStyle = .medium
         return f
     }()
-    
+
     /// Binding that maps logMaxEntries==0 to "unlimited" toggle
     private var isUnlimited: Binding<Bool> {
         Binding(
@@ -24,20 +24,45 @@ struct ConversionLogView: View {
             }
         )
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            // ── Activity Summary Cards ──────────────────────────────
+            HStack(spacing: 12) {
+                statCard(
+                    title: l10n.t("stats.conversions"),
+                    value: "\(settingsManager.conversionCount)",
+                    icon: "arrow.triangle.2.circlepath",
+                    color: .blue
+                )
+                statCard(
+                    title: l10n.t("stats.recoveries"),
+                    value: "\(settingsManager.recoveryCount)",
+                    icon: "arrow.uturn.backward.circle",
+                    color: .purple
+                )
+                statCard(
+                    title: l10n.t("stats.aiGenerated"),
+                    value: "\(UserTextHistoryStore.shared.totalSnippetCount)",
+                    icon: "sparkles",
+                    color: .green
+                )
+            }
+            .padding(.bottom, 2)
+
+            Divider()
+
             // ── Log Settings ────────────────────────────────────────
             HStack {
                 Toggle(l10n.t("general.loggingEnabled"), isOn: $settingsManager.loggingEnabled)
-                
+
                 Spacer()
-                
+
                 if settingsManager.loggingEnabled {
                     Toggle(l10n.t("log.unlimited"), isOn: isUnlimited)
                         .toggleStyle(.switch)
                         .fixedSize()
-                    
+
                     if !isUnlimited.wrappedValue {
                         Stepper(
                             value: $settingsManager.logMaxEntries,
@@ -52,14 +77,14 @@ struct ConversionLogView: View {
                     }
                 }
             }
-            
+
             Text(l10n.t("general.loggingDisabledNote"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            
+
             Divider()
                 .padding(.vertical, 2)
-            
+
             // ── Log Content ─────────────────────────────────────────
             if !settingsManager.loggingEnabled {
                 VStack(spacing: 12) {
@@ -82,29 +107,29 @@ struct ConversionLogView: View {
                 HStack {
                     Text(l10n.t("log.title"))
                         .font(.headline)
-                    
+
                     Spacer()
-                    
+
                     Text(l10n.t("log.entries").replacingOccurrences(of: "%d", with: "\(logStore.logs.count)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Button(l10n.t("log.exportJSON")) {
                         exportJSON()
                     }
                     .font(.caption)
-                    
+
                     Button(l10n.t("log.clearAll")) {
                         showClearConfirmation = true
                     }
                     .font(.caption)
                     .foregroundStyle(.red)
                 }
-                
+
                 Text(l10n.t("log.ratingHint"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 // Log list
                 if logStore.logs.isEmpty {
                     VStack {
@@ -143,9 +168,30 @@ struct ConversionLogView: View {
             Text(l10n.t("log.clearConfirmMessage"))
         }
     }
-    
+
     // MARK: - Rating Cycle
-    
+
+    private func statCard(title: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.body)
+                    .bold()
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(8)
+        .background(Color(NSColor.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
     /// Cycle: nil -> true -> false -> nil
     private func toggleRating(entry: ConversionLog) {
         let newValue: Bool?
@@ -156,17 +202,17 @@ struct ConversionLogView: View {
         }
         logStore.updateRating(id: entry.id, isCorrect: newValue)
     }
-    
+
     // MARK: - Export
-    
+
     private func exportJSON() {
         let json = logStore.exportJSON()
-        
+
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "conversion_log.json"
         panel.title = l10n.t("log.exportPanelTitle")
-        
+
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try json.write(to: url, atomically: true, encoding: .utf8)
@@ -186,7 +232,7 @@ struct ConversionLogRow: View {
     let onToggleRating: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var l10n: LocalizationManager
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Rating button (tri-state)
@@ -197,7 +243,7 @@ struct ConversionLogRow: View {
             }
             .buttonStyle(.plain)
             .help(ratingTooltip)
-            
+
             // Content
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
@@ -205,37 +251,37 @@ struct ConversionLogRow: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.red.opacity(0.8))
                         .lineLimit(1)
-                    
+
                     Text("->")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Text(entry.outputText)
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.green.opacity(0.8))
                         .lineLimit(1)
                 }
-                
+
                 HStack(spacing: 8) {
                     Text(dateFormatter.string(from: entry.timestamp))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                    
+
                     Text(entry.conversionMode)
                         .font(.caption2)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(.blue.opacity(0.1))
                         .clipShape(Capsule())
-                    
+
                     Text(shortLayout(entry.sourceLayout) + " -> " + shortLayout(entry.targetLayout))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
             }
-            
+
             Spacer()
-            
+
             // Delete button
             Button(action: onDelete) {
                 Image(systemName: "trash")
@@ -247,9 +293,9 @@ struct ConversionLogRow: View {
         }
         .padding(.vertical, 2)
     }
-    
+
     // MARK: - Rating Icon
-    
+
     @ViewBuilder
     private var ratingIcon: some View {
         switch entry.isCorrect {
@@ -264,7 +310,7 @@ struct ConversionLogRow: View {
                 .foregroundStyle(.red)
         }
     }
-    
+
     private var ratingTooltip: String {
         switch entry.isCorrect {
         case nil:    return l10n.t("log.ratingUnrated")
@@ -272,9 +318,9 @@ struct ConversionLogRow: View {
         case false?: return l10n.t("log.ratingIncorrect")
         }
     }
-    
+
     // MARK: - Helpers
-    
+
     private func shortLayout(_ layoutID: String) -> String {
         // "com.apple.keylayout.Russian" -> "Russian"
         if let last = layoutID.split(separator: ".").last {

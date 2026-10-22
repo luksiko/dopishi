@@ -337,7 +337,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .environmentObject(l10n)
         
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 600),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

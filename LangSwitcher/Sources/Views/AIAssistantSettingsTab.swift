@@ -6,22 +6,18 @@ import UniformTypeIdentifiers
 struct AIAssistantSettingsTab: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
-    
+
     @StateObject private var modelManager = AIModelManager.shared
     @StateObject private var powerService = PowerService.shared
     @StateObject private var inferenceEngine = AIInferenceEngine.shared
     @StateObject private var profiler = AIModelProfiler.shared
     @StateObject private var textHistoryStore = UserTextHistoryStore.shared
-    
+
     @State private var modelToDelete: RecommendedAIModel?
     @State private var showDeleteAlert = false
     @State private var showResetStatsAlert = false
     @State private var showClearHistoryAlert = false
-    @State private var runningApps: [NSRunningApplication] = []
-    @State private var expandedAppBundleID: String?
-    @State private var vocabularyDrafts: [String: String] = [:]
-    @State private var appMetadataCache: [String: (name: String, icon: NSImage?)] = [:]
-    
+
     var body: some View {
         Form {
             // MARK: - Header
@@ -32,7 +28,7 @@ struct AIAssistantSettingsTab: View {
                             .font(.system(size: 26))
                             .foregroundStyle(.tint)
                             .padding(.trailing, 4)
-                        
+
                         VStack(alignment: .leading, spacing: 3) {
                             Text(l10n.t("ai.title"))
                                 .font(.headline)
@@ -41,13 +37,13 @@ struct AIAssistantSettingsTab: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    
+
                     // Engine status indicator
                     HStack(spacing: 8) {
                         Circle()
                             .fill(inferenceEngine.isRunning ? Color.green : Color.secondary.opacity(0.5))
                             .frame(width: 8, height: 8)
-                        
+
                         if inferenceEngine.isStarting {
                             Text(l10n.t("ai.status.starting"))
                                 .font(.caption)
@@ -64,9 +60,9 @@ struct AIAssistantSettingsTab: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        
+
                         Spacer()
-                        
+
                         if !inferenceEngine.isRunning && modelManager.isDownloaded(model: modelManager.currentModel) {
                             Button(l10n.t("ai.engine.start")) {
                                 Task {
@@ -90,7 +86,124 @@ struct AIAssistantSettingsTab: View {
                 }
                 .padding(.vertical, 4)
             }
-            
+
+            // MARK: - Section 1: Autocompletion Core
+            Section(l10n.t("general.autocompletion")) {
+                Toggle(l10n.t("autocompletion.enabled"), isOn: $settingsManager.autoCompletionEnabled)
+
+                Text(l10n.t("autocompletion.desc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if settingsManager.autoCompletionEnabled {
+                    Picker(l10n.t("autocompletion.displayMode"), selection: $settingsManager.autoCompletionDisplayMode) {
+                        ForEach(AutocompletionDisplayMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+
+                    Text(settingsManager.autoCompletionDisplayMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Stepper("\(l10n.t("autocompletion.minPrefixLength")) \(settingsManager.autoCompletionMinPrefixLength)", value: $settingsManager.autoCompletionMinPrefixLength, in: 2...5)
+
+                    Stepper("\(l10n.t("autocompletion.maxSuggestions")) \(settingsManager.autoCompletionMaxSuggestions)", value: $settingsManager.autoCompletionMaxSuggestions, in: 1...6)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(l10n.t("autocompletion.delay"))
+                            Spacer()
+                            Text("\(Int(settingsManager.autoCompletionDelay * 1000)) \(l10n.t("common.ms"))")
+                                .font(.subheadline)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $settingsManager.autoCompletionDelay, in: 0.0...0.30, step: 0.025)
+                    }
+                    .padding(.vertical, 2)
+
+                    Toggle(l10n.t("autocompletion.includeCrossLayout"), isOn: $settingsManager.autoCompletionIncludeCrossLayout)
+
+                    Toggle(l10n.t("autocompletion.suggestProfanity"), isOn: $settingsManager.autoCompletionSuggestProfanity)
+                }
+            }
+
+            // MARK: - Section 2: Autocompletion Keybindings
+            if settingsManager.autoCompletionEnabled {
+                Section(l10n.t("autocompletion.shortcutsSection")) {
+                    HStack {
+                        Text(l10n.t("autocompletion.completeNextWord"))
+                        Spacer()
+                        Picker("", selection: $settingsManager.autoCompletionAcceptKey) {
+                            ForEach(AutocompletionAcceptKey.allCases) { key in
+                                Text(key.displayName).tag(key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 170)
+                    }
+
+                    if settingsManager.autoCompletionAcceptKey == .custom {
+                        AutocompletionKeyRecorderView(
+                            keyCode: $settingsManager.autoCompletionCustomKeyCode,
+                            modifiers: $settingsManager.autoCompletionCustomModifiers
+                        )
+                    }
+
+                    Toggle(l10n.t("autocompletion.includeTrailingSpace"), isOn: $settingsManager.autoCompletionIncludeTrailingSpace)
+
+                    Toggle(l10n.t("autocompletion.acceptEntirePhrase"), isOn: $settingsManager.autoCompletionAcceptEntirePhrase)
+
+                    Toggle(l10n.t("autocompletion.includeTrailingPunctuation"), isOn: $settingsManager.autoCompletionIncludeTrailingPunctuation)
+
+                    HStack {
+                        Text(l10n.t("autocompletion.triggerFullCompletion"))
+                        Spacer()
+                        Picker("", selection: $settingsManager.autoCompletionAcceptAllKey) {
+                            ForEach(AutocompletionAcceptAllKey.allCases) { key in
+                                Text(key.displayName).tag(key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 170)
+                    }
+
+                    if settingsManager.autoCompletionAcceptAllKey == .custom {
+                        AutocompletionKeyRecorderView(
+                            keyCode: $settingsManager.autoCompletionCustomAcceptAllKeyCode,
+                            modifiers: $settingsManager.autoCompletionCustomAcceptAllModifiers
+                        )
+                    }
+
+                    HStack {
+                        Text(l10n.t("autocompletion.whenEscapePressed"))
+                        Spacer()
+                        Picker("", selection: $settingsManager.autoCompletionEscapeAction) {
+                            ForEach(AutocompletionEscapeAction.allCases) { action in
+                                Text(action.displayName).tag(action)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(l10n.t("autocompletion.forceActivate"))
+                            .font(.subheadline)
+                        AutocompletionKeyRecorderView(
+                            title: "",
+                            keyCode: $settingsManager.autoCompletionForceActivateKeyCode,
+                            modifiers: $settingsManager.autoCompletionForceActivateModifiers,
+                            canClear: true,
+                            enabled: $settingsManager.autoCompletionForceActivateEnabled
+                        )
+                    }
+
+                    Toggle(l10n.t("autocompletion.useNumberShortcuts"), isOn: $settingsManager.autoCompletionUseNumberShortcuts)
+                }
+            }
+
             Section(l10n.t("ai.instructions.title")) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(l10n.t("ai.instructions.desc"))
@@ -121,7 +234,7 @@ struct AIAssistantSettingsTab: View {
                     Text(l10n.t("ai.model.recommended.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     // Model Dropdown Picker
                     Picker(l10n.t("ai.model.picker.label"), selection: Binding(
                         get: { settingsManager.selectedModelId },
@@ -165,27 +278,27 @@ struct AIAssistantSettingsTab: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    
+
                     // Details Card for Selected Model
                     selectedModelCard(modelManager.currentModel)
-                    
+
                     Divider()
                         .padding(.vertical, 2)
-                    
+
                     // Concise RAM Recommendations Guide
                     ramRecommendationsGuide
                 }
                 .padding(.vertical, 4)
             }
-            
+
             // MARK: - Section 3: Predictive Text Continuation
             Section(l10n.t("ai.predictive.enable")) {
                 Toggle(l10n.t("ai.predictive.enable"), isOn: $settingsManager.aiPredictiveEnabled)
-                
+
                 Text(l10n.t("ai.predictive.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 if settingsManager.aiPredictiveEnabled {
                     Picker(l10n.t("ai.predictive.wordCount"), selection: $settingsManager.aiMaxContinuationWords) {
                         Text(String(format: l10n.t("ai.predictive.words"), 2)).tag(2)
@@ -194,7 +307,7 @@ struct AIAssistantSettingsTab: View {
                     }
                     .pickerStyle(.segmented)
                     .padding(.top, 4)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(l10n.t("ai.predictive.debounceDelay"))
@@ -204,13 +317,13 @@ struct AIAssistantSettingsTab: View {
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
-                        
+
                         Slider(
                             value: $settingsManager.aiDebounceDelay,
                             in: 0.15...1.0,
                             step: 0.05
                         )
-                        
+
                         HStack {
                             Text(l10n.t("ai.predictive.fast"))
                                 .font(.caption2)
@@ -222,38 +335,38 @@ struct AIAssistantSettingsTab: View {
                         }
                     }
                     .padding(.top, 6)
-                    
+
                     Toggle(l10n.t("ai.predictive.streaming"), isOn: $settingsManager.aiStreamingEnabled)
                         .padding(.top, 6)
-                    
+
                     Text(l10n.t("ai.predictive.streaming.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Toggle(l10n.t("ai.predictive.screenContext"), isOn: $settingsManager.aiScreenContextEnabled)
                         .padding(.top, 6)
-                    
+
                     Text(l10n.t("ai.predictive.screenContext.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Toggle(l10n.t("ai.fieldAnchor.title"), isOn: $settingsManager.showFieldAnchorBadge)
                         .padding(.top, 6)
-                    
+
                     Text(l10n.t("ai.fieldAnchor.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             // MARK: - Section 4: Battery Mode
             Section(l10n.t("ai.battery.title")) {
                 Toggle(l10n.t("ai.battery.title"), isOn: $settingsManager.aiBatteryModeEnabled)
-                
+
                 Text(l10n.t("ai.battery.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 HStack {
                     Circle()
                         .fill(powerService.isOnBattery ? Color.orange : Color.green)
@@ -271,7 +384,7 @@ struct AIAssistantSettingsTab: View {
                     Text(l10n.t("ai.benchmark.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     HStack {
                         Button {
                             Task {
@@ -289,21 +402,21 @@ struct AIAssistantSettingsTab: View {
                             }
                         }
                         .disabled(profiler.isRunning || (!inferenceEngine.isRunning && !modelManager.isDownloaded(model: modelManager.currentModel)))
-                        
+
                         Spacer()
-                        
+
                         if let report = profiler.lastReport {
                             Text(String(format: l10n.t("ai.benchmark.lastRun"), report.date.formatted(date: .omitted, time: .shortened)))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    
+
                     if let report = profiler.lastReport {
                         VStack(alignment: .leading, spacing: 8) {
                             Divider()
                                 .padding(.vertical, 2)
-                            
+
                             HStack(spacing: 12) {
                                 statCard(
                                     title: l10n.t("ai.benchmark.ttft"),
@@ -324,13 +437,13 @@ struct AIAssistantSettingsTab: View {
                                     color: .green
                                 )
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(l10n.t("ai.benchmark.samples"))
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundStyle(.secondary)
-                                
+
                                 ForEach(report.samples) { sample in
                                     VStack(alignment: .leading, spacing: 2) {
                                         HStack {
@@ -367,66 +480,23 @@ struct AIAssistantSettingsTab: View {
                 .padding(.vertical, 4)
             }
 
-            // MARK: - Section 6: Per-App Settings
-            Section(l10n.t("ai.perApp.title")) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(l10n.t("ai.perApp.desc"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    if settingsManager.perAppAISettings.isEmpty {
-                        Text(l10n.t("ai.perApp.empty"))
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .padding(.vertical, 4)
-                    } else {
-                        ForEach(Array(settingsManager.perAppAISettings.values.sorted(by: { $0.appName < $1.appName }))) { appSetting in
-                            perAppCard(for: appSetting)
-                        }
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Menu {
-                            ForEach(runningApps, id: \.processIdentifier) { app in
-                                if let bid = app.bundleIdentifier, settingsManager.perAppAISettings[bid] == nil {
-                                    Button(app.localizedName ?? bid) {
-                                        let name = app.localizedName ?? bid
-                                        settingsManager.setAppAISettings(AppAISettings(bundleID: bid, appName: name))
-                                        expandedAppBundleID = bid
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label(l10n.t("ai.perApp.addRunning"), systemImage: "plus")
-                        }
-                        .onAppear { refreshRunningApps() }
-                        
-                        Button(l10n.t("ai.perApp.addOther")) {
-                            selectAppBundle()
-                        }
-                    }
-                    .padding(.top, 4)
-                }
-                .padding(.vertical, 4)
-            }
-            
             // MARK: - Section 7: Personalization & Writing History
             Section(l10n.t("ai.personalization.title")) {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle(l10n.t("ai.personalization.enable"), isOn: $settingsManager.aiPersonalizationEnabled)
-                    
+
                     Text(l10n.t("ai.personalization.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     if settingsManager.aiPersonalizationEnabled {
                         HStack {
                             Text(String(format: l10n.t("ai.personalization.count"), textHistoryStore.totalSnippetCount))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            
+
                             Spacer()
-                            
+
                             if textHistoryStore.totalSnippetCount > 0 {
                                 Button(l10n.t("ai.personalization.clear")) {
                                     showClearHistoryAlert = true
@@ -441,7 +511,7 @@ struct AIAssistantSettingsTab: View {
                 }
                 .padding(.vertical, 4)
             }
-            
+
             // MARK: - Section 8: Extended Statistics
             Section(l10n.t("ai.stats.title")) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -465,7 +535,7 @@ struct AIAssistantSettingsTab: View {
                             color: .green
                         )
                     }
-                    
+
                     HStack {
                         Spacer()
                         Button(role: .destructive) {
@@ -492,10 +562,6 @@ struct AIAssistantSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            refreshRunningApps()
-            populateAppMetadataCache()
-        }
         .confirmationDialog(
             modelToDelete?.isCustom == true ? l10n.t("ai.model.custom.disconnectConfirm") : l10n.t("ai.model.deleteConfirm"),
             isPresented: $showDeleteAlert,
@@ -525,15 +591,15 @@ struct AIAssistantSettingsTab: View {
             Button(l10n.t("common.cancel"), role: .cancel) {}
         }
     }
-    
+
     // MARK: - Helper Views & Components
-    
+
     private func pickerTitle(for model: RecommendedAIModel) -> String {
         let star = model.isDefault ? " ★" : ""
         let downloaded = modelManager.isDownloaded(model: model) ? " ✓" : ""
         return "\(model.name) (\(model.localizedSize(using: l10n)))\(star)\(downloaded)"
     }
-    
+
     private var customPickerTitle: String {
         if settingsManager.customModelPath.isEmpty {
             return l10n.t("ai.model.custom.option")
@@ -543,11 +609,11 @@ struct AIAssistantSettingsTab: View {
         let sizePart = size.isEmpty ? "" : " (\(size))"
         return "📁 \(fileName)\(sizePart)"
     }
-    
+
     @ViewBuilder
     private func selectedModelCard(_ model: RecommendedAIModel) -> some View {
         let isDownloaded = modelManager.isDownloaded(model: model)
-        
+
         VStack(alignment: .leading, spacing: 8) {
             // Title & Badges
             HStack(alignment: .center, spacing: 6) {
@@ -555,7 +621,7 @@ struct AIAssistantSettingsTab: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .lineLimit(1)
-                
+
                 if !model.sizeText.isEmpty {
                     Text(model.localizedSize(using: l10n))
                         .font(.caption2)
@@ -564,7 +630,7 @@ struct AIAssistantSettingsTab: View {
                         .background(Color.secondary.opacity(0.12))
                         .cornerRadius(6)
                 }
-                
+
                 Text(l10n.t(model.ramTierKey))
                     .font(.caption2)
                     .foregroundStyle(.purple)
@@ -572,7 +638,7 @@ struct AIAssistantSettingsTab: View {
                     .padding(.vertical, 2)
                     .background(Color.purple.opacity(0.12))
                     .cornerRadius(6)
-                
+
                 if model.isDefault {
                     Text(l10n.t("ai.model.badge.recommended"))
                         .font(.caption2)
@@ -582,9 +648,9 @@ struct AIAssistantSettingsTab: View {
                         .background(Color.blue.opacity(0.12))
                         .cornerRadius(6)
                 }
-                
+
                 Spacer()
-                
+
                 if isDownloaded {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
@@ -599,7 +665,7 @@ struct AIAssistantSettingsTab: View {
                     .cornerRadius(10)
                 }
             }
-            
+
             // Description or Custom Path
             if model.isCustom {
                 if settingsManager.customModelPath.isEmpty {
@@ -617,7 +683,7 @@ struct AIAssistantSettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             // Action Controls
             HStack(spacing: 8) {
                 if model.isCustom {
@@ -631,7 +697,7 @@ struct AIAssistantSettingsTab: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    
+
                     if !settingsManager.customModelPath.isEmpty {
                         Button(role: .destructive) {
                             modelToDelete = model
@@ -675,18 +741,18 @@ struct AIAssistantSettingsTab: View {
                         .disabled(modelManager.state.isDownloading)
                     }
                 }
-                
+
                 Spacer()
             }
             .padding(.top, 2)
-            
+
             // Downloading progress bar
             if case .downloading(let progress, _, _) = modelManager.state,
                modelManager.currentModel.id == model.id {
                 VStack(alignment: .leading, spacing: 3) {
                     ProgressView(value: progress, total: 1.0)
                         .progressViewStyle(.linear)
-                    
+
                     HStack {
                         Text("\(Int(progress * 100))%")
                             .font(.caption2)
@@ -705,9 +771,9 @@ struct AIAssistantSettingsTab: View {
         .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
         .cornerRadius(8)
     }
-    
+
     // MARK: - RAM Recommendations Guide
-    
+
     @ViewBuilder
     private var ramRecommendationsGuide: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -719,7 +785,7 @@ struct AIAssistantSettingsTab: View {
                     .font(.caption)
                     .fontWeight(.semibold)
             }
-            
+
             VStack(alignment: .leading, spacing: 5) {
                 ramGuideRow(
                     tierBadge: "8 GB",
@@ -742,7 +808,7 @@ struct AIAssistantSettingsTab: View {
         .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
         .cornerRadius(8)
     }
-    
+
     @ViewBuilder
     private func ramGuideRow(tierBadge: String, badgeColor: Color, text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
@@ -754,14 +820,14 @@ struct AIAssistantSettingsTab: View {
                 .background(badgeColor.opacity(0.12))
                 .cornerRadius(4)
                 .frame(width: 50, alignment: .leading)
-            
+
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
-    
+
     private func selectCustomModelFile() {
         let panel = NSOpenPanel()
         panel.title = l10n.t("ai.customModel.openPanelTitle")
@@ -774,7 +840,7 @@ struct AIAssistantSettingsTab: View {
         } else {
             panel.allowedContentTypes = [.data]
         }
-        
+
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url {
             modelManager.selectCustomModel(path: url.path)
@@ -787,7 +853,7 @@ struct AIAssistantSettingsTab: View {
             }
         }
     }
-    
+
     private var powerStatusText: String {
         if powerService.isOnBattery {
             return l10n.t("ai.battery.status.battery")
@@ -795,7 +861,7 @@ struct AIAssistantSettingsTab: View {
             return l10n.t("ai.battery.status.ac")
         }
     }
-    
+
     @ViewBuilder
     private func presetButton(titleKey: String, textKey: String) -> some View {
         Button {
@@ -810,7 +876,7 @@ struct AIAssistantSettingsTab: View {
         }
         .buttonStyle(.plain)
     }
-    
+
     @ViewBuilder
     private func statCard(title: String, value: String, icon: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -832,164 +898,5 @@ struct AIAssistantSettingsTab: View {
         .padding(10)
         .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
         .cornerRadius(8)
-    }
-
-    @ViewBuilder
-    private func perAppCard(for appSetting: AppAISettings) -> some View {
-        let isExpanded = expandedAppBundleID == appSetting.bundleID
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                let meta = appMetadata(for: appSetting.bundleID)
-                if let icon = meta.icon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 18, height: 18)
-                } else {
-                    Image(systemName: "app")
-                        .frame(width: 18, height: 18)
-                }
-                
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(appSetting.appName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text(appSetting.bundleID)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        expandedAppBundleID = isExpanded ? nil : appSetting.bundleID
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                
-                Button(role: .destructive) {
-                    settingsManager.removeAppAISettings(bundleID: appSetting.bundleID)
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
-            }
-            
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(l10n.t("ai.perApp.enabled"), isOn: Binding(
-                        get: { appSetting.isAIEnabled },
-                        set: { val in
-                            var updated = appSetting
-                            updated.isAIEnabled = val
-                            settingsManager.setAppAISettings(updated)
-                        }
-                    ))
-                    .font(.caption)
-                    
-                    Text(l10n.t("ai.perApp.instructions"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    
-                    TextField("", text: Binding(
-                        get: { appSetting.customInstructions },
-                        set: { val in
-                            var updated = appSetting
-                            updated.customInstructions = val
-                            settingsManager.setAppAISettings(updated)
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
-                    
-                    Text(l10n.t("ai.perApp.vocabulary"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    
-                    TextField("", text: Binding(
-                        get: {
-                            vocabularyDrafts[appSetting.bundleID] ?? appSetting.customVocabulary.joined(separator: ", ")
-                        },
-                        set: { val in
-                            vocabularyDrafts[appSetting.bundleID] = val
-                            var updated = appSetting
-                            updated.customVocabulary = val.components(separatedBy: ",")
-                                .map { $0.trimmingCharacters(in: .whitespaces) }
-                                .filter { !$0.isEmpty }
-                            settingsManager.setAppAISettings(updated)
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
-                }
-                .padding(.top, 4)
-            }
-        }
-        .padding(8)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(6)
-    }
-
-    private func refreshRunningApps() {
-        let apps = NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil }
-            .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
-        runningApps = apps
-        for app in apps {
-            if let bid = app.bundleIdentifier {
-                let name = app.localizedName ?? bid
-                let icon = app.icon
-                appMetadataCache[bid] = (name, icon)
-            }
-        }
-    }
-
-    private func populateAppMetadataCache() {
-        for bid in settingsManager.perAppAISettings.keys {
-            if appMetadataCache[bid] == nil {
-                if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid) {
-                    let name = FileManager.default.displayName(atPath: url.path)
-                    let icon = NSWorkspace.shared.icon(forFile: url.path)
-                    appMetadataCache[bid] = (name, icon)
-                }
-            }
-        }
-    }
-
-    private func appMetadata(for bundleID: String) -> (name: String, icon: NSImage?) {
-        if let cached = appMetadataCache[bundleID] {
-            return cached
-        }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            let name = FileManager.default.displayName(atPath: url.path)
-            let icon = NSWorkspace.shared.icon(forFile: url.path)
-            let result = (name, Optional(icon))
-            return result
-        } else {
-            return (bundleID, nil as NSImage?)
-        }
-    }
-
-    private func selectAppBundle() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [UTType.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        
-        NSApp.activate(ignoringOtherApps: true)
-        if panel.runModal() == .OK, let url = panel.url,
-           let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier {
-            let name = FileManager.default.displayName(atPath: url.path)
-            let icon = NSWorkspace.shared.icon(forFile: url.path)
-            appMetadataCache[bundleID] = (name, icon)
-            settingsManager.setAppAISettings(AppAISettings(bundleID: bundleID, appName: name))
-            expandedAppBundleID = bundleID
-        }
     }
 }

@@ -237,10 +237,24 @@ final class AIInferenceEngine: ObservableObject {
         afterCaret: String,
         instructions: String?,
         screenContext: String? = nil,
-        hasPendingQuestion: Bool = false
+        hasPendingQuestion: Bool = false,
+        appName: String? = nil,
+        windowTitle: String? = nil
     ) -> [[String: String]] {
         let isCyrillic = containsCyrillic(activeParagraph(in: context))
         var system = isCyrillic ? defaultSystemPromptRu : defaultSystemPromptEn
+        if let app = appName?.trimmingCharacters(in: .whitespacesAndNewlines), !app.isEmpty {
+            let appPrompt = isCyrillic
+                ? "Активное приложение: \(app)."
+                : "Active application: \(app)."
+            system += "\n" + appPrompt
+        }
+        if let title = windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            let titlePrompt = isCyrillic
+                ? "Контекст/тема окна: \"\(title)\"."
+                : "Window context: \"\(title)\"."
+            system += "\n" + titlePrompt
+        }
         let extra = instructions?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !extra.isEmpty { system += "\n" + extra }
         if let screenContext = screenContext?.trimmingCharacters(in: .whitespacesAndNewlines), !screenContext.isEmpty {
@@ -353,7 +367,9 @@ final class AIInferenceEngine: ObservableObject {
         maxWords: Int = 4,
         customInstructions: String? = nil,
         screenContext: String? = nil,
-        hasPendingQuestion: Bool = false
+        hasPendingQuestion: Bool = false,
+        appName: String? = nil,
+        windowTitle: String? = nil
     ) async -> String? {
         await predictContinuationStream(
             context: context,
@@ -363,6 +379,8 @@ final class AIInferenceEngine: ObservableObject {
             customInstructions: customInstructions,
             screenContext: screenContext,
             hasPendingQuestion: hasPendingQuestion,
+            appName: appName,
+            windowTitle: windowTitle,
             onToken: nil
         )
     }
@@ -375,6 +393,8 @@ final class AIInferenceEngine: ObservableObject {
         customInstructions: String? = nil,
         screenContext: String? = nil,
         hasPendingQuestion: Bool = false,
+        appName: String? = nil,
+        windowTitle: String? = nil,
         onToken: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> String? {
         guard !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, maxWords > 0 else { return nil }
@@ -406,7 +426,9 @@ final class AIInferenceEngine: ObservableObject {
                     afterCaret: afterCaret,
                     instructions: customInstructions,
                     screenContext: screenContext,
-                    hasPendingQuestion: hasPendingQuestion
+                    hasPendingQuestion: hasPendingQuestion,
+                    appName: appName,
+                    windowTitle: windowTitle
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
                 let paragraph = rawPrompt.components(separatedBy: .newlines).last ?? rawPrompt
@@ -482,7 +504,9 @@ final class AIInferenceEngine: ObservableObject {
                     afterCaret: afterCaret,
                     instructions: customInstructions,
                     screenContext: screenContext,
-                    hasPendingQuestion: hasPendingQuestion
+                    hasPendingQuestion: hasPendingQuestion,
+                    appName: appName,
+                    windowTitle: windowTitle
                 )])
             do {
                 let (data, response) = try await session.data(for: templateRequest)

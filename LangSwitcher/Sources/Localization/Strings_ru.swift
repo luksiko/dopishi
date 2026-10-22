@@ -21,13 +21,43 @@ enum Strings_ru {
         // ── Окно настроек ───────────────────────────────────────────
         "settings.windowTitle":          "Настройки Dopishi",
         "settings.tab.general":          "Основные",
+        "settings.tab.layout":           "Раскладка",
         "settings.tab.layouts":          "Раскладки",
         "settings.tab.hotkey":           "Горячая клавиша",
-        "settings.tab.ai":               "AI Помощник",
+        "settings.tab.ai":               "Автодополнение и AI",
+        "settings.tab.apps":             "Приложения",
+        "settings.tab.history":          "История и статистика",
         "settings.tab.permissions":      "Разрешения",
         "settings.tab.log":              "Журнал",
         "settings.iconStyle.languageBadge": "Код языка в рамке (RU, EN)",
         "settings.iconStyle.keyboardIcon":  "Значок клавиатуры",
+
+        // ── Вкладка «Приложения» ────────────────────────────────────
+        "apps.title":                    "Правила для приложений",
+        "apps.description":              "Настройка индивидуальных правил переключения раскладки, автоисправления и AI-подсказок для конкретных программ.",
+        "apps.empty":                    "Индивидуальные правила не настроены. Для всех приложений действуют общие параметры.",
+        "apps.addRunning":               "Добавить запущенное приложение",
+        "apps.chooseFromDisk":           "Выбрать из Программ...",
+        "apps.disableLayout":            "Отключить конвертацию и автоисправление",
+        "apps.enableAI":                 "Включить подсказки AI",
+        "apps.customInstructions":       "Инструкции для нейросети в этом приложении:",
+        "apps.customVocabulary":         "Специфические термины (через запятую):",
+        "apps.remove":                   "Удалить правила",
+        "apps.badge.layoutOff":          "Раскладка выкл",
+        "apps.badge.aiOff":              "AI выкл",
+        "apps.badge.customPrompt":       "Свой промпт",
+
+        // ── Статус разрешений ──────────────────────────────────────
+        "permissions.active":            "Универсальный доступ активен",
+        "permissions.activeDesc":        "Мониторинг клавиатуры и конвертация текста работают штатно.",
+        "permissions.openSystemSettings":"Открыть Системные настройки...",
+        "permissions.guide":             "Инструкция по настройке",
+
+        // ── Сводка статистики ───────────────────────────────────────
+        "stats.summary":                 "Сводка активности",
+        "stats.conversions":             "Конвертаций раскладки",
+        "stats.recoveries":              "Восстановлений мысли",
+        "stats.aiGenerated":             "AI-подсказок",
 
         // ── Вкладка «Основные» ──────────────────────────────────────
         "general.language":              "Язык",

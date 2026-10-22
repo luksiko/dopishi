@@ -22,13 +22,43 @@ enum Strings_en {
         // ── Settings Window ─────────────────────────────────────────
         "settings.windowTitle":          "Dopishi Settings",
         "settings.tab.general":          "General",
+        "settings.tab.layout":           "Layout & Typing",
         "settings.tab.layouts":          "Layouts",
         "settings.tab.hotkey":           "Hotkey",
-        "settings.tab.ai":               "AI Assistant",
+        "settings.tab.ai":               "Completions & AI",
+        "settings.tab.apps":             "Apps",
+        "settings.tab.history":          "History & Stats",
         "settings.tab.permissions":      "Permissions",
         "settings.tab.log":              "Log",
         "settings.iconStyle.languageBadge": "Language badge in frame (RU, EN)",
         "settings.iconStyle.keyboardIcon":  "Keyboard icon",
+
+        // ── Apps Tab ────────────────────────────────────────────────
+        "apps.title":                    "Per-Application Rules",
+        "apps.description":              "Configure custom rules for layout conversion, auto-correction, and AI autocompletion for specific applications.",
+        "apps.empty":                    "No custom application rules. Default settings apply everywhere.",
+        "apps.addRunning":               "Add Running App",
+        "apps.chooseFromDisk":           "Choose from Applications...",
+        "apps.disableLayout":            "Disable layout conversion & auto-correction",
+        "apps.enableAI":                 "Enable AI completions",
+        "apps.customInstructions":       "Custom AI instructions for this app:",
+        "apps.customVocabulary":         "Custom vocabulary keywords (comma separated):",
+        "apps.remove":                   "Remove Rules",
+        "apps.badge.layoutOff":          "Layout Off",
+        "apps.badge.aiOff":              "AI Off",
+        "apps.badge.customPrompt":       "Custom Prompt",
+
+        // ── Permissions Integration ────────────────────────────────
+        "permissions.active":            "Accessibility Active",
+        "permissions.activeDesc":        "Keyboard monitoring and text conversion are working properly.",
+        "permissions.openSystemSettings":"Open System Settings...",
+        "permissions.guide":             "Setup Guide",
+
+        // ── Statistics Summary ──────────────────────────────────────
+        "stats.summary":                 "Activity Summary",
+        "stats.conversions":             "Layout Conversions",
+        "stats.recoveries":              "Thought Recoveries",
+        "stats.aiGenerated":             "AI Completions",
 
         // ── General Tab ─────────────────────────────────────────────
         "general.language":              "Language",

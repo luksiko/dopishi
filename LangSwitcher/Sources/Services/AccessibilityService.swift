@@ -37,82 +37,89 @@ final class AccessibilityService {
         pendingPaste?.check(final: true)
     }
 
-    
+
     /// Check if the app has accessibility permissions
     static var hasAccessibilityPermission: Bool {
         let trusted = AXIsProcessTrusted()
         NSLog("[LangSwitcher] AXIsProcessTrusted() = \(trusted), bundle = \(Bundle.main.bundlePath)")
         return trusted
     }
-    
+
     /// Request accessibility permissions (opens System Preferences)
     static func requestAccessibilityPermission() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let result = AXIsProcessTrustedWithOptions(options)
         NSLog("[LangSwitcher] AXIsProcessTrustedWithOptions(prompt=true) = \(result)")
     }
-    
+
+    /// Opens macOS System Settings directly to Privacy & Security > Accessibility
+    static func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     // MARK: - Selected Text Conversion
-    
+
     /// Get selected text and replace it using clipboard-based approach.
     /// Returns false if no text was selected/copied.
     func getAndReplaceSelectedText(with converter: (String) -> String?) -> Bool {
         let pasteboard = NSPasteboard.general
         let savedContents = savePasteboard()
-        
+
         // Copy selected text (try native AX menu action first, fallback to ⌘C)
         pasteboard.clearContents()
         performCopy()
         usleep(150_000) // 150ms — give target app time to process copy
-        
+
         guard let selectedText = pasteboard.string(forType: .string),
               !selectedText.isEmpty else {
             NSLog("[LangSwitcher] getAndReplaceSelectedText: no text on clipboard after ⌘C")
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] getAndReplaceSelectedText: copied text = '\(selectedText)'")
-        
+
         guard let convertedText = converter(selectedText) else {
             NSLog("[LangSwitcher] getAndReplaceSelectedText: converter returned nil")
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] getAndReplaceSelectedText: pasting converted text = '\(convertedText)'")
-        
+
         // Paste converted text
         TransientPasteboard.writeString(convertedText)
         simulatePaste()
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.restorePasteboard(savedContents)
         }
-        
+
         return true
     }
-    
+
     // MARK: - Smart Selection (Greedy Line)
-    
+
     /// Select from cursor to start of line (⌘⇧←), copy, pass to converter,
     /// paste the result back. The converter is responsible for determining
     /// which portion to convert and returning the full replacement text.
     func selectLineAndReplace(with converter: (String) -> String?) -> Bool {
         let pasteboard = NSPasteboard.general
         let savedContents = savePasteboard()
-        
+
         NSLog("[LangSwitcher] selectLineAndReplace: selecting to line start (⌘⇧←)...")
-        
+
         // Select from cursor to beginning of line: Cmd+Shift+Left
         simulateSelectToLineStart()
         usleep(150_000) // 150ms
-        
+
         // Copy the selection (native AX menu copy first, fallback to ⌘C)
         pasteboard.clearContents()
         performCopy()
         usleep(150_000) // 150ms
-        
+
         guard let selectedText = pasteboard.string(forType: .string),
               !selectedText.isEmpty else {
             NSLog("[LangSwitcher] selectLineAndReplace: no text copied, deselecting")
@@ -120,49 +127,49 @@ final class AccessibilityService {
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] selectLineAndReplace: copied line = '\(selectedText)' (len=\(selectedText.count))")
-        
+
         guard let convertedText = converter(selectedText) else {
             NSLog("[LangSwitcher] selectLineAndReplace: converter returned nil, deselecting")
             simulateRightArrow()
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] selectLineAndReplace: pasting = '\(convertedText)'")
-        
+
         // Paste (replaces the entire selection from cursor to line start)
         TransientPasteboard.writeString(convertedText)
         simulatePaste()
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.restorePasteboard(savedContents)
         }
-        
+
         return true
     }
-    
+
     // MARK: - Smart Selection (Last Word)
-    
+
     /// When no text is selected, select the last typed word/chunk via
     /// Option+Shift+Left (select word left), copy it, convert, paste back.
     /// This selects the word just before the cursor.
     func selectAndReplaceLastWord(with converter: (String) -> String?) -> Bool {
         let pasteboard = NSPasteboard.general
         let savedContents = savePasteboard()
-        
+
         NSLog("[LangSwitcher] selectAndReplaceLastWord: selecting word left...")
-        
+
         // First, try selecting last word: Shift+Option+Left arrow selects one word left
         simulateSelectWordLeft()
         usleep(150_000) // 150ms — give target app time to process selection
-        
+
         // Copy the selection (native AX menu copy first, fallback to ⌘C)
         pasteboard.clearContents()
         performCopy()
         usleep(150_000) // 150ms — give target app time to process ⌘C
-        
+
         var selectedText = pasteboard.string(forType: .string) ?? ""
         if !selectedText.isEmpty && selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Only whitespace was selected (user had typed a trailing space). Extend selection one more word left!
@@ -174,16 +181,16 @@ final class AccessibilityService {
             usleep(150_000)
             selectedText = pasteboard.string(forType: .string) ?? ""
         }
-        
+
         guard !selectedText.isEmpty else {
             NSLog("[LangSwitcher] selectAndReplaceLastWord: no text copied after selection+copy, deselecting")
             simulateRightArrow()
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] selectAndReplaceLastWord: copied word = '\(selectedText)'")
-        
+
         guard let convertedText = converter(selectedText) else {
             NSLog("[LangSwitcher] selectAndReplaceLastWord: converter returned nil, deselecting")
             // No conversion needed — deselect by pressing Right arrow
@@ -191,22 +198,22 @@ final class AccessibilityService {
             restorePasteboard(savedContents)
             return false
         }
-        
+
         NSLog("[LangSwitcher] selectAndReplaceLastWord: pasting converted = '\(convertedText)'")
-        
+
         // Paste converted text (replaces the selection)
         TransientPasteboard.writeString(convertedText)
         simulatePaste()
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.restorePasteboard(savedContents)
         }
-        
+
         return true
     }
-    
+
     // MARK: - Keyboard Simulation
-    
+
     /// Helper: post a key event with modifiers.
     /// Uses .hidSystemState to avoid interference with current keyboard state
     /// (e.g., if Shift is still physically held from double-shift trigger).
@@ -214,20 +221,20 @@ final class AccessibilityService {
         // Use .hidSystemState instead of .combinedSessionState to create events
         // independent of the current modifier state (avoids Shift bleed from double-tap)
         let source = CGEventSource(stateID: .hidSystemState)
-        
+
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: virtualKey, keyDown: keyDown) else {
             NSLog("[LangSwitcher] ERROR: Failed to create CGEvent (key=\(virtualKey), down=\(keyDown))")
             return
         }
-        
+
         // Set flags explicitly — this overrides any current keyboard state
         event.flags = modifiers
         event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
         event.post(tap: .cgAnnotatedSessionEventTap)
-        
+
         NSLog("[LangSwitcher] Posted key event: key=0x\(String(virtualKey, radix: 16)), down=\(keyDown), mods=\(modifiers.rawValue)")
     }
-    
+
     /// Simulate a full keystroke (key down + key up) with modifiers
     private func simulateKeystroke(virtualKey: CGKeyCode, modifiers: CGEventFlags = []) {
         postKeyEvent(virtualKey: virtualKey, keyDown: true, modifiers: modifiers)
@@ -242,7 +249,7 @@ final class AccessibilityService {
         let source = CGEventSource(stateID: .hidSystemState)
         let characters = Array(text)
         var charIndex = 0
-        
+
         // Chunk into slices of up to 16 UTF-16 code units (safely below macOS CGEvent limit).
         // Extended grapheme clusters (Characters) are kept intact to prevent splitting surrogate pairs.
         while charIndex < characters.count {
@@ -256,14 +263,14 @@ final class AccessibilityService {
                 charIndex += 1
             }
             var chunk = Array(chunkString.utf16)
-            
+
             guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
                 continue
             }
             keyDown.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
             keyUp.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
-            
+
             for event in [keyDown, keyUp] {
                 event.flags = []
                 event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
@@ -271,7 +278,7 @@ final class AccessibilityService {
             }
         }
     }
-    
+
     /// Attempts to trigger Copy via native AX menu action first; falls back to synthetic ⌘C.
     private func performCopy() {
         if pressCopyMenuItem() {
@@ -291,19 +298,19 @@ final class AccessibilityService {
     /// Internal search for Edit -> Copy menu item in the given application element.
     static func pressCopyMenuItem(in appElement: AXUIElement) -> Bool {
         AXUIElementSetMessagingTimeout(appElement, 0.05)
-        
+
         var menuBarRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXMenuBarAttribute as CFString, &menuBarRef) == .success,
               let menuBar = menuBarRef, CFGetTypeID(menuBar) == AXUIElementGetTypeID() else {
             return false
         }
-        
+
         var menuBarItemsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(menuBar as! AXUIElement, kAXChildrenAttribute as CFString, &menuBarItemsRef) == .success,
               let menuBarItems = menuBarItemsRef as? [AXUIElement] else {
             return false
         }
-        
+
         // Scan menus (Edit is typically among the first 8 menus)
         for menuBarItem in menuBarItems.prefix(8) {
             var childrenRef: CFTypeRef?
@@ -311,14 +318,14 @@ final class AccessibilityService {
                   let menus = childrenRef as? [AXUIElement] else {
                 continue
             }
-            
+
             for menu in menus {
                 var itemsRef: CFTypeRef?
                 guard AXUIElementCopyAttributeValue(menu, kAXChildrenAttribute as CFString, &itemsRef) == .success,
                       let items = itemsRef as? [AXUIElement] else {
                     continue
                 }
-                
+
                 for item in items {
                     // Check cmd key shortcut (Cmd+C)
                     var cmdCharRef: CFTypeRef?
@@ -332,7 +339,7 @@ final class AccessibilityService {
                         }
                         return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
                     }
-                    
+
                     // Fallback: check localized title
                     var titleRef: CFTypeRef?
                     if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &titleRef) == .success,
@@ -350,38 +357,38 @@ final class AccessibilityService {
                 }
             }
         }
-        
+
         return false
     }
-    
+
     private func simulateCopy() {
         NSLog("[LangSwitcher] Simulating ⌘C...")
         simulateKeystroke(virtualKey: 0x08, modifiers: .maskCommand) // C key
     }
-    
+
     private func simulatePaste() {
         NSLog("[LangSwitcher] Simulating ⌘V...")
         simulateKeystroke(virtualKey: 0x09, modifiers: .maskCommand) // V key
     }
-    
+
     /// Simulate Cmd+Shift+Left to select from cursor to start of line
     private func simulateSelectToLineStart() {
         NSLog("[LangSwitcher] Simulating ⌘⇧←...")
         simulateKeystroke(virtualKey: 0x7B, modifiers: [.maskShift, .maskCommand]) // Left arrow + Cmd+Shift
     }
-    
+
     /// Simulate Shift+Option+Left to select one word to the left
     private func simulateSelectWordLeft() {
         NSLog("[LangSwitcher] Simulating ⇧⌥←...")
         simulateKeystroke(virtualKey: 0x7B, modifiers: [.maskShift, .maskAlternate]) // Left arrow
     }
-    
+
     /// Simulate Right arrow to deselect (move cursor to end of selection)
     private func simulateRightArrow() {
         NSLog("[LangSwitcher] Simulating →...")
         simulateKeystroke(virtualKey: 0x7C) // Right arrow, no modifiers
     }
-    
+
     // MARK: - Thought Recovery Preview
 
     /// Select from the cursor to the start of the line and copy it, but keep
@@ -457,14 +464,14 @@ final class AccessibilityService {
         TransientPasteboard.writeString(text)
     }
 
-    /// Collapse the still-active selection (right arrow) after the user 
+    /// Collapse the still-active selection (right arrow) after the user
     /// cancelled the preview.
     func collapseSelection() {
         simulateRightArrow()
     }
 
     // MARK: - Focused Field Inspection
-    
+
     /// Role/subrole of the currently focused UI element, or nil when it
     /// cannot be determined (no AX permission, non-standard UI).
     /// Thin AX glue — policy lives in AutoCorrectionGate; callers fail
@@ -491,15 +498,15 @@ final class AccessibilityService {
         AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
         var subroleValue: CFTypeRef?
         AXUIElementCopyAttributeValue(axElement, kAXSubroleAttribute as CFString, &subroleValue)
-        
+
         let role = roleValue as? String
         let subrole = subroleValue as? String
         NSLog("[LangSwitcher] focusedFieldRole: role='\(role ?? "nil")' subrole='\(subrole ?? "nil")'")
         return (role, subrole)
     }
-    
+
     // MARK: - Caret Context Inspection
-    
+
     // MARK: WebKit AXTextMarker Dynamic Bindings
     private typealias AXTextMarkerRangeCopyMarkerFunc = @convention(c) (CFTypeRef) -> CFTypeRef?
     private typealias AXTextMarkerRangeCreateFunc = @convention(c) (CFAllocator?, CFTypeRef, CFTypeRef) -> CFTypeRef?
@@ -565,28 +572,28 @@ final class AccessibilityService {
         var selectedMarkerRangeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &selectedMarkerRangeRef) == .success,
               let selectedMarkerRange = selectedMarkerRangeRef else { return nil }
-        
+
         var selectedTextRef: CFTypeRef?
         var selectedText = ""
         if AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, selectedMarkerRange, &selectedTextRef) == .success,
            let str = selectedTextRef as? String {
             selectedText = str
         }
-        
+
         guard let caretStartMarker = copyStartMarker(from: selectedMarkerRange, element: element),
               let caretEndMarker = copyEndMarker(from: selectedMarkerRange, element: element) else { return nil }
-        
+
         // Scope bounds: Attempt paragraph first, then line, then full element boundaries
         var scopeStartMarker: CFTypeRef?
         var scopeEndMarker: CFTypeRef?
-        
+
         var scopeRangeRef: CFTypeRef?
         if AXUIElementCopyParameterizedAttributeValue(element, "AXParagraphTextMarkerRangeForTextMarker" as CFString, selectedMarkerRange, &scopeRangeRef) == .success,
            let scopeRange = scopeRangeRef {
             scopeStartMarker = copyStartMarker(from: scopeRange, element: element)
             scopeEndMarker = copyEndMarker(from: scopeRange, element: element)
         }
-        
+
         if scopeStartMarker == nil {
             if AXUIElementCopyParameterizedAttributeValue(element, "AXLineTextMarkerRangeForTextMarker" as CFString, selectedMarkerRange, &scopeRangeRef) == .success,
                let scopeRange = scopeRangeRef {
@@ -594,7 +601,7 @@ final class AccessibilityService {
                 scopeEndMarker = copyEndMarker(from: scopeRange, element: element)
             }
         }
-        
+
         if scopeStartMarker == nil {
             var docStartRef: CFTypeRef?
             var docEndRef: CFTypeRef?
@@ -603,7 +610,7 @@ final class AccessibilityService {
             scopeStartMarker = docStartRef
             scopeEndMarker = docEndRef
         }
-        
+
         var textBefore = ""
         if let start = scopeStartMarker,
            let rangeBefore = createMarkerRange(start: start, end: caretStartMarker, element: element) {
@@ -613,7 +620,7 @@ final class AccessibilityService {
                 textBefore = str
             }
         }
-        
+
         var textAfter = ""
         if let end = scopeEndMarker,
            let rangeAfter = createMarkerRange(start: caretEndMarker, end: end, element: element) {
@@ -623,14 +630,14 @@ final class AccessibilityService {
                 textAfter = str
             }
         }
-        
+
         if textBefore.count > maxSurroundingLength {
             textBefore = String(textBefore.suffix(maxSurroundingLength))
         }
         if textAfter.count > maxSurroundingLength {
             textAfter = String(textAfter.prefix(maxSurroundingLength))
         }
-        
+
         return CaretContext(
             fieldIdentifier: fieldIdentifier,
             textBeforeCaret: textBefore,
@@ -640,7 +647,7 @@ final class AccessibilityService {
             fullTextLength: textBefore.utf16.count + selectedText.utf16.count + textAfter.utf16.count
         )
     }
-    
+
     /// Fast, lightweight identifier for currently focused text element.
     func focusedFieldIdentifier() -> String? {
         guard let element = focusedTextElement(),
@@ -650,17 +657,41 @@ final class AccessibilityService {
         let elementHash = CFHash(element)
         return "\(bundleID):\(pid):\(elementHash)"
     }
-    
+
+    /// Returns the frontmost app name, bundle identifier, and focused window title.
+    /// Fast query (<0.1ms) used to ground AI completion prompts in application context.
+    func activeWindowContext() -> (appName: String?, bundleID: String?, windowTitle: String?) {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return (nil, nil, nil) }
+        let appName = app.localizedName
+        let bundleID = app.bundleIdentifier
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var windowRef: CFTypeRef?
+        var windowTitle: String?
+        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
+           let window = windowRef, CFGetTypeID(window) == AXUIElementGetTypeID() {
+            var titleRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &titleRef) == .success,
+               let str = titleRef as? String {
+                let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty && !AutoCorrectionGate.containsSensitiveInformation(trimmed) {
+                    windowTitle = String(trimmed.prefix(120))
+                }
+            }
+        }
+        return (appName, bundleID, windowTitle)
+    }
+
     /// Captures the surrounding text before/after caret and identifies the focused field.
     func captureCaretContext(maxSurroundingLength: Int = 200) -> CaretContext? {
         guard let element = focusedTextElement(),
               let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        
+
         let bundleID = app.bundleIdentifier ?? "unknown"
         let pid = app.processIdentifier
         let elementHash = CFHash(element)
         let fieldID = "\(bundleID):\(pid):\(elementHash)"
-        
+
         var rangeRef: CFTypeRef?
         var selectedRange = CFRange(location: 0, length: 0)
         if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
@@ -673,7 +704,7 @@ final class AccessibilityService {
                let str = selectedTextRef as? String {
                 selectedText = str
             }
-            
+
             var valueRef: CFTypeRef?
             if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
                let fullText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string {
@@ -684,7 +715,7 @@ final class AccessibilityService {
                                              selection: selectedRange, selectedText: selectedText,
                                              maxSurroundingLength: maxSurroundingLength)
             }
-            
+
             // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
             // use parameterized attribute kAXStringForRangeParameterizedAttribute around the caret.
             let queryStart = max(0, selectedRange.location - maxSurroundingLength)
@@ -705,7 +736,7 @@ final class AccessibilityService {
                         let selText = selectedText.isEmpty && selLengthInChunk > 0
                             ? (chunk as NSString).substring(with: NSRange(location: caretOffsetInChunk, length: selLengthInChunk))
                             : selectedText
-                        
+
                         return CaretContext(
                             fieldIdentifier: fieldID,
                             textBeforeCaret: textBefore,
@@ -717,7 +748,7 @@ final class AccessibilityService {
                     }
                 }
             }
-            
+
             return CaretContext(
                 fieldIdentifier: fieldID,
                 textBeforeCaret: "",
@@ -727,15 +758,15 @@ final class AccessibilityService {
                 fullTextLength: 0
             )
         }
-        
+
         // WebKit / Safari / Apple Mail / Google Docs AXTextMarker fallback
         if let markerContext = captureWebKitMarkerCaretContext(element: element, fieldIdentifier: fieldID, maxSurroundingLength: maxSurroundingLength) {
             return markerContext
         }
-        
+
         return nil
     }
-    
+
     /// AX ranges and stored caret locations are UTF-16 offsets. Expand only
     /// the context window edges so a small window never splits an emoji.
     static func makeCaretContext(fieldIdentifier: String, text: String, selection: CFRange,
@@ -761,7 +792,7 @@ final class AccessibilityService {
     }
 
     // MARK: - Caret Positioning
-    
+
     /// Only return measured insertion bounds. Field bounds and mouse location
     /// are not cursor positions and must never anchor inline suggestions.
     func caretScreenRect() -> CGRect? {
@@ -897,7 +928,7 @@ final class AccessibilityService {
         guard let app = NSWorkspace.shared.frontmostApplication,
               preparedElectronPID != app.processIdentifier,
               AXIsProcessTrusted() else { return }
-        
+
         let bundlePath = app.bundleURL?.path ?? ""
         let isElectronOrChromium = bundlePath.contains("Electron") ||
                                    bundlePath.contains("Chrome") ||
@@ -1032,7 +1063,7 @@ final class AccessibilityService {
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success,
               settable.boolValue else { return false }
-        
+
         let result = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFString)
         return result == .success
     }
@@ -1334,11 +1365,11 @@ final class AccessibilityService {
     }
 
     // MARK: - Pasteboard Save/Restore
-    
+
     private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {
         TransientPasteboard.snapshot()
     }
-    
+
     private func restorePasteboard(_ items: [[(NSPasteboard.PasteboardType, Data)]]) {
         TransientPasteboard.restore(items)
     }
