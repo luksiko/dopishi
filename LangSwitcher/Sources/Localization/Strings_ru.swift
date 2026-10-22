@@ -145,7 +145,7 @@ enum Strings_ru {
         // ── Окно «О программе» ──────────────────────────────────────
         "about.windowTitle":             "О программе Dopishi",
         "about.appName":                 "Dopishi",
-        "about.version":                 "Версия 1.3.0",
+        "about.version":                 "Версия 1.4.0",
         "about.tagline":                 "Конвертер раскладки клавиатуры для macOS с открытым кодом",
         "about.howToUse":                "Как использовать:",
         "about.step1":                   "Выделите текст, набранный не в той раскладке",
