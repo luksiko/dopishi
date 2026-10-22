@@ -752,7 +752,7 @@ final class AutoCorrectionService {
     // MARK: - Autocompletion Logic
 
     /// Dismiss current suggestion popup and ghost text without resetting AI debounce or hiding the field anchor.
-    private func dismissSuggestionsOnly() {
+    func dismissSuggestionsOnly() {
         if let current = currentAIRequestId {
             if cancelledRequestIds.count > 100 {
                 cancelledRequestIds.removeAll(keepingCapacity: true)
@@ -942,15 +942,17 @@ final class AutoCorrectionService {
                     guard self.completionsEnabledForCurrentApp else { return }
 
                     // Word boundary check: only update streaming ghost text
-                    // when a full word boundary is formed or sufficient text exists
+                    // when a full word boundary is formed (space, punctuation, or newline)
                     let hasWordBoundary = partialSuffix.last?.isWhitespace == true ||
                                           partialSuffix.last?.isPunctuation == true ||
-                                          partialSuffix.last?.isNewline == true ||
-                                          partialSuffix.count >= 12
+                                          partialSuffix.last?.isNewline == true
                     guard hasWordBoundary else { return }
 
-                    // Lightweight field identity check (omit heavy AX captureCaretContext)
-                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                    // Validate field identity and text context before presenting
+                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID,
+                          let currentContext = self.accessibilityService.captureCaretContext(maxSurroundingLength: 512),
+                          currentContext.fieldIdentifier == fieldID,
+                          initialBuffer.isEmpty || currentContext.textBeforeCaret.hasSuffix(initialBuffer) else {
                         self.dismissSuggestionsOnly()
                         return
                     }
@@ -969,7 +971,10 @@ final class AutoCorrectionService {
                 if let finalSuffix = streamResult {
                     guard self.currentAIRequestId == requestId else { return }
                     guard self.completionsEnabledForCurrentApp else { return }
-                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID,
+                          let currentContext = self.accessibilityService.captureCaretContext(maxSurroundingLength: 512),
+                          currentContext.fieldIdentifier == fieldID,
+                          initialBuffer.isEmpty || currentContext.textBeforeCaret.hasSuffix(initialBuffer) else {
                         self.dismissSuggestionsOnly()
                         return
                     }
@@ -985,6 +990,7 @@ final class AutoCorrectionService {
                     )
                 } else {
                     // Stale / cancelled / failed stream requests must not dismiss or overwrite an active valid suggestion.
+                    guard self.currentAIRequestId == requestId else { return }
                     if self.accessibilityService.focusedFieldIdentifier() != fieldID {
                         self.dismissSuggestionsOnly()
                     }
@@ -999,6 +1005,7 @@ final class AutoCorrectionService {
                     screenContext: screenContextText,
                     hasPendingQuestion: hasPendingQuestion
                 ) else {
+                    guard self.currentAIRequestId == requestId else { return }
                     if self.accessibilityService.focusedFieldIdentifier() != fieldID {
                         self.dismissSuggestionsOnly()
                     }
@@ -1006,7 +1013,10 @@ final class AutoCorrectionService {
                 }
                 guard self.currentAIRequestId == requestId else { return }
                 guard self.completionsEnabledForCurrentApp else { return }
-                guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                guard self.accessibilityService.focusedFieldIdentifier() == fieldID,
+                      let currentContext = self.accessibilityService.captureCaretContext(maxSurroundingLength: 512),
+                      currentContext.fieldIdentifier == fieldID,
+                      initialBuffer.isEmpty || currentContext.textBeforeCaret.hasSuffix(initialBuffer) else {
                     self.dismissSuggestionsOnly()
                     return
                 }
@@ -1395,6 +1405,20 @@ final class AutoCorrectionService {
                     self.lastCaretContext = self.accessibilityService.captureCaretContext()
                     self.overlayController.hide()
                     if let continuationTarget = self.suggestionTarget {
+                        let continuationRequestId = UUID()
+                        self.currentAIRequestId = continuationRequestId
+                        let fieldID = self.lastCaretContext?.fieldIdentifier ?? self.accessibilityService.focusedFieldIdentifier() ?? ""
+                        let liveCaret = self.accessibilityService.caretScreenRect() ?? .zero
+                        self.activeGhostState = ActiveGhostState(
+                            requestId: continuationRequestId,
+                            initialBuffer: "",
+                            remainingSuffix: remaining,
+                            fullCompletionText: remaining,
+                            fieldIdentifier: fieldID,
+                            suggestionTarget: continuationTarget,
+                            caretRect: liveCaret,
+                            creationDate: Date()
+                        )
                         self.ghostTextController.showContinuation(candidate: remainingCandidate, suffix: remaining,
                             caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
                             isCurrent: { [weak self] in

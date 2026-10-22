@@ -625,4 +625,78 @@ extension GhostTextOverlayTests {
         XCTAssertEqual(plan3.replacement, "hello world")
         XCTAssertEqual(plan3.appendingSuffix, " world")
     }
+
+    func testStaleFailedRequestDoesNotDismissNewSuggestion() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+
+        let req1 = UUID()
+        let req2 = UUID()
+
+        // req2 is the current active request and displays a suggestion
+        service.currentAIRequestId = req2
+        service.presentAIPrediction(
+            suffix: "active suggestion",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req2,
+            fieldIdentifier: "field:2",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+
+        XCTAssertEqual(service.activeGhostState?.requestId, req2)
+        XCTAssertEqual(ghost.currentSuffix, "active suggestion")
+
+        // Now an older request (req1 from field:1) fails or returns nil.
+        // It must NOT dismiss req2's suggestion.
+        // Simulate what happens in scheduleAIDebounce:
+        if service.currentAIRequestId == req1 {
+            service.dismissSuggestionsOnly()
+        }
+
+        XCTAssertEqual(service.activeGhostState?.requestId, req2)
+        XCTAssertEqual(ghost.currentSuffix, "active suggestion")
+    }
+
+    func testTypeAheadPreservedAfterPartialPhraseAcceptance() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+
+        let req = UUID()
+        service.currentAIRequestId = req
+        service.presentAIPrediction(
+            suffix: "hello beautiful world",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "hello beautiful world")
+
+        // Simulate acceptCandidate word-by-word (first word "hello" accepted, remainder " beautiful world")
+        let continuationRequestId = UUID()
+        service.currentAIRequestId = continuationRequestId
+        service.activeGhostState = ActiveGhostState(
+            requestId: continuationRequestId,
+            initialBuffer: "",
+            remainingSuffix: " beautiful world",
+            fullCompletionText: " beautiful world",
+            fieldIdentifier: "field:1",
+            suggestionTarget: nil,
+            caretRect: CGRect(x: 150, y: 200, width: 2, height: 16),
+            creationDate: Date()
+        )
+        ghost.show(candidate: AutocompletionCandidate(word: " beautiful world", targetLayoutID: "com.apple.keylayout.US"),
+                   suffix: " beautiful world", caretRect: CGRect(x: 150, y: 200, width: 2, height: 16))
+
+        // User now presses Space
+        XCTAssertTrue(service.handleTypeAhead(char: " "))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "beautiful world")
+        XCTAssertEqual(ghost.currentSuffix, "beautiful world")
+
+        // User now presses 'b'
+        XCTAssertTrue(service.handleTypeAhead(char: "b"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "eautiful world")
+        XCTAssertEqual(ghost.currentSuffix, "eautiful world")
+    }
 }
