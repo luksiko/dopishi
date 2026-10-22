@@ -776,7 +776,11 @@ final class AutoCorrectionService {
                           self.completionsEnabledForCurrentApp,
                           let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
                           current == caretContext else { return }
-                    self.presentAIPrediction(suffix: partialSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
+                    // Prevent sub-token jittering: only update streaming ghost text
+                    // when a full word boundary is formed or sufficient text exists
+                    if partialSuffix.contains(" ") || partialSuffix.count >= 8 {
+                        self.presentAIPrediction(suffix: partialSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
+                    }
                 }
                 if let finalSuffix = streamResult {
                     guard self.physicalInputRevision == captureRevision,
@@ -959,7 +963,14 @@ final class AutoCorrectionService {
 
         // 1. Ghost text inline tail
         if displayMode == .ghostText || displayMode == .both {
-            if let topCandidate = candidates.first,
+            if settingsManager.isAIAllowed {
+                // When AI predictive mode is active, do not flash the offline dictionary
+                // single-word completion in Ghost Text. The AI model will provide the
+                // unified completion (completing the word AND continuing the sentence).
+                if phraseContinuationAnchor == nil && ghostTextController.currentCandidate?.hasScreenContext != true {
+                    ghostTextController.hide()
+                }
+            } else if let topCandidate = candidates.first,
                topCandidate.word.lowercased().hasPrefix(wordBuffer.lowercased()),
                topCandidate.word.count > wordBuffer.count {
                 let suffixIndex = topCandidate.word.index(topCandidate.word.startIndex, offsetBy: wordBuffer.count)
