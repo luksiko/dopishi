@@ -14,7 +14,9 @@ enum AutoCorrectionGate {
         "AXTextArea",
         "AXSearchField",
         "AXComboBox",
-        "AXWebArea"
+        "AXWebArea",
+        "AXGenericElement",
+        "AXParagraph"
     ]
     
     /// Accessibility identifier marking a password field — appears either

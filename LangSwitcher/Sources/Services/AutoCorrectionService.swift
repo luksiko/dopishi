@@ -1239,9 +1239,20 @@ final class AutoCorrectionService {
 
     @discardableResult
     private func performCheckedReplacement(expected: String, replacement: String, target existingTarget: AccessibilityService.ReplacementTarget? = nil, onSuccess: @escaping (Bool) -> Void) -> Bool {
-        guard let target = existingTarget ?? accessibilityService.captureReplacementTarget(),
-              let operation = replacementSession.begin() else { return false }
+        guard let operation = replacementSession.begin() else { return false }
         completionRefresh.cancel()
+
+        guard let target = existingTarget ?? accessibilityService.captureReplacementTarget() else {
+            // Target app does not expose accessible text node (e.g. Electron / Chromium web view).
+            // Fall back to synthetic backspaces + paste!
+            NSLog("[LangSwitcher] performCheckedReplacement: no AX target, using backspace fallback for '\(expected)' → '\(replacement)'")
+            accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] applied in
+                guard let self, self.replacementSession.isCurrent(operation) else { return }
+                self.replacementSession.finish(operation)
+                if applied { onSuccess(true) }
+            }
+            return true
+        }
 
         // 1. Immediate path: replace immediately if the editor has already committed the delimiter
         if accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target,
@@ -1268,9 +1279,18 @@ final class AutoCorrectionService {
                 // its setter. Paste only into a freshly verified selection.
                 self.accessibilityService.pasteVerifiedSuffix(expected, with: replacement, target: target) { [weak self] applied in
                     guard let self, self.replacementSession.isCurrent(operation) else { return }
-                    self.replacementSession.finish(operation)
                     if applied {
+                        self.replacementSession.finish(operation)
                         onSuccess(true)
+                    } else {
+                        // AX paste verification failed (common in Electron / web contenteditable).
+                        // Fall back to synthetic backspaces + paste!
+                        NSLog("[LangSwitcher] performCheckedReplacement: AX paste failed, falling back to backspaces for '\(expected)' → '\(replacement)'")
+                        self.accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] backspaceApplied in
+                            guard let self, self.replacementSession.isCurrent(operation) else { return }
+                            self.replacementSession.finish(operation)
+                            if backspaceApplied { onSuccess(true) }
+                        }
                     }
                 }
             }

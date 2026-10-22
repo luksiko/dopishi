@@ -225,6 +225,7 @@ final class AccessibilityService {
         
         // Set flags explicitly — this overrides any current keyboard state
         event.flags = modifiers
+        event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
         event.post(tap: .cgAnnotatedSessionEventTap)
         
         NSLog("[LangSwitcher] Posted key event: key=0x\(String(virtualKey, radix: 16)), down=\(keyDown), mods=\(modifiers.rawValue)")
@@ -386,6 +387,33 @@ final class AccessibilityService {
         pasteboard.setString(text, forType: .string)
         NSLog("[LangSwitcher] pasteReplacingSelection: '\(text)'")
         simulatePaste()
+    }
+
+    /// Replaces trailing text using synthetic Backspace strokes followed by clipboard paste.
+    /// Used as a universal hardware-level fallback when Accessibility API cannot manipulate selection directly
+    /// (e.g. Electron apps, Chromium contenteditable web inputs, chat boxes).
+    func replaceWithBackspaces(count: Int, replacement: String, completion: ((Bool) -> Void)? = nil) {
+        guard count > 0, !replacement.isEmpty else {
+            completion?(false)
+            return
+        }
+
+        let savedContents = savePasteboard()
+        copyToPasteboard(replacement)
+
+        for _ in 0..<count {
+            simulateKeystroke(virtualKey: 0x33) // Backspace key
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in
+            guard let self else { completion?(false); return }
+            self.simulatePaste()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.restorePasteboard(savedContents)
+                completion?(true)
+            }
+        }
     }
 
     /// Copy text to the clipboard without touching any app.
@@ -670,17 +698,28 @@ final class AccessibilityService {
         return result
     }
 
-    /// Electron documents this attribute for third-party assistive applications.
-    /// Request once per active process, not on every keystroke. No permission is granted here.
+    /// Electron and Chromium document these attributes for third-party assistive applications.
+    /// Request once per active process, not on every keystroke.
     private func prepareBrowserAccessibility() {
         guard let app = NSWorkspace.shared.frontmostApplication,
               preparedElectronPID != app.processIdentifier,
-              let bundle = app.bundleURL,
-              FileManager.default.fileExists(atPath: bundle.appendingPathComponent(
-                "Contents/Frameworks/Electron Framework.framework").path), AXIsProcessTrusted() else { return }
+              AXIsProcessTrusted() else { return }
+        
+        let bundlePath = app.bundleURL?.path ?? ""
+        let isElectronOrChromium = bundlePath.contains("Electron") ||
+                                   bundlePath.contains("Chrome") ||
+                                   bundlePath.contains("Opera") ||
+                                   bundlePath.contains("Brave") ||
+                                   bundlePath.contains("Edge") ||
+                                   bundlePath.contains("Arc") ||
+                                   FileManager.default.fileExists(atPath: (app.bundleURL?.appendingPathComponent(
+                                    "Contents/Frameworks/Electron Framework.framework").path) ?? "")
+
+        guard isElectronOrChromium else { return }
         preparedElectronPID = app.processIdentifier
-        AXUIElementSetAttributeValue(AXUIElementCreateApplication(app.processIdentifier),
-                                     "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
 
     private func parameterizedRect(_ element: AXUIElement, attribute: String, parameter: CFTypeRef) -> CGRect? {
