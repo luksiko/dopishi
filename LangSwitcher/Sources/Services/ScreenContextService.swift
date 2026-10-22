@@ -472,6 +472,14 @@ final class ScreenContextService: ObservableObject {
            trimmed.hasPrefix("прочитано ") || trimmed.hasPrefix("доставлено ") {
             return true
         }
+        
+        // Dialogue turn and role markers like "[User 001]", "User [002]", "[001]", "User:"
+        if let roleRegex = try? NSRegularExpression(pattern: #"^\[?\b(user|assistant|human|system)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\]"#) {
+            let range = NSRange(location: 0, length: trimmed.utf16.count)
+            if roleRegex.firstMatch(in: trimmed, range: range) != nil {
+                return true
+            }
+        }
         return false
     }
     

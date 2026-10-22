@@ -407,10 +407,10 @@ final class AIInferenceEngine: ObservableObject {
             "prompt": prompt,
             "n_predict": Self.predictionTokenBudget(context: context, maxWords: maxWords),
             "stop": [
-                "<|im_end|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
-                "[User", "[user", "[USER", "User:", "user:", "USER:",
+                "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
+                "[User", "[user", "[USER", "User:", "user:", "USER:", "User [", "user [", "User 0", "user 0",
                 "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
-                "\n[User", "\nUser", "\n["
+                "\n[User", "\nUser", "\n[", "[00", "[0", "[User "
             ]
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
@@ -551,8 +551,8 @@ final class AIInferenceEngine: ObservableObject {
             }
         }
 
-        // Also stop at [User 001] or any bracketed role/turn tag
-        if let roleMatch = text.range(of: "\\[(User|user|Assistant|assistant|System|system).*?\\]", options: .regularExpression) {
+        // Also stop at [User 001], User [002], [002], or any bracketed/numbered dialogue role tag
+        if let roleMatch = text.range(of: #"(\[?\b(User|user|Assistant|assistant|Human|human|System|system)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\])"#, options: .regularExpression) {
             text = String(text[..<roleMatch.lowerBound])
         }
         
