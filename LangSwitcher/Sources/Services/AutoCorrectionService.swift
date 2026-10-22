@@ -701,6 +701,19 @@ final class AutoCorrectionService {
             return
         }
 
+        // Intercept keys if Thesaurus HUD is active
+        if ThesaurusController.shared.isVisible {
+            if keyCode == 0x35 { // Escape
+                ThesaurusController.shared.hide()
+                return
+            }
+            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
+                if ThesaurusController.shared.handleNumericInput(digit) {
+                    return
+                }
+            }
+        }
+
         // Handle special keys
         switch keyCode {
         case 0x33: // Backspace

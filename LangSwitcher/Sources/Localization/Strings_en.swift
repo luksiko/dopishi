@@ -243,6 +243,7 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "common.ms":                     "ms",
 
         "menu.previewRecovery":          "Preview Recovery...",
+        "menu.thesaurus":                "Contextual Thesaurus (Synonyms)...",
         "general.autoCorrectOnSpace":      "Auto-correct on Space",
         "general.autoCorrectOnSpaceHint":  "Automatically convert the last word when Space is pressed if it looks like the wrong layout.",
         "general.thoughtRecovery":         "Thought Recovery",

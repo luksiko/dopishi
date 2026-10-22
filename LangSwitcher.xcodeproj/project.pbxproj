@@ -71,6 +71,9 @@
 		E10000010000000000000057 /* BatteryPowerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000057 /* BatteryPowerManager.swift */; };
 		E10000010000000000000058 /* SmartPunctuationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000058 /* SmartPunctuationEngine.swift */; };
 		E1000001000000000000005D /* EmojiShortcodeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005D /* EmojiShortcodeEngine.swift */; };
+		E1000001000000000000005E /* ThesaurusEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005E /* ThesaurusEngine.swift */; };
+		E1000001000000000000005F /* ThesaurusController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005F /* ThesaurusController.swift */; };
+		E10000010000000000000060 /* ThesaurusHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000060 /* ThesaurusHUDView.swift */; };
 		E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000059 /* CompletionStatsTracker.swift */; };
 		E1000001000000000000005A /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005A /* KeyboardView.swift */; };
 		E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005B /* CompletionDemoTextField.swift */; };
@@ -104,6 +107,7 @@
 		E10000010000000000000129 /* BrowserDomainExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000129 /* BrowserDomainExtractorTests.swift */; };
 		E1000001000000000000012A /* SmartPunctuationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000012A /* SmartPunctuationEngineTests.swift */; };
 		E10000010000000000000132 /* EmojiShortcodeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000132 /* EmojiShortcodeEngineTests.swift */; };
+		E10000010000000000000133 /* ThesaurusEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000133 /* ThesaurusEngineTests.swift */; };
 		E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000130 /* BatteryPowerManagerTests.swift */; };
 		E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000131 /* CompletionStatsTrackerTests.swift */; };
 		E10000010000000000000049 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
@@ -185,6 +189,9 @@
 		E10000020000000000000057 /* BatteryPowerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManager.swift; sourceTree = "<group>"; };
 		E10000020000000000000058 /* SmartPunctuationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartPunctuationEngine.swift; sourceTree = "<group>"; };
 		E1000002000000000000005D /* EmojiShortcodeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiShortcodeEngine.swift; sourceTree = "<group>"; };
+		E1000002000000000000005E /* ThesaurusEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThesaurusEngine.swift; sourceTree = "<group>"; };
+		E1000002000000000000005F /* ThesaurusController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThesaurusController.swift; sourceTree = "<group>"; };
+		E10000020000000000000060 /* ThesaurusHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThesaurusHUDView.swift; sourceTree = "<group>"; };
 		E10000020000000000000059 /* CompletionStatsTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTracker.swift; sourceTree = "<group>"; };
 		E1000002000000000000005A /* KeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
 		E1000002000000000000005B /* CompletionDemoTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionDemoTextField.swift; sourceTree = "<group>"; };
@@ -218,6 +225,7 @@
 		E10000020000000000000129 /* BrowserDomainExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserDomainExtractorTests.swift; sourceTree = "<group>"; };
 		E1000002000000000000012A /* SmartPunctuationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartPunctuationEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000132 /* EmojiShortcodeEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiShortcodeEngineTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000133 /* ThesaurusEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThesaurusEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000131 /* CompletionStatsTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTrackerTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -305,6 +313,7 @@
 				E1000002000000000000005A /* KeyboardView.swift */,
 				E1000002000000000000005B /* CompletionDemoTextField.swift */,
 				E1000002000000000000005C /* TimeSavedBanner.swift */,
+				E10000020000000000000060 /* ThesaurusHUDView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -350,6 +359,8 @@
 				E10000020000000000000057 /* BatteryPowerManager.swift */,
 				E10000020000000000000058 /* SmartPunctuationEngine.swift */,
 				E1000002000000000000005D /* EmojiShortcodeEngine.swift */,
+				E1000002000000000000005E /* ThesaurusEngine.swift */,
+				E1000002000000000000005F /* ThesaurusController.swift */,
 				E10000020000000000000059 /* CompletionStatsTracker.swift */,
 			);
 			path = Services;
@@ -429,6 +440,7 @@
 				E10000020000000000000129 /* BrowserDomainExtractorTests.swift */,
 				E1000002000000000000012A /* SmartPunctuationEngineTests.swift */,
 				E10000020000000000000132 /* EmojiShortcodeEngineTests.swift */,
+				E10000020000000000000133 /* ThesaurusEngineTests.swift */,
 				E10000020000000000000130 /* BatteryPowerManagerTests.swift */,
 				E10000020000000000000131 /* CompletionStatsTrackerTests.swift */,
 			);
@@ -606,6 +618,9 @@
 				E10000010000000000000057 /* BatteryPowerManager.swift in Sources */,
 				E10000010000000000000058 /* SmartPunctuationEngine.swift in Sources */,
 				E1000001000000000000005D /* EmojiShortcodeEngine.swift in Sources */,
+				E1000001000000000000005E /* ThesaurusEngine.swift in Sources */,
+				E1000001000000000000005F /* ThesaurusController.swift in Sources */,
+				E10000010000000000000060 /* ThesaurusHUDView.swift in Sources */,
 				E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */,
 				E1000001000000000000005A /* KeyboardView.swift in Sources */,
 				E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */,
@@ -646,6 +661,7 @@
 				E10000010000000000000129 /* BrowserDomainExtractorTests.swift in Sources */,
 				E1000001000000000000012A /* SmartPunctuationEngineTests.swift in Sources */,
 				E10000010000000000000132 /* EmojiShortcodeEngineTests.swift in Sources */,
+				E10000010000000000000133 /* ThesaurusEngineTests.swift in Sources */,
 				E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */,
 				E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */,
 			);

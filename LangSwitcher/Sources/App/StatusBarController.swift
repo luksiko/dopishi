@@ -379,6 +379,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         previewItem.isEnabled = settingsManager.thoughtRecoveryEnabled
         menu.addItem(previewItem)
 
+        // Contextual Thesaurus action
+        let thesaurusItem = NSMenuItem(
+            title: l10n.t("menu.thesaurus"),
+            action: #selector(thesaurusAction),
+            keyEquivalent: "t"
+        )
+        thesaurusItem.keyEquivalentModifierMask = [.command, .option]
+        thesaurusItem.target = self
+        menu.addItem(thesaurusItem)
+
         // Direct switch layout action
         let switchKeyTitle: String
         if settingsManager.layoutSwitchKey != .disabled {
@@ -515,6 +525,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func previewRecoveryAction() {
         onPreviewRecoveryAction?()
+    }
+
+    @objc private func thesaurusAction() {
+        ThesaurusController.shared.triggerForCurrentSelection()
     }
 
     @objc private func switchLayoutAction() {
