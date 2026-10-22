@@ -291,3 +291,338 @@ extension GhostTextOverlayTests {
         XCTAssertTrue(contextual.hasScreenContext)
     }
 }
+
+// MARK: - Ghost Text Stability Tests
+extension GhostTextOverlayTests {
+    private func makeService(
+        popup: AutocompletionOverlayController? = nil,
+        ghost: GhostTextOverlayController? = nil
+    ) -> (service: AutoCorrectionService, ghost: GhostTextOverlayController, popup: AutocompletionOverlayController) {
+        let settings = SettingsManager.shared
+        let p = popup ?? AutocompletionOverlayController()
+        let g = ghost ?? GhostTextOverlayController()
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings),
+            overlayController: p,
+            ghostTextController: g,
+            completionRefresh: AutocompletionRefresh()
+        )
+        return (service, g, p)
+    }
+
+    func testGeometryAnchoredAtCaret() {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+        let screen = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let caret = CGRect(x: screen.maxX - 60, y: screen.midY, width: 2, height: 16)
+        let candidate = AutocompletionCandidate(word: "very long candidate phrase that exceeds the visible screen bounds", targetLayoutID: "com.apple.keylayout.US")
+        
+        ghost.show(candidate: candidate, suffix: "very long candidate phrase that exceeds the visible screen bounds", caretRect: caret)
+        
+        XCTAssertTrue(ghost.isVisible)
+        guard let frame = ghost.panelFrame else {
+            XCTFail("panelFrame should exist")
+            return
+        }
+        
+        // Origin.x must be anchored strictly to caret.maxX, never shifted leftwards
+        XCTAssertEqual(frame.origin.x, caret.maxX)
+        // Panel width must be clamped so frame does not overflow visible screen
+        XCTAssertLessThanOrEqual(frame.maxX, screen.maxX)
+        // Full unclipped suffix is preserved in controller state
+        XCTAssertEqual(ghost.currentSuffix, "very long candidate phrase that exceeds the visible screen bounds")
+    }
+
+    func testStaleRequestDoesNotDismissNewSuggestion() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req1 = UUID()
+        let req2 = UUID()
+        
+        // Present suggestion for req2 (the newer request)
+        service.presentAIPrediction(
+            suffix: "newer completion",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req2,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertEqual(service.activeGhostState?.requestId, req2)
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "newer completion")
+        XCTAssertEqual(ghost.currentSuffix, "newer completion")
+        
+        // Stale late response from req1 arrives
+        service.presentAIPrediction(
+            suffix: "stale completion",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req1,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        // Must NOT overwrite req2
+        XCTAssertEqual(service.activeGhostState?.requestId, req2)
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "newer completion")
+        XCTAssertEqual(ghost.currentSuffix, "newer completion")
+    }
+
+    func testFieldSwitchInvalidatesGhost() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req = UUID()
+        service.presentAIPrediction(
+            suffix: "test phrase",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertNotNil(service.activeGhostState)
+        XCTAssertTrue(ghost.isVisible)
+        
+        // Mouse click outside popup immediately invalidates ghost text
+        service.handleMouseDown()
+        
+        XCTAssertNil(service.activeGhostState)
+        XCTAssertFalse(ghost.isVisible)
+        XCTAssertEqual(ghost.currentSuffix, "")
+    }
+
+    func testTypeAheadLettersSpacesPunctuation() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req = UUID()
+        service.presentAIPrediction(
+            suffix: "hello world, 123",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "hello world, 123")
+        
+        // 1. Letters: 'h'
+        let matchedH = service.handleTypeAhead(char: "h")
+        XCTAssertTrue(matchedH)
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "ello world, 123")
+        XCTAssertEqual(ghost.currentSuffix, "ello world, 123")
+        
+        for c in "ello" {
+            XCTAssertTrue(service.handleTypeAhead(char: c))
+        }
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, " world, 123")
+        
+        // 2. Space
+        XCTAssertTrue(service.handleTypeAhead(char: " "))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "world, 123")
+        
+        for c in "world" {
+            XCTAssertTrue(service.handleTypeAhead(char: c))
+        }
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, ", 123")
+        
+        // 3. Punctuation: ','
+        XCTAssertTrue(service.handleTypeAhead(char: ","))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, " 123")
+        
+        // 4. Space
+        XCTAssertTrue(service.handleTypeAhead(char: " "))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "123")
+        
+        // 5. Digits: '1'
+        XCTAssertTrue(service.handleTypeAhead(char: "1"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "23")
+        
+        // 6. Mismatch: 'z'
+        let mismatch = service.handleTypeAhead(char: "z")
+        XCTAssertFalse(mismatch)
+        XCTAssertNil(service.activeGhostState)
+        XCTAssertFalse(ghost.isVisible)
+    }
+
+    func testEscapeDuringStreamCancelsPermanently() throws {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req = UUID()
+        service.presentAIPrediction(
+            suffix: "initial token",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertNotNil(service.activeGhostState)
+        XCTAssertTrue(ghost.isVisible)
+        
+        // Simulate Escape key press (virtualKey 0x35)
+        let escEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: true))
+        escEvent.flags = []
+        let intercepted = service.interceptKeyIfOverlayVisible(event: escEvent)
+        XCTAssertTrue(intercepted, "Escape must be intercepted and consumed")
+        
+        XCTAssertNil(service.activeGhostState)
+        XCTAssertFalse(ghost.isVisible)
+        
+        // Subsequent token arrives from the cancelled stream
+        service.presentAIPrediction(
+            suffix: "initial token and more words",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        // Must remain cancelled and suppressed
+        XCTAssertNil(service.activeGhostState)
+        XCTAssertFalse(ghost.isVisible)
+    }
+
+    func testPrefixInvarianceEnforced() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req = UUID()
+        // 1. Initial prediction
+        service.presentAIPrediction(
+            suffix: "приложение для macOS",
+            activeLayoutID: "com.apple.keylayout.Russian",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "приложение для macOS")
+        XCTAssertEqual(ghost.currentSuffix, "приложение для macOS")
+        
+        // 2. Valid continuation extending the prefix
+        service.presentAIPrediction(
+            suffix: "приложение для macOS и iOS",
+            activeLayoutID: "com.apple.keylayout.Russian",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "приложение для macOS и iOS")
+        XCTAssertEqual(ghost.currentSuffix, "приложение для macOS и iOS")
+        
+        // 3. Divergent continuation (does not start with already shown prefix)
+        service.presentAIPrediction(
+            suffix: "программа для Windows",
+            activeLayoutID: "com.apple.keylayout.Russian",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        // Divergence discarded: original prefix preserved!
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "приложение для macOS и iOS")
+        XCTAssertEqual(ghost.currentSuffix, "приложение для macOS и iOS")
+    }
+
+    func testBackgroundExtensionPrefixInvariance() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req1 = UUID()
+        service.presentAIPrediction(
+            suffix: "world is great",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req1,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "world is great")
+        
+        // Background extension arrives under a NEW requestId (req2)
+        let req2 = UUID()
+        service.currentAIRequestId = req2
+        
+        // 1. Extension that diverges from visible text -> MUST BE DISCARDED
+        service.presentAIPrediction(
+            suffix: "completely different sentence",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req2,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "world is great")
+        XCTAssertEqual(ghost.currentSuffix, "world is great")
+        
+        // 2. Extension that starts with visible text -> ACCEPTED
+        service.presentAIPrediction(
+            suffix: "world is great and beautiful",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req2,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "world is great and beautiful")
+        XCTAssertEqual(ghost.currentSuffix, "world is great and beautiful")
+    }
+
+    func testTypeAheadWithLeadingWhitespaceNormalization() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+        
+        let req = UUID()
+        // Stream chunk 1 arrives without leading space (trimmed because buffer was empty)
+        service.presentAIPrediction(
+            suffix: "world",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            initialBuffer: "",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "world")
+        
+        // User types 'w'
+        XCTAssertTrue(service.handleTypeAhead(char: "w"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "orld")
+        
+        // Stream chunk 2 arrives with leading space from the model: " world and more"
+        service.presentAIPrediction(
+            suffix: " world and more",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+        
+        // Must NOT be discarded as divergence! Should drop typed 'w' and extend to "orld and more"
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "orld and more")
+        XCTAssertEqual(ghost.currentSuffix, "orld and more")
+    }
+
+    func testTypeAheadTabAcceptanceTextIntegrity() {
+        // Test that PhraseAcceptancePlan correctly produces remaining suffix after typing
+        // Scenario 1: User typed 'h' from "hello world"
+        let plan1 = PhraseAcceptancePlan(buffer: "h", continuationAnchor: nil, insertion: "hello world")
+        XCTAssertEqual(plan1.expected, "h")
+        XCTAssertEqual(plan1.replacement, "hello world")
+        XCTAssertEqual(plan1.appendingSuffix, "ello world")
+        
+        // Scenario 2: User typed through a space: "hello " -> wordBuffer is "", remainingSuffix is "world"
+        let plan2 = PhraseAcceptancePlan(buffer: "", continuationAnchor: nil, insertion: "world")
+        XCTAssertEqual(plan2.expected, "")
+        XCTAssertEqual(plan2.replacement, "world")
+        XCTAssertEqual(plan2.appendingSuffix, "world")
+        
+        // Scenario 3: Continuation anchor with subsequent word
+        let plan3 = PhraseAcceptancePlan(buffer: "", continuationAnchor: "hello", insertion: "world")
+        XCTAssertEqual(plan3.expected, "hello")
+        XCTAssertEqual(plan3.replacement, "hello world")
+        XCTAssertEqual(plan3.appendingSuffix, " world")
+    }
+}

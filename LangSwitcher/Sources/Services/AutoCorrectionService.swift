@@ -16,6 +16,29 @@ import Carbon
 //      d. Replace the exact verified range via Accessibility
 //   4. Buffer is cleared and the cycle restarts
 
+// MARK: - Active Ghost State
+// Centralized state machine model tracking the life cycle, remaining suffix,
+// insertion target, and geometry of an active AI ghost text suggestion.
+struct ActiveGhostState: Equatable {
+    let requestId: UUID
+    let initialBuffer: String
+    var remainingSuffix: String
+    var fullCompletionText: String
+    let fieldIdentifier: String
+    var suggestionTarget: AccessibilityService.ReplacementTarget?
+    var caretRect: CGRect
+    let creationDate: Date
+
+    static func == (lhs: ActiveGhostState, rhs: ActiveGhostState) -> Bool {
+        lhs.requestId == rhs.requestId &&
+        lhs.initialBuffer == rhs.initialBuffer &&
+        lhs.remainingSuffix == rhs.remainingSuffix &&
+        lhs.fullCompletionText == rhs.fullCompletionText &&
+        lhs.fieldIdentifier == rhs.fieldIdentifier &&
+        lhs.caretRect == rhs.caretRect
+    }
+}
+
 @MainActor
 final class AutoCorrectionService {
 
@@ -38,6 +61,10 @@ final class AutoCorrectionService {
 
     // MARK: - State
 
+    internal(set) var activeGhostState: ActiveGhostState?
+    internal(set) var currentAIRequestId: UUID?
+    private var cancelledRequestIds: Set<UUID> = []
+    private var typeAheadHandledCount: Int = 0
     private var wordBuffer: String = ""
     private var previousWord: String?
     private var suggestionTarget: AccessibilityService.ReplacementTarget?
@@ -230,6 +257,9 @@ final class AutoCorrectionService {
         accessibilityService.cancelPendingReplacement()
         overlayController.hide()
         ghostTextController.hide()
+        activeGhostState = nil
+        currentAIRequestId = nil
+        typeAheadHandledCount = 0
         fieldAnchorController.hide()
         stopFieldAnchorPoll()
         if let tap = eventTap {
@@ -333,6 +363,7 @@ final class AutoCorrectionService {
         guard !isProcessingCorrection else { return false }
         let isOverlayActive = overlayController.isVisible || ghostTextController.isVisible
             || (phraseContinuationAnchor != nil && ghostTextController.currentCandidate != nil)
+            || activeGhostState != nil
         guard isOverlayActive else {
             let key = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             if settingsManager.isAutocompletionAcceptKey(keyCode: key, flags: event.flags)
@@ -393,6 +424,14 @@ final class AutoCorrectionService {
             let candidate = overlayController.selectedCandidate
                 ?? overlayController.candidates.first
                 ?? ghostTextController.currentCandidate
+                ?? (activeGhostState.map { state in
+                    AutocompletionCandidate(
+                        word: wordBuffer.isEmpty ? state.remainingSuffix : (wordBuffer + state.remainingSuffix),
+                        targetLayoutID: KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US",
+                        isCrossLayout: false,
+                        score: 1500
+                    )
+                })
             if let candidate = candidate {
                 return submitCandidate(candidate, appendSpace: false, entirePhrase: true, failureEvent: event)
             }
@@ -403,6 +442,14 @@ final class AutoCorrectionService {
             let candidate = overlayController.selectedCandidate
                 ?? overlayController.candidates.first
                 ?? ghostTextController.currentCandidate
+                ?? (activeGhostState.map { state in
+                    AutocompletionCandidate(
+                        word: wordBuffer.isEmpty ? state.remainingSuffix : (wordBuffer + state.remainingSuffix),
+                        targetLayoutID: KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US",
+                        isCrossLayout: false,
+                        score: 1500
+                    )
+                })
             if let candidate = candidate {
                 let entirePhrase = settingsManager.autoCompletionAcceptEntirePhrase
                 let appendSpace = settingsManager.autoCompletionIncludeTrailingSpace || (settingsManager.autoCompletionAcceptKey == .space)
@@ -410,9 +457,89 @@ final class AutoCorrectionService {
             }
         }
         
+        // Check for Type-Ahead if ghost text is active
+        if activeGhostState != nil,
+           nonModFlags.isEmpty,
+           let char = getCharactersFromEvent(event)?.first {
+            if handleTypeAhead(char: char) {
+                // Key matched type-ahead. Let it pass through to the editor.
+                typeAheadHandledCount += 1
+                return false
+            }
+        }
+        
         // Invalidate candidates before any other physical key reaches the editor.
         dismissSuggestionsOnly()
         return false
+    }
+
+    /// Synchronously processes a matching character during active ghost text,
+    /// trimming the remaining suffix and updating the insertion target.
+    @discardableResult
+    func handleTypeAhead(char: Character) -> Bool {
+        guard var state = activeGhostState else { return false }
+        guard let firstChar = state.remainingSuffix.first else {
+            activeGhostState = nil
+            ghostTextController.hide()
+            return false
+        }
+
+        guard firstChar == char else {
+            activeGhostState = nil
+            ghostTextController.hide()
+            dismissSuggestionsOnly()
+            scheduleAIDebounce()
+            return false
+        }
+
+        // MATCH:
+        state.remainingSuffix.removeFirst()
+
+        let isBoundary = char.isWhitespace || (!char.isLetter && !char.isNumber && !isAlternativeLetterKey(char))
+        if isBoundary {
+            let previous = (previousWord ?? "")
+            previousWord = previous.isEmpty ? wordBuffer : (previous + " " + wordBuffer).trimmingCharacters(in: .whitespaces)
+            wordBuffer = ""
+        } else {
+            wordBuffer.append(char)
+        }
+
+        let updatedTarget = accessibilityService.captureReplacementTarget()
+        state.suggestionTarget = updatedTarget
+        self.suggestionTarget = updatedTarget
+        self.lastCaretContext = accessibilityService.captureCaretContext()
+
+        if state.remainingSuffix.isEmpty {
+            activeGhostState = nil
+            ghostTextController.hide()
+            dismissSuggestionsOnly()
+            scheduleAIDebounce()
+            return true
+        }
+
+        self.activeGhostState = state
+
+        let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
+        let fullWord = wordBuffer.isEmpty ? state.remainingSuffix : (wordBuffer + state.remainingSuffix)
+        let updatedCandidate = AutocompletionCandidate(
+            word: fullWord,
+            targetLayoutID: activeLayoutID,
+            isCrossLayout: false,
+            score: 1500,
+            hasScreenContext: ghostTextController.currentCandidate?.hasScreenContext ?? false
+        )
+
+        let currentCaret = accessibilityService.caretScreenRect() ?? state.caretRect
+        ghostTextController.show(candidate: updatedCandidate, suffix: state.remainingSuffix, caretRect: currentCaret)
+
+        overlayController.hide()
+
+        let wordCount = state.remainingSuffix.split(separator: " ").count
+        if wordCount <= 2 {
+            scheduleAIDebounce()
+        }
+
+        return true
     }
 
     private func submitCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool,
@@ -504,9 +631,28 @@ final class AutoCorrectionService {
             wordBuffer = ""
             overlayController.hide()
             ghostTextController.hide()
+            activeGhostState = nil
+            currentAIRequestId = nil
+            typeAheadHandledCount = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 self?.updateFieldAnchor()
             }
+            return
+        }
+
+        if typeAheadHandledCount > 0 {
+            typeAheadHandledCount -= 1
+            if let caret = accessibilityService.caretScreenRect(), let state = activeGhostState {
+                activeGhostState?.caretRect = caret
+                if let candidate = ghostTextController.currentCandidate {
+                    ghostTextController.show(candidate: candidate, suffix: state.remainingSuffix, caretRect: caret)
+                }
+            }
+            if let target = accessibilityService.captureReplacementTarget() {
+                self.suggestionTarget = target
+                activeGhostState?.suggestionTarget = target
+            }
+            self.lastCaretContext = accessibilityService.captureCaretContext()
             return
         }
 
@@ -607,6 +753,14 @@ final class AutoCorrectionService {
 
     /// Dismiss current suggestion popup and ghost text without resetting AI debounce or hiding the field anchor.
     private func dismissSuggestionsOnly() {
+        if let current = currentAIRequestId {
+            if cancelledRequestIds.count > 100 {
+                cancelledRequestIds.removeAll(keepingCapacity: true)
+            }
+            cancelledRequestIds.insert(current)
+        }
+        activeGhostState = nil
+        currentAIRequestId = nil
         completionRefresh.cancel()
         suggestionTarget = nil
         phraseContinuationAnchor = nil
@@ -618,6 +772,9 @@ final class AutoCorrectionService {
 
     /// Full dismissal called on Escape, App switch, or deactivation.
     private func dismissAutocompletion(hideFieldAnchor: Bool = false) {
+        if let current = currentAIRequestId {
+            cancelledRequestIds.insert(current)
+        }
         dismissSuggestionsOnly()
         aiDebounceTimer.cancel()
         ScreenContextService.shared.invalidateCache()
@@ -729,6 +886,13 @@ final class AutoCorrectionService {
                 bundleID: currentBundleID,
                 excludedBundleIDs: Set(self.settingsManager.excludedAppBundleIDs)) else { return }
             guard self.settingsManager.isAIEnabled(for: currentBundleID) else { return }
+
+            let requestId = UUID()
+            self.currentAIRequestId = requestId
+            let fieldID = caretContext.fieldIdentifier
+            let initialBuffer = self.wordBuffer
+            let initialCaret = self.accessibilityService.caretScreenRect() ?? .zero
+
             let liveContext = caretContext.textBeforeCaret
             let currentLang = AIInferenceEngine.containsCyrillic(liveContext) ? "ru" : "en"
             let currentInstructions = self.settingsManager.aiInstructions(for: currentBundleID, language: currentLang)
@@ -745,6 +909,8 @@ final class AutoCorrectionService {
                     hasPendingQuestion = screenCtx.hasPendingQuestion
                 }
             }
+
+            guard self.currentAIRequestId == requestId else { return }
 
             self.fieldAnchorController.updateContextState(
                 hasScreenContext: screenContextText != nil,
@@ -772,24 +938,56 @@ final class AutoCorrectionService {
                     hasPendingQuestion: hasPendingQuestion
                 ) { [weak self] partialSuffix in
                     guard let self else { return }
-                    guard self.physicalInputRevision == captureRevision,
-                          self.completionsEnabledForCurrentApp,
-                          let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
-                          current == caretContext else { return }
-                    // Prevent sub-token jittering: only update streaming ghost text
+                    guard self.currentAIRequestId == requestId else { return }
+                    guard self.completionsEnabledForCurrentApp else { return }
+
+                    // Word boundary check: only update streaming ghost text
                     // when a full word boundary is formed or sufficient text exists
-                    if partialSuffix.contains(" ") || partialSuffix.count >= 8 {
-                        self.presentAIPrediction(suffix: partialSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
+                    let hasWordBoundary = partialSuffix.last?.isWhitespace == true ||
+                                          partialSuffix.last?.isPunctuation == true ||
+                                          partialSuffix.last?.isNewline == true ||
+                                          partialSuffix.count >= 12
+                    guard hasWordBoundary else { return }
+
+                    // Lightweight field identity check (omit heavy AX captureCaretContext)
+                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                        self.dismissSuggestionsOnly()
+                        return
                     }
+
+                    self.presentAIPrediction(
+                        suffix: partialSuffix,
+                        activeLayoutID: activeLayoutID,
+                        hasScreenContext: hasContext,
+                        requestId: requestId,
+                        fieldIdentifier: fieldID,
+                        initialBuffer: initialBuffer,
+                        caretRect: initialCaret,
+                        isFinal: false
+                    )
                 }
                 if let finalSuffix = streamResult {
-                    guard self.physicalInputRevision == captureRevision,
-                          self.completionsEnabledForCurrentApp,
-                          let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
-                          current == caretContext else { return }
-                    self.presentAIPrediction(suffix: finalSuffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
+                    guard self.currentAIRequestId == requestId else { return }
+                    guard self.completionsEnabledForCurrentApp else { return }
+                    guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                        self.dismissSuggestionsOnly()
+                        return
+                    }
+                    self.presentAIPrediction(
+                        suffix: finalSuffix,
+                        activeLayoutID: activeLayoutID,
+                        hasScreenContext: hasContext,
+                        requestId: requestId,
+                        fieldIdentifier: fieldID,
+                        initialBuffer: initialBuffer,
+                        caretRect: initialCaret,
+                        isFinal: true
+                    )
                 } else {
-                    self.dismissSuggestionsOnly()
+                    // Stale / cancelled / failed stream requests must not dismiss or overwrite an active valid suggestion.
+                    if self.accessibilityService.focusedFieldIdentifier() != fieldID {
+                        self.dismissSuggestionsOnly()
+                    }
                 }
             } else {
                 guard let suffix = await AIInferenceEngine.shared.predictContinuation(
@@ -801,38 +999,72 @@ final class AutoCorrectionService {
                     screenContext: screenContextText,
                     hasPendingQuestion: hasPendingQuestion
                 ) else {
+                    if self.accessibilityService.focusedFieldIdentifier() != fieldID {
+                        self.dismissSuggestionsOnly()
+                    }
                     return
                 }
-                guard self.physicalInputRevision == captureRevision,
-                      self.completionsEnabledForCurrentApp,
-                      let current = self.accessibilityService.captureCaretContext(maxSurroundingLength: 2048),
-                      current == caretContext else { return }
+                guard self.currentAIRequestId == requestId else { return }
+                guard self.completionsEnabledForCurrentApp else { return }
+                guard self.accessibilityService.focusedFieldIdentifier() == fieldID else {
+                    self.dismissSuggestionsOnly()
+                    return
+                }
 
-                self.presentAIPrediction(suffix: suffix, activeLayoutID: activeLayoutID, hasScreenContext: hasContext)
+                self.presentAIPrediction(
+                    suffix: suffix,
+                    activeLayoutID: activeLayoutID,
+                    hasScreenContext: hasContext,
+                    requestId: requestId,
+                    fieldIdentifier: fieldID,
+                    initialBuffer: initialBuffer,
+                    caretRect: initialCaret,
+                    isFinal: true
+                )
             }
         }
     }
 
-    private func presentAIPrediction(suffix: String, activeLayoutID: String, hasScreenContext: Bool = false) {
+    func presentAIPrediction(
+        suffix: String,
+        activeLayoutID: String,
+        hasScreenContext: Bool = false,
+        requestId: UUID? = nil,
+        fieldIdentifier: String? = nil,
+        initialBuffer: String? = nil,
+        caretRect: CGRect? = nil,
+        isFinal: Bool = false
+    ) {
         guard !suffix.isEmpty else { return }
+        let effectiveRequestId = requestId ?? currentAIRequestId ?? UUID()
+        if let reqId = requestId {
+            if cancelledRequestIds.contains(reqId) {
+                return
+            }
+            if let current = currentAIRequestId, current != reqId {
+                return
+            }
+        }
+
         let displayMode = settingsManager.autoCompletionDisplayMode
 
-        // Check focus & gate
-        let focus = accessibilityService.focusedFieldRole()
-        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        guard AutoCorrectionGate.allowsAutoCorrection(
-            role: focus?.role,
-            subrole: focus?.subrole,
-            bundleID: frontmostBundleID,
-            excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
-        ) else { return }
+        // Check focus & gate if focused element is present
+        if let role = accessibilityService.focusedFieldRole()?.role {
+            let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            guard AutoCorrectionGate.allowsAutoCorrection(
+                role: role,
+                subrole: accessibilityService.focusedFieldRole()?.subrole,
+                bundleID: frontmostBundleID,
+                excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
+            ) else { return }
+        }
 
         // Clean up leading space if buffer is empty (e.g. typing after a space)
-        let displaySuffix: String
+        var displaySuffix: String
         let fullPhrase: String
-        if wordBuffer.isEmpty {
+        if wordBuffer.isEmpty || (activeGhostState?.requestId == effectiveRequestId && activeGhostState?.initialBuffer.isEmpty == true) {
             displaySuffix = suffix.trimmingCharacters(in: .whitespaces)
-            fullPhrase = displaySuffix
+            fullPhrase = wordBuffer.isEmpty ? displaySuffix : (wordBuffer + displaySuffix)
         } else {
             displaySuffix = suffix
             fullPhrase = wordBuffer + suffix
@@ -840,20 +1072,79 @@ final class AutoCorrectionService {
 
         guard !displaySuffix.isEmpty else { return }
 
+        // Prefix Invariance Enforcement:
+        // Updates are only permitted if newCandidate extends alreadyVisibleText
+        var effectiveRemainingSuffix = displaySuffix
+        if let existing = self.activeGhostState {
+            let alreadyVisibleText = existing.remainingSuffix
+            let fullPrior = existing.fullCompletionText
+            var candidateToCheck = displaySuffix
+
+            // Normalize leading whitespace if existing visible text doesn't start with whitespace
+            if !alreadyVisibleText.hasPrefix(" ") && candidateToCheck.hasPrefix(" ") {
+                candidateToCheck = candidateToCheck.trimmingCharacters(in: .whitespaces)
+            }
+
+            if existing.requestId == effectiveRequestId {
+                let isPrefixValid = candidateToCheck.hasPrefix(alreadyVisibleText) ||
+                                   (candidateToCheck.hasPrefix(fullPrior) && fullPrior.hasSuffix(alreadyVisibleText))
+
+                if !isPrefixValid {
+                    NSLog("[LangSwitcher] Prefix invariance: discarded divergence (new='%@', visible='%@')", displaySuffix, alreadyVisibleText)
+                    return
+                }
+
+                let typedCount = fullPrior.count - alreadyVisibleText.count
+                if typedCount > 0 && candidateToCheck.hasPrefix(fullPrior) && candidateToCheck.count >= typedCount {
+                    effectiveRemainingSuffix = String(candidateToCheck.dropFirst(typedCount))
+                } else if candidateToCheck.hasPrefix(alreadyVisibleText) {
+                    effectiveRemainingSuffix = candidateToCheck
+                }
+            } else {
+                // Background extension / new request while ghost text is visible:
+                // MUST start with alreadyVisibleText to prevent visual jumping
+                if candidateToCheck.hasPrefix(alreadyVisibleText) {
+                    effectiveRemainingSuffix = candidateToCheck
+                } else {
+                    NSLog("[LangSwitcher] Prefix invariance: discarded extension divergence (new='%@', visible='%@')", displaySuffix, alreadyVisibleText)
+                    return
+                }
+            }
+        }
+
+        let effectiveFieldID = fieldIdentifier ?? accessibilityService.focusedFieldIdentifier() ?? ""
+        let target = accessibilityService.captureReplacementTarget()
+        let liveCaret = accessibilityService.caretScreenRect() ?? caretRect ?? .zero
+
+        let state = ActiveGhostState(
+            requestId: effectiveRequestId,
+            initialBuffer: initialBuffer ?? wordBuffer,
+            remainingSuffix: effectiveRemainingSuffix,
+            fullCompletionText: displaySuffix,
+            fieldIdentifier: effectiveFieldID,
+            suggestionTarget: target,
+            caretRect: liveCaret,
+            creationDate: Date()
+        )
+        self.activeGhostState = state
+        self.currentAIRequestId = effectiveRequestId
+        self.suggestionTarget = target
+        if isFinal {
+            self.lastCaretContext = accessibilityService.captureCaretContext()
+        } else {
+            self.lastCaretContext = self.lastCaretContext ?? accessibilityService.captureCaretContext()
+        }
+
         let aiCandidate = AutocompletionCandidate(
-            word: fullPhrase,
+            word: wordBuffer.isEmpty ? effectiveRemainingSuffix : (wordBuffer + effectiveRemainingSuffix),
             targetLayoutID: activeLayoutID,
             isCrossLayout: false,
             score: 1500,
             hasScreenContext: hasScreenContext
         )
 
-        suggestionTarget = accessibilityService.captureReplacementTarget()
-        lastCaretContext = accessibilityService.captureCaretContext()
-        let caretRect = accessibilityService.caretScreenRect()
-
         if displayMode == .ghostText || displayMode == .both {
-            ghostTextController.show(candidate: aiCandidate, suffix: displaySuffix, caretRect: caretRect)
+            ghostTextController.show(candidate: aiCandidate, suffix: effectiveRemainingSuffix, caretRect: liveCaret)
         }
 
         if displayMode == .popup || displayMode == .both {
@@ -867,7 +1158,7 @@ final class AutoCorrectionService {
             }
             overlayController.show(
                 candidates: Array(newCandidates.prefix(settingsManager.autoCompletionMaxSuggestions)),
-                caretRect: caretRect ?? accessibilityService.focusedFieldScreenRect(),
+                caretRect: liveCaret,
                 acceptKeyHint: hint,
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
@@ -889,7 +1180,9 @@ final class AutoCorrectionService {
                 snoozeFieldIdentifier = nil
             } else if Date() < snooze {
                 overlayController.hide()
-                ghostTextController.hide()
+                if !settingsManager.isAIAllowed {
+                    ghostTextController.hide()
+                }
                 return
             } else {
                 snoozeUntil = nil
@@ -915,7 +1208,7 @@ final class AutoCorrectionService {
         if !force {
             guard wordBuffer.count >= settingsManager.autoCompletionMinPrefixLength else {
                 overlayController.hide()
-                if phraseContinuationAnchor == nil {
+                if !settingsManager.isAIAllowed && phraseContinuationAnchor == nil {
                     ghostTextController.hide()
                 }
                 return
@@ -923,7 +1216,7 @@ final class AutoCorrectionService {
         } else {
             guard !wordBuffer.isEmpty else {
                 overlayController.hide()
-                if phraseContinuationAnchor == nil {
+                if !settingsManager.isAIAllowed && phraseContinuationAnchor == nil {
                     ghostTextController.hide()
                 }
                 return
@@ -950,26 +1243,24 @@ final class AutoCorrectionService {
 
         guard !candidates.isEmpty else {
             overlayController.hide()
-            if phraseContinuationAnchor == nil {
+            if !settingsManager.isAIAllowed && phraseContinuationAnchor == nil {
                 ghostTextController.hide()
             }
             return
         }
 
-        suggestionTarget = accessibilityService.captureReplacementTarget()
-        lastCaretContext = currentContext ?? accessibilityService.captureCaretContext()
+        if !settingsManager.isAIAllowed || activeGhostState == nil {
+            suggestionTarget = accessibilityService.captureReplacementTarget()
+            lastCaretContext = currentContext ?? accessibilityService.captureCaretContext()
+        }
         let caretRect = accessibilityService.caretScreenRect()
         let displayMode = settingsManager.autoCompletionDisplayMode
 
         // 1. Ghost text inline tail
         if displayMode == .ghostText || displayMode == .both {
             if settingsManager.isAIAllowed {
-                // When AI predictive mode is active, do not flash the offline dictionary
-                // single-word completion in Ghost Text. The AI model will provide the
-                // unified completion (completing the word AND continuing the sentence).
-                if phraseContinuationAnchor == nil && ghostTextController.currentCandidate?.hasScreenContext != true {
-                    ghostTextController.hide()
-                }
+                // When AI predictive mode is active, do not touch ghostTextController here.
+                // Ghost text is exclusively owned by AI inference and activeGhostState.
             } else if let topCandidate = candidates.first,
                topCandidate.word.lowercased().hasPrefix(wordBuffer.lowercased()),
                topCandidate.word.count > wordBuffer.count {
@@ -980,7 +1271,9 @@ final class AutoCorrectionService {
                 ghostTextController.hide()
             }
         } else {
-            ghostTextController.hide()
+            if !settingsManager.isAIAllowed {
+                ghostTextController.hide()
+            }
         }
 
         // 2. Floating popup HUD
@@ -1009,14 +1302,14 @@ final class AutoCorrectionService {
     func acceptCandidate(_ candidate: AutocompletionCandidate, appendSpace: Bool, entirePhrase: Bool = true,
                          failureEvent: CGEvent? = nil) -> Bool {
         guard !isProcessingCorrection,
-              !wordBuffer.isEmpty || phraseContinuationAnchor != nil || ghostTextController.isVisible || overlayController.isVisible else {
+              !wordBuffer.isEmpty || phraseContinuationAnchor != nil || ghostTextController.isVisible || overlayController.isVisible || activeGhostState != nil else {
             dismissAutocompletion()
             return false
         }
         
         // A suggestion belongs to the field captured when it was presented.
         // Never redirect an old suggestion to a newly focused editor.
-        guard let validTarget = suggestionTarget,
+        guard let validTarget = activeGhostState?.suggestionTarget ?? suggestionTarget,
               accessibilityService.isCurrentReplacementTarget(validTarget) else {
             NSLog("[LangSwitcher] Completion rejected: missing or changed target")
             dismissAutocompletion()
@@ -1078,6 +1371,9 @@ final class AutoCorrectionService {
                     return
                 }
                 self.wordBuffer = ""
+                self.activeGhostState = nil
+                self.currentAIRequestId = nil
+                self.typeAheadHandledCount = 0
                 let acceptedWord = insertionText.trimmingCharacters(in: .whitespaces)
                 self.adaptiveStore.recordWordUsage(word: acceptedWord, after: precedingWord)
                 self.previousWord = acceptedWord.lowercased()

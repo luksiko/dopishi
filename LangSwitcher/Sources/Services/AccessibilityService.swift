@@ -465,6 +465,16 @@ final class AccessibilityService {
     
     // MARK: - Caret Context Inspection
     
+    /// Fast, lightweight identifier for currently focused text element.
+    func focusedFieldIdentifier() -> String? {
+        guard let element = focusedTextElement(),
+              let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let bundleID = app.bundleIdentifier ?? "unknown"
+        let pid = app.processIdentifier
+        let elementHash = CFHash(element)
+        return "\(bundleID):\(pid):\(elementHash)"
+    }
+    
     /// Captures the surrounding text before/after caret and identifies the focused field.
     func captureCaretContext(maxSurroundingLength: Int = 200) -> CaretContext? {
         guard let element = focusedTextElement(),

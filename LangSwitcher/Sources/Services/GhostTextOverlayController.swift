@@ -18,6 +18,10 @@ final class GhostTextOverlayController: NSObject {
         panel?.isVisible == true
     }
     
+    var panelFrame: NSRect? {
+        panel?.frame
+    }
+    
     override init() {
         super.init()
     }
@@ -59,17 +63,20 @@ final class GhostTextOverlayController: NSObject {
         } ?? NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
         
         let vf = screen.visibleFrame
-        if origin.x + fittingSize.width > vf.maxX {
-            origin.x = vf.maxX - fittingSize.width - 2
+        // Anchor origin.x strictly to caret.maxX. Never shift leftwards over typed text.
+        var panelSize = fittingSize
+        if origin.x + panelSize.width > vf.maxX {
+            let availableWidth = max(0, vf.maxX - origin.x - 2)
+            panelSize.width = min(fittingSize.width, availableWidth)
         }
         if origin.y < vf.minY {
             origin.y = vf.minY + 2
         }
-        if origin.y + fittingSize.height > vf.maxY {
-            origin.y = vf.maxY - fittingSize.height - 2
+        if origin.y + panelSize.height > vf.maxY {
+            origin.y = vf.maxY - panelSize.height - 2
         }
         
-        let newFrame = NSRect(origin: origin, size: fittingSize)
+        let newFrame = NSRect(origin: origin, size: panelSize)
         if p.frame != newFrame {
             p.setFrame(newFrame, display: true)
         }
