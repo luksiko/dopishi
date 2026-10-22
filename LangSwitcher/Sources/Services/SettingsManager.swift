@@ -206,6 +206,11 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionFixCapsLockErrors, forKey: Keys.autoCorrectionFixCapsLockErrors) }
     }
 
+    /// Whether to replace emoji shortcodes like :fire: or :огонь: or :jujym: with Unicode emojis. Default: true.
+    @Published var autoCorrectionEmojiShortcodes: Bool {
+        didSet { defaults.set(autoCorrectionEmojiShortcodes, forKey: Keys.autoCorrectionEmojiShortcodes) }
+    }
+
     /// Whether real-time word autocompletion HUD is enabled. Default: true.
     @Published var autoCompletionEnabled: Bool {
         didSet {
@@ -741,6 +746,7 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionRemoveSpaceBeforePunctuation = "autoCorrectionRemoveSpaceBeforePunctuation"
         static let autoCorrectionSmartDashesAndEllipsis = "autoCorrectionSmartDashesAndEllipsis"
         static let autoCorrectionFixCapsLockErrors = "autoCorrectionFixCapsLockErrors"
+        static let autoCorrectionEmojiShortcodes = "autoCorrectionEmojiShortcodes"
         static let autoCompletionEnabled = "autoCompletionEnabled"
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
         static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
@@ -833,6 +839,7 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionRemoveSpaceBeforePunctuation = defaults.object(forKey: Keys.autoCorrectionRemoveSpaceBeforePunctuation) as? Bool ?? true // Default: ON
         self.autoCorrectionSmartDashesAndEllipsis = defaults.object(forKey: Keys.autoCorrectionSmartDashesAndEllipsis) as? Bool ?? true // Default: ON
         self.autoCorrectionFixCapsLockErrors = defaults.object(forKey: Keys.autoCorrectionFixCapsLockErrors) as? Bool ?? true // Default: ON
+        self.autoCorrectionEmojiShortcodes = defaults.object(forKey: Keys.autoCorrectionEmojiShortcodes) as? Bool ?? true // Default: ON
         
         self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
         let savedAcceptKey = defaults.string(forKey: Keys.autoCompletionAcceptKey)

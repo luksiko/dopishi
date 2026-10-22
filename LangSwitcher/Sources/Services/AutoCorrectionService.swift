@@ -757,6 +757,21 @@ final class AutoCorrectionService {
 
         case 0x31: // Space
             dismissSuggestionsOnly()
+            if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionEmojiShortcodes {
+                let context = (accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer) + " "
+                if let emojiMatch = EmojiShortcodeEngine.findSpaceReplacement(in: context) {
+                    performCheckedReplacement(expected: emojiMatch.expected, replacement: emojiMatch.replacement) { [weak self] _ in
+                        guard let self else { return }
+                        self.playCorrectionFeedback()
+                        self.settingsManager.recordAutoCorrection(charCount: emojiMatch.expected.count)
+                    }
+                    wordBuffer = ""
+                    recentTextBuffer.append(" ")
+                    if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
+                    scheduleAIDebounce()
+                    return
+                }
+            }
             if settingsManager.autoCorrectionEnabled {
                 triggerCheckAndCorrect(triggerChar: " ")
             } else {
@@ -785,6 +800,22 @@ final class AutoCorrectionService {
             if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             updateFieldAnchor()
             return
+        }
+
+        // Check for emoji shortcode closed with colon (e.g. ":fire:" or ":огонь:" -> 🔥)
+        if char == ":" && settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionEmojiShortcodes {
+            let context = (accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer) + ":"
+            if let emojiMatch = EmojiShortcodeEngine.findColonReplacement(in: context) {
+                performCheckedReplacement(expected: emojiMatch.expected, replacement: emojiMatch.replacement) { [weak self] _ in
+                    guard let self else { return }
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: emojiMatch.expected.count)
+                }
+                wordBuffer = ""
+                recentTextBuffer.append(char)
+                if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
+                return
+            }
         }
 
         // Check for typographic smart dashes & ellipsis

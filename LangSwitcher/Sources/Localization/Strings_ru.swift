@@ -307,6 +307,8 @@ Dopishi нуждается в разрешении универсального 
         "general.autoCorrectionRemoveSpaceBeforePunctuationDesc": "Убирает лишний пробел перед запятой, точкой, двоеточием, точкой с запятой, вопросительным и восклицательным знаками (например, «слово ,» → «слово,»).",
         "general.autoCorrectionSmartDashesAndEllipsis": "Тире и многоточие (типографика)",
         "general.autoCorrectionSmartDashesAndEllipsisDesc": "Автоматически заменяет два дефиса «--» на длинное тире «—» и три точки «...» на многоточие «…».",
+        "general.autoCorrectionEmojiShortcodes": "Эмодзи по шорткодам (:огонь: или :fire: → 🔥)",
+        "general.autoCorrectionEmojiShortcodesDesc": "Автоматически заменяет текстовые шорткоды на эмодзи на русском, английском и даже при ошибочной раскладке (:огонь:, :fire:, :jujym: → 🔥) при вводе двоеточия или пробела.",
 
         // ── Автодополнение ──────────────────────────────────────────
         "general.autocompletion":                "Автодополнение слов",

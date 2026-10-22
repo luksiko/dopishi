@@ -308,6 +308,8 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "general.autoCorrectionRemoveSpaceBeforePunctuationDesc": "Fixes accidental space typed before commas, periods, colons, question marks, and exclamation marks (e.g. 'word ,' → 'word,').",
         "general.autoCorrectionSmartDashesAndEllipsis": "Smart dashes and ellipsis",
         "general.autoCorrectionSmartDashesAndEllipsisDesc": "Automatically transforms double hyphen '--' into em-dash '—' and triple dot '...' into ellipsis '…'.",
+        "general.autoCorrectionEmojiShortcodes": "Emoji shortcodes (:fire: or :огонь: → 🔥)",
+        "general.autoCorrectionEmojiShortcodesDesc": "Automatically converts emoji shortcodes in English, Russian, and cross-layout typing (e.g. :fire:, :огонь:, or :jujym: → 🔥) on closing colon or space.",
 
         // ── Autocompletion ──────────────────────────────────────────
         "general.autocompletion":                "Word Autocompletion",

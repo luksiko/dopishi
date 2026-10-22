@@ -404,6 +404,11 @@ struct LayoutSettingsTab: View {
                         Text(l10n.t("general.autoCorrectionSmartDashesAndEllipsisDesc"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionEmojiShortcodes"), isOn: $settingsManager.autoCorrectionEmojiShortcodes)
+                        Text(l10n.t("general.autoCorrectionEmojiShortcodesDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
