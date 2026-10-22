@@ -72,13 +72,20 @@ final class AIInferenceEngine: ObservableObject {
         guard let activePath = AIModelManager.shared.activeModelPath else {
             return false
         }
-        if isRunning {
-            if currentLoadedModelPath == activePath {
-                return true
-            }
-            // Model path changed, restart with new model
-            stop()
+        let isEngineAlive: Bool
+        if await AILocalEngine.shared.isLoaded {
+            isEngineAlive = true
+        } else if let p = process, p.isRunning {
+            isEngineAlive = true
+        } else {
+            isEngineAlive = false
         }
+
+        if isRunning && isEngineAlive && currentLoadedModelPath == activePath {
+            return true
+        }
+        // Process died, was never started, or model path changed -> restart
+        stop()
         return await start(modelPath: activePath)
     }
     
@@ -145,6 +152,15 @@ final class AIInferenceEngine: ObservableObject {
         
         do {
             NSLog("[LangSwitcher] AIInferenceEngine: starting %@ on port %d", modelPath, port)
+            proc.terminationHandler = { [weak self] p in
+                Task { @MainActor [weak self] in
+                    guard let self = self, self.process === p else { return }
+                    NSLog("[LangSwitcher] AIInferenceEngine: daemon process terminated with status %d", p.terminationStatus)
+                    self.isRunning = false
+                    self.process = nil
+                    self.currentLoadedModelPath = nil
+                }
+            }
             try proc.run()
             self.process = proc
             
@@ -191,6 +207,7 @@ final class AIInferenceEngine: ObservableObject {
             await AILocalEngine.shared.unload()
         }
         if let p = process {
+            p.terminationHandler = nil
             if p.isRunning {
                 p.terminate()
             }
@@ -203,6 +220,21 @@ final class AIInferenceEngine: ObservableObject {
         metadataCacheRevision &+= 1
         cachedTemplateModel = nil
         cachedUsesChatTemplate = true
+    }
+
+    private func checkAndRecoverProcess(error: Error) {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorCannotConnectToHost || nsError.code == NSURLErrorNetworkConnectionLost) {
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if !(await AILocalEngine.shared.isLoaded) {
+                    NSLog("[LangSwitcher] AIInferenceEngine: server connection failed (%d), resetting running state", nsError.code)
+                    self.isRunning = false
+                    self.process = nil
+                    self.currentLoadedModelPath = nil
+                }
+            }
+        }
     }
     
     static let defaultSystemPromptEn = "Continue the immediate thought naturally with a few words (up to 4 words). Maintain the existing context, language and style. Do not invent new unrelated topics, quotes, proper nouns or random questions. Do not explain."
@@ -546,7 +578,13 @@ final class AIInferenceEngine: ObservableObject {
                 // generation continue text instead of answering or echoing it.
                 let paragraph = prompt.components(separatedBy: .newlines).last ?? prompt
                 prompt = rendered + String(paragraph.suffix(512))
-            } catch { return nil }
+            } catch {
+                if !Task.isCancelled {
+                    NSLog("[LangSwitcher] AIInferenceEngine: template request failed (%@)", error.localizedDescription)
+                    checkAndRecoverProcess(error: error)
+                }
+                return nil
+            }
         }
         let isStreaming = onToken != nil
         let payload: [String: Any] = [
@@ -639,6 +677,7 @@ final class AIInferenceEngine: ObservableObject {
             } catch {
                 if !Task.isCancelled {
                     NSLog("[LangSwitcher] AI streaming inference failed after %.2fs: %@", Date().timeIntervalSince(started), error.localizedDescription)
+                    checkAndRecoverProcess(error: error)
                 }
                 return nil
             }
@@ -658,6 +697,7 @@ final class AIInferenceEngine: ObservableObject {
             } catch {
                 if !Task.isCancelled {
                     NSLog("[LangSwitcher] AI inference failed after %.2fs: %@", Date().timeIntervalSince(started), error.localizedDescription)
+                    checkAndRecoverProcess(error: error)
                 }
                 return nil
             }

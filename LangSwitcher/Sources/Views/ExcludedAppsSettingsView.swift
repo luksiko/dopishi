@@ -216,9 +216,13 @@ struct AppsSettingsTab: View {
                     // AI Details if enabled
                     if settingsManager.perAppAISettings[bundleID]?.isAIEnabled ?? true {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(l10n.t("apps.customInstructions"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack {
+                                Text(l10n.t("apps.customInstructions"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                ProBadge()
+                            }
 
                             TextEditor(text: Binding(
                                 get: { settingsManager.perAppAISettings[bundleID]?.customInstructions ?? "" },
@@ -236,9 +240,13 @@ struct AppsSettingsTab: View {
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(l10n.t("apps.customVocabulary"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack {
+                                Text(l10n.t("apps.customVocabulary"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                ProBadge()
+                            }
 
                             TextField("", text: Binding(
                                 get: {

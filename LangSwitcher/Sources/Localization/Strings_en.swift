@@ -295,6 +295,19 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "general.autoCorrectionSwitchLayoutDesc": "Automatically switch the system input language to match the corrected word (e.g. to Russian after 'ghbdtn ' → 'привет ').",
         "general.autoCorrectionFixTwoCapitals":    "Fix two initial capitals (e.g. 'THis' → 'This')",
         "general.autoCorrectionFixTwoCapitalsDesc": "Automatically corrects words typed with two uppercase letters at the beginning if followed by lowercase letters.",
+        "general.autoCorrectionGroup.layout":        "Layout & Dictionary",
+        "general.autoCorrectionGroup.casing":        "Capitalization & Letter Case",
+        "general.autoCorrectionGroup.punctuation":   "Smart Punctuation & Typography",
+        "general.autoCorrectionCapitalizeSentences": "Capitalize first letter after period and sentence start",
+        "general.autoCorrectionCapitalizeSentencesDesc": "Automatically capitalizes words after '.', '!', '?' or at the beginning of paragraphs.",
+        "general.autoCorrectionFixCapsLock":         "Fix accidental cAPS lOCK (e.g. 'hELLO' → 'Hello')",
+        "general.autoCorrectionFixCapsLockDesc":     "Corrects words accidentally typed when Caps Lock is active and the first letter is lowercase.",
+        "general.autoCorrectionCommaBeforeConjunctions": "Insert comma before conjunctions 'а' and 'но'",
+        "general.autoCorrectionCommaBeforeConjunctionsDesc": "Automatically places a comma before Russian coordinating conjunctions 'а' and 'но' when typed in the middle of a sentence.",
+        "general.autoCorrectionRemoveSpaceBeforePunctuation": "Remove space before punctuation marks",
+        "general.autoCorrectionRemoveSpaceBeforePunctuationDesc": "Fixes accidental space typed before commas, periods, colons, question marks, and exclamation marks (e.g. 'word ,' → 'word,').",
+        "general.autoCorrectionSmartDashesAndEllipsis": "Smart dashes and ellipsis",
+        "general.autoCorrectionSmartDashesAndEllipsisDesc": "Automatically transforms double hyphen '--' into em-dash '—' and triple dot '...' into ellipsis '…'.",
 
         // ── Autocompletion ──────────────────────────────────────────
         "general.autocompletion":                "Word Autocompletion",
@@ -503,6 +516,7 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.benchmark.latency":                  "Total Latency",
         "ai.benchmark.speed":                    "Generation Speed",
         "ai.benchmark.samples":                  "Benchmark Prompts & Output:",
+        "ai.benchmark.error.noResponse":         "Inference engine failed to respond. Model daemon may need to be restarted.",
 
         // ── Per-Application Settings ───────────────────────────────────
         "ai.perApp.title":                       "Per-Application Settings",
@@ -530,6 +544,27 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.stats.conversions":                  "Corrections",
         "ai.stats.reset":                        "Reset Statistics",
         "ai.stats.resetConfirm":                 "Are you sure you want to reset all productivity statistics?",
+
+        // ── Time Saved & Completion Statistics ─────────────────────────
+        "stats.banner.title":                    "Productivity & Time Saved",
+        "stats.scope.today":                     "Today",
+        "stats.scope.allTime":                   "All Time",
+        "stats.card.timeSaved":                  "Time Saved",
+        "stats.card.keystrokes":                 "Keystrokes Saved",
+        "stats.card.words":                      "Words Completed",
+        "stats.time.sec":                        "sec",
+        "stats.time.min":                        "min",
+        "stats.time.hr":                         "hr",
+
+        // ── Interactive Sandbox & Keyboard View ───────────────────────
+        "ai.sandbox.title":                      "Interactive Sandbox",
+        "ai.sandbox.desc":                       "Try typing a few letters below to experience real-time autocompletion right here.",
+        "ai.sandbox.placeholder":                "Type something, e.g. 'Hello' or 'Let's'…",
+        "ai.sandbox.clear":                      "Clear",
+        "ai.sandbox.typeToSee":                  "Type text to see suggestion",
+        "ai.sandbox.pressTab":                   "Press Tab to accept suggestion",
+        "ai.sandbox.examples":                   "Try Example",
+        "ai.sandbox.success":                    "Completed! +%d characters saved",
     ]
 
     @MainActor static func register() {

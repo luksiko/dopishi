@@ -102,12 +102,24 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let settingsManager: SettingsManager
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var lastActiveExternalApp: NSRunningApplication?
 
     var onConvertAction: (() -> Void)?
     var onPreviewRecoveryAction: (() -> Void)?
     var onSwitchLayoutAction: (() -> Void)?
 
     private var l10n: LocalizationManager { LocalizationManager.shared }
+
+    private var currentTargetApp: NSRunningApplication? {
+        if let front = NSWorkspace.shared.frontmostApplication,
+           let bid = front.bundleIdentifier,
+           bid != Bundle.main.bundleIdentifier,
+           bid != "com.apple.dock",
+           bid != "com.apple.systemuiserver" {
+            return front
+        }
+        return lastActiveExternalApp
+    }
 
     init(settingsManager: SettingsManager) {
         self.settingsManager = settingsManager
@@ -118,6 +130,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         super.init()
         Self.shared = self
 
+        if let front = NSWorkspace.shared.frontmostApplication,
+           let bid = front.bundleIdentifier,
+           bid != Bundle.main.bundleIdentifier {
+            self.lastActiveExternalApp = front
+        }
+
         menu.delegate = self
         setupStatusBarButton()
         setupMenu()
@@ -127,6 +145,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     deinit {
         NotificationCenter.default.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     // MARK: - NSMenuDelegate
@@ -212,6 +231,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             name: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
             object: nil
         )
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(applicationDidActivate(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+    }
+
+    @objc private func applicationDidActivate(_ notification: Notification) {
+        if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+           let bid = app.bundleIdentifier,
+           bid != Bundle.main.bundleIdentifier,
+           bid != "com.apple.dock",
+           bid != "com.apple.systemuiserver" {
+            lastActiveExternalApp = app
+        }
     }
 
     @objc private func keyboardLayoutDidChange() {
@@ -229,14 +265,41 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private func setupMenu() {
         menu.removeAllItems()
 
-        // Header
+        // ── 1. Header & Version ─────────────────────────────────────
         let headerItem = NSMenuItem(title: "Dopishi", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.boldSystemFont(ofSize: 13)
         ]
-        headerItem.attributedTitle = NSAttributedString(string: l10n.t("menu.header"), attributes: attrs)
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        headerItem.attributedTitle = NSAttributedString(string: "\(l10n.t("menu.header")) v\(version)", attributes: attrs)
         menu.addItem(headerItem)
+
+        // ── 2. AI Model & Resource Status line ──────────────────────
+        let aiState = AIModelManager.shared.state
+        let aiStatusText: String
+        if PowerService.shared.isOnBattery && settingsManager.aiBatteryModeEnabled {
+            aiStatusText = "🔋 " + l10n.t("menu.aiStatusBattery")
+        } else {
+            switch aiState {
+            case .ready(_, let fileSize):
+                let modelName = AIModelManager.shared.currentModel.name
+                let formattedSize = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .memory)
+                aiStatusText = "● AI: \(modelName) (\(formattedSize))"
+            case .downloading(let progress, _, _):
+                let pct = Int(progress * 100)
+                aiStatusText = "⟳ AI: " + l10n.t("menu.aiStatusDownloading").replacingOccurrences(of: "%d", with: "\(pct)")
+            case .notDownloaded, .error:
+                if settingsManager.autoCompletionEnabled {
+                    aiStatusText = "○ AI: " + l10n.t("menu.aiStatusFastDictionary")
+                } else {
+                    aiStatusText = "○ AI: " + l10n.t("menu.aiStatusDisabled")
+                }
+            }
+        }
+        let aiStatusItem = NSMenuItem(title: aiStatusText, action: #selector(openAISettings), keyEquivalent: "")
+        aiStatusItem.target = self
+        menu.addItem(aiStatusItem)
 
         // Attention Center Section
         AttentionCenter.shared.refreshIssues()
@@ -269,6 +332,34 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        // ── 3. App Context & Active Control ─────────────────────────
+        if let app = currentTargetApp, let bundleID = app.bundleIdentifier {
+            let appName = app.localizedName ?? bundleID
+            let isExcluded = settingsManager.isAppExcluded(bundleID: bundleID)
+            let title = isExcluded
+                ? l10n.t("menu.appDisabled").replacingOccurrences(of: "%@", with: appName)
+                : l10n.t("menu.appActive").replacingOccurrences(of: "%@", with: appName)
+            let appItem = NSMenuItem(title: title, action: #selector(toggleCurrentAppExclusion(_:)), keyEquivalent: "")
+            appItem.target = self
+            appItem.representedObject = bundleID
+            menu.addItem(appItem)
+        }
+
+        if settingsManager.isTemporarilyPaused {
+            let remainingMinutes = max(1, Int(ceil((settingsManager.temporaryPauseUntil?.timeIntervalSinceNow ?? 0) / 60.0)))
+            let title = l10n.t("menu.resumeNow").replacingOccurrences(of: "%d", with: "\(remainingMinutes)")
+            let resumeItem = NSMenuItem(title: title, action: #selector(resumeAction), keyEquivalent: "")
+            resumeItem.target = self
+            menu.addItem(resumeItem)
+        } else {
+            let pauseItem = NSMenuItem(title: l10n.t("menu.pause30Min"), action: #selector(pause30MinAction), keyEquivalent: "")
+            pauseItem.target = self
+            menu.addItem(pauseItem)
+        }
+
+        menu.addItem(NSMenuItem.separator())
+
+        // ── 4. Direct Actions ───────────────────────────────────────
         // Convert action
         let convertItem = NSMenuItem(
             title: "\(l10n.t("menu.convertText")) (\(settingsManager.hotkeyDescription))",
@@ -303,13 +394,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         switchItem.target = self
         menu.addItem(switchItem)
 
-        menu.addItem(NSMenuItem.separator())
-
-        // Active layouts info
-        let layoutsHeader = NSMenuItem(title: l10n.t("menu.activeLayouts"), action: nil, keyEquivalent: "")
-        layoutsHeader.isEnabled = false
-        menu.addItem(layoutsHeader)
-
+        // Compact Layouts Submenu
+        let layoutsSubmenu = NSMenu()
         let currentLayout = KeyboardLayoutDetector.getCurrentLayout()
         for layout in settingsManager.enabledLayouts {
             let isCurrent = (layout.id == currentLayout?.id || layout.languageCode.lowercased() == currentLayout?.languageCode.lowercased())
@@ -321,32 +407,44 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             )
             item.representedObject = layout.id
             item.target = self
-            menu.addItem(item)
+            layoutsSubmenu.addItem(item)
         }
+        let layoutsParentItem = NSMenuItem(title: l10n.t("menu.layoutsSubmenu"), action: nil, keyEquivalent: "")
+        layoutsParentItem.submenu = layoutsSubmenu
+        menu.addItem(layoutsParentItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        // Stats
-        let statsItem = NSMenuItem(
-            title: "\(l10n.t("menu.conversions")) \(settingsManager.conversionCount)",
-            action: nil,
+        // ── 5. Quick Toggles & History ──────────────────────────────
+        let batteryItem = NSMenuItem(
+            title: l10n.t("menu.batteryEcoMode"),
+            action: #selector(toggleBatteryEcoMode),
             keyEquivalent: ""
         )
-        statsItem.isEnabled = false
-        menu.addItem(statsItem)
+        batteryItem.target = self
+        batteryItem.state = settingsManager.aiBatteryModeEnabled ? .on : .off
+        menu.addItem(batteryItem)
+
+        let historyItem = NSMenuItem(
+            title: l10n.t("menu.conversionHistory"),
+            action: #selector(openHistorySettings),
+            keyEquivalent: "h"
+        )
+        historyItem.keyEquivalentModifierMask = [.command]
+        historyItem.target = self
+        menu.addItem(historyItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        // Settings
+        // ── 6. System & App ─────────────────────────────────────────
         let settingsItem = NSMenuItem(
             title: l10n.t("menu.settings"),
-            action: #selector(openSettings),
+            action: #selector(openSettingsDefault),
             keyEquivalent: ","
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        // About
         let aboutItem = NSMenuItem(
             title: l10n.t("menu.about"),
             action: #selector(openAbout),
@@ -357,7 +455,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Quit
         let quitItem = NSMenuItem(
             title: l10n.t("menu.quit"),
             action: #selector(NSApplication.terminate(_:)),
@@ -367,6 +464,43 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: - Actions
+
+    @objc private func toggleCurrentAppExclusion(_ sender: NSMenuItem) {
+        guard let bundleID = sender.representedObject as? String else { return }
+        if settingsManager.isAppExcluded(bundleID: bundleID) {
+            settingsManager.removeExcludedApp(bundleID: bundleID)
+        } else {
+            settingsManager.addExcludedApp(bundleID: bundleID)
+        }
+        setupMenu()
+    }
+
+    @objc private func resumeAction() {
+        settingsManager.resumeFromPause()
+        setupMenu()
+    }
+
+    @objc private func pause30MinAction() {
+        settingsManager.pauseTemporarily(minutes: 30)
+        setupMenu()
+    }
+
+    @objc private func toggleBatteryEcoMode() {
+        settingsManager.aiBatteryModeEnabled.toggle()
+        setupMenu()
+    }
+
+    @objc private func openAISettings() {
+        openSettings(tab: 2)
+    }
+
+    @objc private func openHistorySettings() {
+        openSettings(tab: 4)
+    }
+
+    @objc private func openSettingsDefault() {
+        openSettings(tab: 0)
+    }
 
     @objc private func handleAttentionIssue(_ sender: NSMenuItem) {
         guard let idString = sender.representedObject as? String,
@@ -394,6 +528,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc func openSettings() {
+        openSettings(tab: 0)
+    }
+
+    func openSettings(tab: Int = 0) {
+        settingsManager.selectedSettingsTab = tab
         NSApp.activate(ignoringOtherApps: true)
 
         if let window = settingsWindow, window.isVisible {

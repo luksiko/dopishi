@@ -181,6 +181,31 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionFixTwoInitialCapitals, forKey: Keys.autoCorrectionFixTwoInitialCapitals) }
     }
 
+    /// Whether to capitalize the first letter after a period or sentence start. Default: true.
+    @Published var autoCorrectionCapitalizeSentences: Bool {
+        didSet { defaults.set(autoCorrectionCapitalizeSentences, forKey: Keys.autoCorrectionCapitalizeSentences) }
+    }
+
+    /// Whether to insert a comma before coordinating conjunctions «а» and «но». Default: true.
+    @Published var autoCorrectionCommaBeforeConjunctions: Bool {
+        didSet { defaults.set(autoCorrectionCommaBeforeConjunctions, forKey: Keys.autoCorrectionCommaBeforeConjunctions) }
+    }
+
+    /// Whether to remove accidental space before punctuation marks (e.g. "слово ," -> "слово,"). Default: true.
+    @Published var autoCorrectionRemoveSpaceBeforePunctuation: Bool {
+        didSet { defaults.set(autoCorrectionRemoveSpaceBeforePunctuation, forKey: Keys.autoCorrectionRemoveSpaceBeforePunctuation) }
+    }
+
+    /// Whether to replace double hyphens "--" with em-dash "—" and triple dots "..." with ellipsis "…". Default: true.
+    @Published var autoCorrectionSmartDashesAndEllipsis: Bool {
+        didSet { defaults.set(autoCorrectionSmartDashesAndEllipsis, forKey: Keys.autoCorrectionSmartDashesAndEllipsis) }
+    }
+
+    /// Whether to fix accidental Caps Lock typing (e.g. "пРИВЕТ" -> "Привет", "hELLO" -> "Hello"). Default: true.
+    @Published var autoCorrectionFixCapsLockErrors: Bool {
+        didSet { defaults.set(autoCorrectionFixCapsLockErrors, forKey: Keys.autoCorrectionFixCapsLockErrors) }
+    }
+
     /// Whether real-time word autocompletion HUD is enabled. Default: true.
     @Published var autoCompletionEnabled: Bool {
         didSet {
@@ -711,6 +736,11 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionUseSpellCheck = "autoCorrectionUseSpellCheck"
         static let autoCorrectionSwitchLayout = "autoCorrectionSwitchLayout"
         static let autoCorrectionFixTwoInitialCapitals = "autoCorrectionFixTwoInitialCapitals"
+        static let autoCorrectionCapitalizeSentences = "autoCorrectionCapitalizeSentences"
+        static let autoCorrectionCommaBeforeConjunctions = "autoCorrectionCommaBeforeConjunctions"
+        static let autoCorrectionRemoveSpaceBeforePunctuation = "autoCorrectionRemoveSpaceBeforePunctuation"
+        static let autoCorrectionSmartDashesAndEllipsis = "autoCorrectionSmartDashesAndEllipsis"
+        static let autoCorrectionFixCapsLockErrors = "autoCorrectionFixCapsLockErrors"
         static let autoCompletionEnabled = "autoCompletionEnabled"
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
         static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
@@ -798,6 +828,11 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionUseSpellCheck = defaults.object(forKey: Keys.autoCorrectionUseSpellCheck) as? Bool ?? true  // Default: ON
         self.autoCorrectionSwitchLayout = defaults.object(forKey: Keys.autoCorrectionSwitchLayout) as? Bool ?? true    // Default: ON
         self.autoCorrectionFixTwoInitialCapitals = defaults.object(forKey: Keys.autoCorrectionFixTwoInitialCapitals) as? Bool ?? true // Default: ON
+        self.autoCorrectionCapitalizeSentences = defaults.object(forKey: Keys.autoCorrectionCapitalizeSentences) as? Bool ?? true // Default: ON
+        self.autoCorrectionCommaBeforeConjunctions = defaults.object(forKey: Keys.autoCorrectionCommaBeforeConjunctions) as? Bool ?? true // Default: ON
+        self.autoCorrectionRemoveSpaceBeforePunctuation = defaults.object(forKey: Keys.autoCorrectionRemoveSpaceBeforePunctuation) as? Bool ?? true // Default: ON
+        self.autoCorrectionSmartDashesAndEllipsis = defaults.object(forKey: Keys.autoCorrectionSmartDashesAndEllipsis) as? Bool ?? true // Default: ON
+        self.autoCorrectionFixCapsLockErrors = defaults.object(forKey: Keys.autoCorrectionFixCapsLockErrors) as? Bool ?? true // Default: ON
         
         self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
         let savedAcceptKey = defaults.string(forKey: Keys.autoCompletionAcceptKey)

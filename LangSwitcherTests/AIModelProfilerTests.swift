@@ -53,4 +53,19 @@ final class AIModelProfilerTests: XCTestCase {
         XCTAssertEqual(report.successRate, 0.5)
         XCTAssertEqual(report.samples.count, 2)
     }
+
+    func testBenchmarkSampleAppropriatenessForEmptyContinuation() {
+        let sample = BenchmarkSample(
+            prompt: "Test prompt",
+            continuation: "",
+            ttftMs: 25.0,
+            totalDurationMs: 25.0,
+            tokensCount: 0,
+            tokensPerSecond: 0.0,
+            isAppropriate: false
+        )
+        XCTAssertFalse(sample.isAppropriate)
+        XCTAssertEqual(sample.tokensCount, 0)
+        XCTAssertEqual(sample.tokensPerSecond, 0.0)
+    }
 }

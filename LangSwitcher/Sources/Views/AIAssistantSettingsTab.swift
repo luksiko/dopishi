@@ -118,6 +118,16 @@ struct AIAssistantSettingsTab: View {
                 .padding(.vertical, 4)
             }
 
+            // MARK: - Time Saved Banner
+            Section {
+                TimeSavedBanner()
+            }
+
+            // MARK: - Interactive Sandbox
+            Section {
+                CompletionDemoTextField()
+            }
+
             // MARK: - Section 1: Autocompletion Core
             Section(l10n.t("general.autocompletion")) {
                 Toggle(l10n.t("autocompletion.enabled"), isOn: $settingsManager.autoCompletionEnabled)
@@ -157,6 +167,17 @@ struct AIAssistantSettingsTab: View {
                     Toggle(l10n.t("autocompletion.includeCrossLayout"), isOn: $settingsManager.autoCompletionIncludeCrossLayout)
 
                     Toggle(l10n.t("autocompletion.suggestProfanity"), isOn: $settingsManager.autoCompletionSuggestProfanity)
+
+                    HStack {
+                        Toggle(l10n.t("autocompletion.fim"), isOn: $settingsManager.proFimEnabled)
+                        Spacer()
+                        ProBadge()
+                    }
+                    .padding(.top, 4)
+
+                    Text(l10n.t("autocompletion.fimDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -335,9 +356,21 @@ struct AIAssistantSettingsTab: View {
                         Text(String(format: l10n.t("ai.predictive.words"), 2)).tag(2)
                         Text(String(format: l10n.t("ai.predictive.words"), 3)).tag(3)
                         Text(String(format: l10n.t("ai.predictive.words"), 4)).tag(4)
+                        Text("8 (PRO)").tag(8)
+                        Text("15 (PRO)").tag(15)
                     }
                     .pickerStyle(.segmented)
                     .padding(.top, 4)
+
+                    if settingsManager.aiMaxContinuationWords > 4 {
+                        HStack(spacing: 6) {
+                            ProBadge()
+                            Text(l10n.t("ai.predictive.proLengthDesc"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 2)
+                    }
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -378,6 +411,17 @@ struct AIAssistantSettingsTab: View {
                         .padding(.top, 6)
 
                     Text(l10n.t("ai.predictive.screenContext.desc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack {
+                        Toggle(l10n.t("ai.deepContext"), isOn: $settingsManager.proDeepContextEnabled)
+                        Spacer()
+                        ProBadge()
+                    }
+                    .padding(.top, 6)
+
+                    Text(l10n.t("ai.deepContextDesc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -460,6 +504,20 @@ struct AIAssistantSettingsTab: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Divider()
                                 .padding(.vertical, 2)
+
+                            if report.samples.allSatisfy({ $0.continuation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.orange)
+                                    Text(l10n.t("ai.benchmark.error.noResponse"))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.orange.opacity(0.12))
+                                .cornerRadius(6)
+                            }
 
                             HStack(spacing: 12) {
                                 statCard(
@@ -641,7 +699,8 @@ struct AIAssistantSettingsTab: View {
     private func pickerTitle(for model: RecommendedAIModel) -> String {
         let star = model.isDefault ? " ★" : ""
         let downloaded = modelManager.isDownloaded(model: model) ? " ✓" : ""
-        return "\(model.name) (\(model.localizedSize(using: l10n)))\(star)\(downloaded)"
+        let pro = (model.ramTier.contains("24") || model.id == "gemma-4-e2b") ? " [PRO]" : ""
+        return "\(model.name) (\(model.localizedSize(using: l10n)))\(star)\(downloaded)\(pro)"
     }
 
     private var customPickerTitle: String {
@@ -691,6 +750,10 @@ struct AIAssistantSettingsTab: View {
                         .padding(.vertical, 2)
                         .background(Color.blue.opacity(0.12))
                         .cornerRadius(6)
+                }
+
+                if model.ramTier.contains("24") || model.id == "gemma-4-e2b" {
+                    ProBadge()
                 }
 
                 Spacer()

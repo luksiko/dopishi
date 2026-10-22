@@ -66,6 +66,7 @@ final class AutoCorrectionService {
     private var cancelledRequestIds: Set<UUID> = []
     private var typeAheadHandledCount: Int = 0
     private var wordBuffer: String = ""
+    private var recentTextBuffer: String = ""
     private var previousWord: String?
     private var suggestionTarget: AccessibilityService.ReplacementTarget?
     private var phraseContinuationAnchor: String?
@@ -273,6 +274,7 @@ final class AutoCorrectionService {
             runLoopSource = nil
         }
         wordBuffer = ""
+        recentTextBuffer = ""
         previousWord = nil
         dismissAutocompletion(hideFieldAnchor: true)
         ServiceStatus.shared.state = .disabled
@@ -281,6 +283,7 @@ final class AutoCorrectionService {
 
     @objc private func handleLayoutChanged() {
         wordBuffer = ""
+        recentTextBuffer = ""
         previousWord = nil
         dismissSuggestionsOnly()
     }
@@ -289,6 +292,7 @@ final class AutoCorrectionService {
         dismissSuggestionsOnly()
         aiDebounceTimer.cancel()
         wordBuffer = ""
+        recentTextBuffer = ""
         previousWord = nil
         ScreenContextService.shared.invalidateCache()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -320,6 +324,7 @@ final class AutoCorrectionService {
             return
         }
         wordBuffer = ""
+        recentTextBuffer = ""
         previousWord = nil
         snoozeUntil = nil
         snoozeFieldIdentifier = nil
@@ -701,14 +706,19 @@ final class AutoCorrectionService {
         case 0x33: // Backspace
             if flags.contains(.maskAlternate) {
                 wordBuffer = ""
+                recentTextBuffer = ""
             } else if !wordBuffer.isEmpty {
                 wordBuffer.removeLast()
+            }
+            if !recentTextBuffer.isEmpty {
+                recentTextBuffer.removeLast()
             }
             scheduleAutocompletion()
             return
 
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
             wordBuffer = ""
+            recentTextBuffer = ""
             previousWord = nil
             dismissSuggestionsOnly()
             aiDebounceTimer.cancel()
@@ -716,6 +726,7 @@ final class AutoCorrectionService {
 
         case 0x35: // Escape
             wordBuffer = ""
+            recentTextBuffer = ""
             previousWord = nil
             dismissSuggestionsOnly()
             aiDebounceTimer.cancel()
@@ -727,6 +738,7 @@ final class AutoCorrectionService {
 
         case 0x30: // Tab
             wordBuffer = ""
+            recentTextBuffer = ""
             dismissSuggestionsOnly()
             aiDebounceTimer.cancel()
             return
@@ -737,6 +749,8 @@ final class AutoCorrectionService {
                 previousWord = wordBuffer.lowercased()
             }
             wordBuffer = ""
+            recentTextBuffer.append("\n")
+            if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             dismissSuggestionsOnly()
             aiDebounceTimer.cancel()
             return
@@ -751,6 +765,8 @@ final class AutoCorrectionService {
                 }
                 wordBuffer = ""
             }
+            recentTextBuffer.append(" ")
+            if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             scheduleAIDebounce()
             return
 
@@ -765,8 +781,45 @@ final class AutoCorrectionService {
 
         // If an active ghost completion is visible, check if typing this character advances it
         if activeGhostState != nil && handleTypeAhead(char: char) {
+            recentTextBuffer.append(char)
+            if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             updateFieldAnchor()
             return
+        }
+
+        // Check for typographic smart dashes & ellipsis
+        if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionSmartDashesAndEllipsis {
+            let context = accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer
+            if let typo = SmartPunctuationEngine.smartDashesAndEllipsis(char: char, precedingText: context) {
+                performCheckedReplacement(expected: typo.expected, replacement: typo.replacement) { [weak self] _ in
+                    guard let self else { return }
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: typo.expected.count)
+                }
+                recentTextBuffer.append(char)
+                if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
+                return
+            }
+        }
+
+        // Check for accidental space before punctuation (e.g. "слово ," -> "слово,")
+        if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionRemoveSpaceBeforePunctuation {
+            let context = accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer
+            if let fix = SmartPunctuationEngine.fixSpaceBeforePunctuation(char: char, precedingText: context) {
+                performCheckedReplacement(expected: fix.expected, replacement: fix.replacement) { [weak self] _ in
+                    guard let self else { return }
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: 1)
+                }
+                if recentTextBuffer.hasSuffix(" ") {
+                    recentTextBuffer.removeLast()
+                }
+                recentTextBuffer.append(char)
+                if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
+                dismissSuggestionsOnly()
+                scheduleAIDebounce()
+                return
+            }
         }
 
         // Check if it's a word boundary (punctuation)
@@ -780,12 +833,16 @@ final class AutoCorrectionService {
                 }
                 wordBuffer = ""
             }
+            recentTextBuffer.append(char)
+            if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             scheduleAIDebounce()
             return
         }
 
-        // Accumulate character in word buffer
+        // Accumulate character in word buffer and recent text buffer
         wordBuffer.append(char)
+        recentTextBuffer.append(char)
+        if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
         scheduleAutocompletion()
     }
 
@@ -1472,6 +1529,7 @@ final class AutoCorrectionService {
 
                 // Record saved characters and clicks in extended statistics
                 self.settingsManager.recordSavedText(inserted: acceptance.replacement.count, typed: acceptance.expected.count)
+                CompletionStatsTracker.shared.recordAcceptedCompletion(insertedText: acceptance.replacement, typedPrefix: acceptance.expected)
 
                 if let remaining = remainingPhrase, !remaining.isEmpty {
                     self.phraseContinuationAnchor = insertionText
@@ -1568,6 +1626,33 @@ final class AutoCorrectionService {
             return
         }
         if !word.isEmpty { previousWord = word.lowercased() }
+
+        let axBefore = accessibilityService.captureCaretContext()?.textBeforeCaret
+        let fullContext = axBefore ?? recentTextBuffer
+        let textBeforeWord: String
+        if fullContext.hasSuffix(bufferedWord) {
+            textBeforeWord = String(fullContext.dropLast(bufferedWord.count))
+        } else if recentTextBuffer.hasSuffix(bufferedWord) {
+            textBeforeWord = String(recentTextBuffer.dropLast(bufferedWord.count))
+        } else {
+            textBeforeWord = recentTextBuffer
+        }
+
+        // Check for comma before Russian coordinating conjunctions «а» and «но»
+        if settingsManager.autoCorrectionCommaBeforeConjunctions && triggerChar == " " {
+            if SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: word, precedingText: textBeforeWord) {
+                NSLog("[LangSwitcher] AutoCorrection: inserting comma before conjunction '\(word)'")
+                performCheckedReplacement(expected: " " + bufferedWord + " ",
+                                          replacement: ", " + bufferedWord + " ") { [weak self] _ in
+                    guard let self else { return }
+                    self.previousWord = word.lowercased()
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: 2)
+                }
+                return
+            }
+        }
+
         guard word.count >= 2 else { return }
 
         NSLog("[LangSwitcher] AutoCorrection: checking word '\(word)' (trigger='\(triggerChar)')")
@@ -1579,6 +1664,10 @@ final class AutoCorrectionService {
             if settingsManager.autoCorrectionFixTwoInitialCapitals,
                let fixedCapitals = textConverter.fixTwoInitialCapitals(convertedWord) {
                 convertedWord = fixedCapitals
+            }
+            if settingsManager.autoCorrectionCapitalizeSentences,
+               let capitalized = SmartPunctuationEngine.capitalizeAfterSentence(word: convertedWord, precedingText: textBeforeWord) {
+                convertedWord = capitalized
             }
 
             var isLayoutConversionValid = true
@@ -1643,6 +1732,60 @@ final class AutoCorrectionService {
                 self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
             }
             return
+        }
+
+        // Step 3: Check for accidental Caps Lock (e.g. "пРИВЕТ" -> "Привет", "hELLO" -> "Hello")
+        if settingsManager.autoCorrectionFixCapsLockErrors,
+           let fixedCaps = SmartPunctuationEngine.fixCapsLockError(word) {
+            NSLog("[LangSwitcher] AutoCorrection: checking Caps Lock error: '\(word)' → '\(fixedCaps)'")
+            var isCapsValid = true
+            if settingsManager.autoCorrectionUseSpellCheck {
+                let layouts = settingsManager.enabledLayouts
+                let langs = layouts.map(\.languageCode)
+                let inSpell = spellCheckService.isValidWordInAnyLanguage(fixedCaps, languages: langs)
+                let inList = LanguageWordlists.contains(word: fixedCaps)
+                if !inSpell && !inList {
+                    isCapsValid = false
+                }
+            }
+            if isCapsValid {
+                NSLog("[LangSwitcher] AutoCorrection: Caps Lock corrected: '\(word)' → '\(fixedCaps)'")
+                performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                          replacement: token.prefix + fixedCaps + token.punctuation + String(triggerChar)) { [weak self] _ in
+                    guard let self else { return }
+                    self.previousWord = fixedCaps.lowercased()
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
+                }
+                return
+            }
+        }
+
+        // Step 4: Capitalize after sentence terminator or start of line (e.g. ". привет" -> ". Привет")
+        if settingsManager.autoCorrectionCapitalizeSentences,
+           let capitalized = SmartPunctuationEngine.capitalizeAfterSentence(word: word, precedingText: textBeforeWord) {
+            NSLog("[LangSwitcher] AutoCorrection: checking sentence capitalization: '\(word)' → '\(capitalized)'")
+            var isCapValid = true
+            if settingsManager.autoCorrectionUseSpellCheck {
+                let layouts = settingsManager.enabledLayouts
+                let langs = layouts.map(\.languageCode)
+                let inSpell = spellCheckService.isValidWordInAnyLanguage(capitalized, languages: langs)
+                let inList = LanguageWordlists.contains(word: capitalized)
+                if !inSpell && !inList {
+                    isCapValid = false
+                }
+            }
+            if isCapValid {
+                NSLog("[LangSwitcher] AutoCorrection: sentence capitalized: '\(word)' → '\(capitalized)'")
+                performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                          replacement: token.prefix + capitalized + token.punctuation + String(triggerChar)) { [weak self] _ in
+                    guard let self else { return }
+                    self.previousWord = capitalized.lowercased()
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: 1)
+                }
+                return
+            }
         }
 
         NSLog("[LangSwitcher] AutoCorrection: '\(word)' does not need correction")

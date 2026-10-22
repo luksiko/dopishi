@@ -1,5 +1,27 @@
 import SwiftUI
 
+// MARK: - Pro Badge Component
+
+struct ProBadge: View {
+    var text: String = "PRO"
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                LinearGradient(
+                    colors: [Color.purple, Color.blue],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(Capsule())
+    }
+}
+
 // MARK: - Settings View
 
 struct SettingsView: View {
@@ -83,6 +105,15 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 620, height: 600)
+        .onAppear {
+            selectedTab = settingsManager.selectedSettingsTab
+        }
+        .onChange(of: settingsManager.selectedSettingsTab) { newTab in
+            selectedTab = newTab
+        }
+        .onChange(of: selectedTab) { newTab in
+            settingsManager.selectedSettingsTab = newTab
+        }
     }
 }
 
@@ -118,6 +149,15 @@ struct GeneralSettingsTab: View {
                 Toggle(l10n.t("general.launchAtLogin"), isOn: $settingsManager.launchAtLogin)
                 Toggle(l10n.t("general.playSound"), isOn: $settingsManager.playSounds)
                 Toggle(l10n.t("general.showNotifications"), isOn: $settingsManager.showNotifications)
+
+                HStack {
+                    Toggle(l10n.t("general.iCloudSync"), isOn: $settingsManager.iCloudSyncEnabled)
+                    Spacer()
+                    ProBadge()
+                }
+                Text(l10n.t("general.iCloudSyncDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // ── Accessibility Permissions Status ────────────────────
@@ -223,6 +263,17 @@ struct LayoutSettingsTab: View {
                 Text(l10n.t("layoutSwitchKey.hint"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                HStack {
+                    Toggle(l10n.t("layout.multiLanguageAutoDetect"), isOn: $settingsManager.proMultiLanguageAutoDetect)
+                    Spacer()
+                    ProBadge()
+                }
+                .padding(.top, 4)
+
+                Text(l10n.t("layout.multiLanguageAutoDetectDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // ── 2. Text Conversion Shortcut ─────────────────────────
@@ -286,20 +337,74 @@ struct LayoutSettingsTab: View {
                     .foregroundStyle(.secondary)
 
                 if settingsManager.autoCorrectionEnabled {
-                    Toggle(l10n.t("general.autoCorrectionSpellCheck"), isOn: $settingsManager.autoCorrectionUseSpellCheck)
-                    Text(l10n.t("general.autoCorrectionSpellCheckDesc"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    // Layout & Dictionary
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(l10n.t("general.autoCorrectionGroup.layout"))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
 
-                    Toggle(l10n.t("general.autoCorrectionSwitchLayout"), isOn: $settingsManager.autoCorrectionSwitchLayout)
-                    Text(l10n.t("general.autoCorrectionSwitchLayoutDesc"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Toggle(l10n.t("general.autoCorrectionSpellCheck"), isOn: $settingsManager.autoCorrectionUseSpellCheck)
+                        Text(l10n.t("general.autoCorrectionSpellCheckDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
-                    Toggle(l10n.t("general.autoCorrectionFixTwoCapitals"), isOn: $settingsManager.autoCorrectionFixTwoInitialCapitals)
-                    Text(l10n.t("general.autoCorrectionFixTwoCapitalsDesc"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Toggle(l10n.t("general.autoCorrectionSwitchLayout"), isOn: $settingsManager.autoCorrectionSwitchLayout)
+                        Text(l10n.t("general.autoCorrectionSwitchLayoutDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 4)
+
+                    Divider().padding(.vertical, 4)
+
+                    // Capitalization & Letter Case
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(l10n.t("general.autoCorrectionGroup.casing"))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+
+                        Toggle(l10n.t("general.autoCorrectionCapitalizeSentences"), isOn: $settingsManager.autoCorrectionCapitalizeSentences)
+                        Text(l10n.t("general.autoCorrectionCapitalizeSentencesDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionFixTwoCapitals"), isOn: $settingsManager.autoCorrectionFixTwoInitialCapitals)
+                        Text(l10n.t("general.autoCorrectionFixTwoCapitalsDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionFixCapsLock"), isOn: $settingsManager.autoCorrectionFixCapsLockErrors)
+                        Text(l10n.t("general.autoCorrectionFixCapsLockDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // Smart Punctuation & Typography
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(l10n.t("general.autoCorrectionGroup.punctuation"))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+
+                        Toggle(l10n.t("general.autoCorrectionCommaBeforeConjunctions"), isOn: $settingsManager.autoCorrectionCommaBeforeConjunctions)
+                        Text(l10n.t("general.autoCorrectionCommaBeforeConjunctionsDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionRemoveSpaceBeforePunctuation"), isOn: $settingsManager.autoCorrectionRemoveSpaceBeforePunctuation)
+                        Text(l10n.t("general.autoCorrectionRemoveSpaceBeforePunctuationDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionSmartDashesAndEllipsis"), isOn: $settingsManager.autoCorrectionSmartDashesAndEllipsis)
+                        Text(l10n.t("general.autoCorrectionSmartDashesAndEllipsisDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

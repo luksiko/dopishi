@@ -98,17 +98,19 @@ final class AIModelProfiler: ObservableObject {
             }
             
             let finalOutput = result ?? accumulatedText
-            let wordCount = finalOutput.split(separator: " ").count
+            let trimmed = finalOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let hasOutput = !trimmed.isEmpty
+            let wordCount = hasOutput ? trimmed.split(separator: " ").count : 0
             let tokenMultiplier = (test.expectedScript == "ru") ? 3 : 2
-            let effectiveTokens = max(tokenCount, max(1, wordCount * tokenMultiplier))
+            let effectiveTokens = hasOutput ? max(tokenCount, max(1, wordCount * tokenMultiplier)) : 0
             let generationDurationMs = max(1.0, totalMs - (firstTokenTime != nil ? ttftMs : 0.0))
-            let tps = Double(effectiveTokens) / (generationDurationMs / 1000.0)
+            let tps = (effectiveTokens > 0) ? (Double(effectiveTokens) / (generationDurationMs / 1000.0)) : 0.0
             
             // Check appropriateness: non-empty, matching script, no leftover tags
             let isCyrillic = AIInferenceEngine.containsCyrillic(finalOutput)
             let matchesScript = (test.expectedScript == "ru") ? isCyrillic : !isCyrillic
             let hasMarkup = finalOutput.contains("<") || finalOutput.contains(">")
-            let isAppropriate = !finalOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let isAppropriate = hasOutput
                 && matchesScript
                 && !hasMarkup
             
@@ -127,9 +129,10 @@ final class AIModelProfiler: ObservableObject {
         
         guard !samples.isEmpty else { return nil }
         
-        let avgTTFT = samples.map(\.ttftMs).reduce(0, +) / Double(samples.count)
+        let validSamples = samples.filter { !$0.continuation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let avgTTFT = validSamples.isEmpty ? 0.0 : (validSamples.map(\.ttftMs).reduce(0, +) / Double(validSamples.count))
         let avgLatency = samples.map(\.totalDurationMs).reduce(0, +) / Double(samples.count)
-        let avgTPS = samples.map(\.tokensPerSecond).reduce(0, +) / Double(samples.count)
+        let avgTPS = validSamples.isEmpty ? 0.0 : (validSamples.map(\.tokensPerSecond).reduce(0, +) / Double(validSamples.count))
         let successCount = samples.filter(\.isAppropriate).count
         let successRate = Double(successCount) / Double(samples.count)
         

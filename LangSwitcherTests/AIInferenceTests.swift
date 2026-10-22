@@ -379,4 +379,11 @@ extension AIInferenceTests {
             }
         }
     }
+
+    func testEnsureRunningDetectsDeadEngine() async {
+        let engine = AIInferenceEngine()
+        // When no valid active model is set or engine was stopped
+        let running = await engine.ensureRunning()
+        XCTAssertFalse(running)
+    }
 }
