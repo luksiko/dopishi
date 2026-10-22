@@ -480,10 +480,14 @@ final class AIInferenceEngine: ObservableObject {
         if await AILocalEngine.shared.isLoaded {
             var nativePrompt = rawPrompt
             if usesTemplate {
+                let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
+                let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
+                let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+
                 let msgs = Self.completionMessages(
                     context: context,
                     afterCaret: afterCaret,
-                    instructions: customInstructions,
+                    instructions: combinedInstructions.isEmpty ? nil : combinedInstructions,
                     screenContext: screenContext,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
@@ -555,6 +559,10 @@ final class AIInferenceEngine: ObservableObject {
         }
 
         if usesTemplate {
+            let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
+            let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
+            let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+
             var templateRequest = URLRequest(url: URL(string: "http://127.0.0.1:\(serverPort)/apply-template")!)
             templateRequest.httpMethod = "POST"
             templateRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -562,7 +570,7 @@ final class AIInferenceEngine: ObservableObject {
                 "messages": Self.completionMessages(
                     context: context,
                     afterCaret: afterCaret,
-                    instructions: customInstructions,
+                    instructions: combinedInstructions.isEmpty ? nil : combinedInstructions,
                     screenContext: screenContext,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
@@ -588,7 +596,7 @@ final class AIInferenceEngine: ObservableObject {
         }
         let isStreaming = onToken != nil
         let payload: [String: Any] = [
-            "temperature": 0.2,
+            "temperature": Double(LoRAAdapterManager.shared.effectiveTemperature(base: 0.2)),
             "seed": 42,
             "stream": isStreaming,
             "prompt": prompt,

@@ -80,6 +80,7 @@
 		E10000010000000000000064 /* SmartRepliesEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000064 /* SmartRepliesEngine.swift */; };
 		E10000010000000000000065 /* SmartRepliesController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000065 /* SmartRepliesController.swift */; };
 		E10000010000000000000066 /* SmartRepliesHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000066 /* SmartRepliesHUDView.swift */; };
+		E10000010000000000000067 /* LoRAAdapterManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000067 /* LoRAAdapterManager.swift */; };
 		E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000059 /* CompletionStatsTracker.swift */; };
 		E1000001000000000000005A /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005A /* KeyboardView.swift */; };
 		E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005B /* CompletionDemoTextField.swift */; };
@@ -116,6 +117,7 @@
 		E10000010000000000000133 /* ThesaurusEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000133 /* ThesaurusEngineTests.swift */; };
 		E10000010000000000000134 /* WordAlternativesEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000134 /* WordAlternativesEngineTests.swift */; };
 		E10000010000000000000135 /* SmartRepliesEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000135 /* SmartRepliesEngineTests.swift */; };
+		E10000010000000000000136 /* LoRAAdapterManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000136 /* LoRAAdapterManagerTests.swift */; };
 		E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000130 /* BatteryPowerManagerTests.swift */; };
 		E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000131 /* CompletionStatsTrackerTests.swift */; };
 		E10000010000000000000049 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
@@ -206,6 +208,7 @@
 		E10000020000000000000064 /* SmartRepliesEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRepliesEngine.swift; sourceTree = "<group>"; };
 		E10000020000000000000065 /* SmartRepliesController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRepliesController.swift; sourceTree = "<group>"; };
 		E10000020000000000000066 /* SmartRepliesHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRepliesHUDView.swift; sourceTree = "<group>"; };
+		E10000020000000000000067 /* LoRAAdapterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoRAAdapterManager.swift; sourceTree = "<group>"; };
 		E10000020000000000000059 /* CompletionStatsTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTracker.swift; sourceTree = "<group>"; };
 		E1000002000000000000005A /* KeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
 		E1000002000000000000005B /* CompletionDemoTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionDemoTextField.swift; sourceTree = "<group>"; };
@@ -242,6 +245,7 @@
 		E10000020000000000000133 /* ThesaurusEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThesaurusEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000134 /* WordAlternativesEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordAlternativesEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000135 /* SmartRepliesEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRepliesEngineTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000136 /* LoRAAdapterManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoRAAdapterManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000131 /* CompletionStatsTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTrackerTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -383,6 +387,7 @@
 				E10000020000000000000062 /* WordAlternativesController.swift */,
 				E10000020000000000000064 /* SmartRepliesEngine.swift */,
 				E10000020000000000000065 /* SmartRepliesController.swift */,
+				E10000020000000000000067 /* LoRAAdapterManager.swift */,
 				E10000020000000000000059 /* CompletionStatsTracker.swift */,
 			);
 			path = Services;
@@ -465,6 +470,7 @@
 				E10000020000000000000133 /* ThesaurusEngineTests.swift */,
 				E10000020000000000000134 /* WordAlternativesEngineTests.swift */,
 				E10000020000000000000135 /* SmartRepliesEngineTests.swift */,
+				E10000020000000000000136 /* LoRAAdapterManagerTests.swift */,
 				E10000020000000000000130 /* BatteryPowerManagerTests.swift */,
 				E10000020000000000000131 /* CompletionStatsTrackerTests.swift */,
 			);
@@ -651,6 +657,7 @@
 				E10000010000000000000064 /* SmartRepliesEngine.swift in Sources */,
 				E10000010000000000000065 /* SmartRepliesController.swift in Sources */,
 				E10000010000000000000066 /* SmartRepliesHUDView.swift in Sources */,
+				E10000010000000000000067 /* LoRAAdapterManager.swift in Sources */,
 				E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */,
 				E1000001000000000000005A /* KeyboardView.swift in Sources */,
 				E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */,
@@ -694,6 +701,7 @@
 				E10000010000000000000133 /* ThesaurusEngineTests.swift in Sources */,
 				E10000010000000000000134 /* WordAlternativesEngineTests.swift in Sources */,
 				E10000010000000000000135 /* SmartRepliesEngineTests.swift in Sources */,
+				E10000010000000000000136 /* LoRAAdapterManagerTests.swift in Sources */,
 				E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */,
 				E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */,
 			);

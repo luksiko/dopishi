@@ -493,6 +493,8 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.ramGuide.24gb":                      "Qwen 3B, Gemma 2B or Custom GGUF — best contextual depth for Apple Silicon.",
 
         // ── AI Custom Instructions ─────────────────────────────────────
+        "ai.persona.title":                      "Persona & LoRA Adapters",
+        "ai.persona.desc":                       "Fine-tunes vocabulary, tone of voice, and sampling temperature for your specific domain.",
         "ai.instructions.title":                 "AI Instructions",
         "ai.instructions.desc":                  "Personalize completion style, role, or technical terminology.",
         "ai.instructions.placeholder":           "e.g. I am a programmer, write concisely, keep technical terms in English.",

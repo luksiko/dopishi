@@ -14,6 +14,7 @@ struct AIAssistantSettingsTab: View {
     @StateObject private var textHistoryStore = UserTextHistoryStore.shared
     @ObservedObject private var attentionCenter = AttentionCenter.shared
     @ObservedObject private var batteryManager = BatteryPowerManager.shared
+    @ObservedObject private var loraManager = LoRAAdapterManager.shared
 
     @State private var modelToDelete: RecommendedAIModel?
     @State private var showDeleteAlert = false
@@ -257,7 +258,33 @@ struct AIAssistantSettingsTab: View {
             }
 
             Section(l10n.t("ai.instructions.title")) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Persona & LoRA Picker
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker(l10n.t("ai.persona.title"), selection: $loraManager.activeAdapterId) {
+                            ForEach(loraManager.allAdapters) { adapter in
+                                Label(adapter.name, systemImage: adapter.icon)
+                                    .tag(adapter.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        if let active = loraManager.activeAdapter {
+                            HStack {
+                                Image(systemName: active.icon)
+                                    .foregroundStyle(Color.accentColor)
+                                Text(l10n.currentLanguage == "ru" ? active.systemPromptRu : active.systemPromptEn)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(6)
+                            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+
+                    Divider()
+
                     Text(l10n.t("ai.instructions.desc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
