@@ -370,10 +370,10 @@ final class AIInferenceEngine: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Back up to the word boundary so tokenization never locks an unfinished
-        // subword into the wrong token. Only accept a generated word matching it.
+        // Keep the full context right up to caret including wordBuffer,
+        // allowing the model to naturally complete both the word and subsequent words.
         let healsWord = !wordBuffer.isEmpty && context.hasSuffix(wordBuffer)
-        let generationContext = healsWord ? String(context.dropLast(wordBuffer.count)) : context
+        let generationContext = context
         guard !generationContext.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         var prompt = Self.continuationPrefix(generationContext)
         if usesTemplate {
@@ -430,18 +430,14 @@ final class AIInferenceEngine: ObservableObject {
                         accumulatedRaw += chunk
                         
                         var currentRaw = accumulatedRaw
-                        if healsWord {
-                            if let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
-                                currentRaw = healed
-                            } else {
-                                continue
-                            }
+                        if healsWord, let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
+                            currentRaw = healed
                         }
                         
                         if let cleaned = Self.cleanAndTrimContinuation(
                             raw: currentRaw,
                             context: context,
-                            wordBuffer: healsWord ? "" : wordBuffer,
+                            wordBuffer: wordBuffer,
                             maxWords: maxWords,
                             afterCaret: afterCaret,
                             screenContext: screenContext
@@ -497,12 +493,11 @@ final class AIInferenceEngine: ObservableObject {
                 guard !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
                       let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
                 guard var raw = json["content"] as? String else { return nil }
-                if healsWord {
-                    guard let healed = Self.healedContinuation(raw, wordBuffer: wordBuffer) else { return nil }
+                if healsWord, let healed = Self.healedContinuation(raw, wordBuffer: wordBuffer) {
                     raw = healed
                 }
                 guard let cleaned = Self.cleanAndTrimContinuation(raw: raw, context: context,
-                    wordBuffer: healsWord ? "" : wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
+                    wordBuffer: wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
                     screenContext: screenContext) else { return nil }
                 return context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
             } catch {

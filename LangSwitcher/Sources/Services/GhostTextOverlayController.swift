@@ -70,8 +70,12 @@ final class GhostTextOverlayController: NSObject {
         }
         
         let newFrame = NSRect(origin: origin, size: fittingSize)
-        p.setFrame(newFrame, display: true)
-        p.orderFrontRegardless()
+        if p.frame != newFrame {
+            p.setFrame(newFrame, display: true)
+        }
+        if !p.isVisible {
+            p.orderFrontRegardless()
+        }
     }
     
     func hide() {
