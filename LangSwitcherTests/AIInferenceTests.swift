@@ -168,13 +168,17 @@ final class AIInferenceTests: XCTestCase {
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[User 001]", context: "Привет ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[User 002]", context: "Привет ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "User [002]", context: "Привет ", wordBuffer: "", maxWords: 4))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[Model 001]", context: "Привет ", wordBuffer: "", maxWords: 4))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Model [002]", context: "Привет ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[002]", context: "Привет ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "User: как дела?", context: "Привет ", wordBuffer: "", maxWords: 4))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Model: как дела?", context: "Привет ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[User 001] как дела?", context: "Привет, ", wordBuffer: "", maxWords: 4))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "[User 002] как дела?", context: "Привет, ", wordBuffer: "", maxWords: 4))
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "как дела? [User 001]", context: "Привет, ", wordBuffer: "", maxWords: 4), "как дела?")
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "как дела? [User 002]", context: "Привет, ", wordBuffer: "", maxWords: 4), "как дела?")
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "как дела? User [002]", context: "Привет, ", wordBuffer: "", maxWords: 4), "как дела?")
+        XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "как дела? Model [001]", context: "Привет, ", wordBuffer: "", maxWords: 4), "как дела?")
     }
 
     func testGGUFTemplateDetectionAndMalformedMetadata() throws {

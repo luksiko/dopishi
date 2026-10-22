@@ -410,6 +410,7 @@ final class AIInferenceEngine: ObservableObject {
                 "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
                 "[User", "[user", "[USER", "User:", "user:", "USER:", "User [", "user [", "User 0", "user 0",
                 "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
+                "[Model", "[model", "[MODEL", "Model:", "model:", "MODEL:", "Model [", "model [",
                 "\n[User", "\nUser", "\n[", "[00", "[0", "[User "
             ]
         ]
@@ -442,7 +443,7 @@ final class AIInferenceEngine: ObservableObject {
                         if let cleaned = Self.cleanAndTrimContinuation(
                             raw: currentRaw,
                             context: context,
-                            wordBuffer: wordBuffer,
+                            wordBuffer: healsWord ? "" : wordBuffer,
                             maxWords: maxWords,
                             afterCaret: afterCaret,
                             screenContext: screenContext
@@ -543,6 +544,7 @@ final class AIInferenceEngine: ObservableObject {
             "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
             "[User", "[user", "[USER", "User:", "user:", "USER:",
             "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
+            "[Model", "[model", "[MODEL", "Model:", "model:", "MODEL:",
             "[System", "[system", "System:", "system:"
         ]
         for tag in stopTags {
@@ -552,7 +554,7 @@ final class AIInferenceEngine: ObservableObject {
         }
 
         // Also stop at [User 001], User [002], [002], or any bracketed/numbered dialogue role tag
-        if let roleMatch = text.range(of: #"(\[?\b(User|user|Assistant|assistant|Human|human|System|system)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\])"#, options: .regularExpression) {
+        if let roleMatch = text.range(of: #"(\[?\b(User|user|Assistant|assistant|Human|human|System|system|Model|model)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\])"#, options: .regularExpression) {
             text = String(text[..<roleMatch.lowerBound])
         }
         

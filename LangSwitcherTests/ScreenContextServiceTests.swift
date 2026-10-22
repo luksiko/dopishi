@@ -38,8 +38,11 @@ final class ScreenContextServiceTests: XCTestCase {
         XCTAssertTrue(ScreenContextService.isUINoiseText("[User 001]"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("[User 002]"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("User [002]"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("[Model 001]"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("Model [002]"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("[002]"))
         XCTAssertTrue(ScreenContextService.isUINoiseText("User:"))
+        XCTAssertTrue(ScreenContextService.isUINoiseText("Model:"))
         
         XCTAssertFalse(ScreenContextService.isUINoiseText("Привет, во сколько сегодня встреча?"))
         XCTAssertFalse(ScreenContextService.isUINoiseText("Can we reschedule the sync to 3 PM?"))
