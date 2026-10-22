@@ -701,6 +701,24 @@ final class AutoCorrectionService {
             return
         }
 
+        // Intercept keys if Smart Replies HUD is active
+        if SmartRepliesController.shared.isVisible {
+            if keyCode == 0x35 { // Escape
+                SmartRepliesController.shared.hide()
+                return
+            }
+            if keyCode == 0x24 || keyCode == 0x30 { // Enter or Tab
+                if SmartRepliesController.shared.confirmCurrentSelection() {
+                    return
+                }
+            }
+            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
+                if SmartRepliesController.shared.handleNumericInput(digit) {
+                    return
+                }
+            }
+        }
+
         // Intercept keys if Word Alternatives Carousel is active
         if WordAlternativesController.shared.isVisible {
             if keyCode == 0x35 { // Escape

@@ -389,6 +389,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         thesaurusItem.target = self
         menu.addItem(thesaurusItem)
 
+        // Smart Replies action
+        let smartRepliesItem = NSMenuItem(
+            title: l10n.t("menu.smartReplies"),
+            action: #selector(smartRepliesAction),
+            keyEquivalent: "r"
+        )
+        smartRepliesItem.keyEquivalentModifierMask = [.command, .option]
+        smartRepliesItem.target = self
+        menu.addItem(smartRepliesItem)
+
         // Direct switch layout action
         let switchKeyTitle: String
         if settingsManager.layoutSwitchKey != .disabled {
@@ -529,6 +539,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func thesaurusAction() {
         ThesaurusController.shared.triggerForCurrentSelection()
+    }
+
+    @objc private func smartRepliesAction() {
+        SmartRepliesController.shared.triggerSmartReplies()
     }
 
     @objc private func switchLayoutAction() {
