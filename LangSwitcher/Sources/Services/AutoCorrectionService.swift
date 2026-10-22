@@ -855,6 +855,7 @@ final class AutoCorrectionService {
         
         let text = caretContext.textBeforeCaret
         let lastLine = text.components(separatedBy: .newlines).last ?? text
+        guard !AutoCorrectionGate.containsSensitiveInformation(lastLine) else { return }
         UserTextHistoryStore.shared.recordSnippet(text: lastLine, bundleID: currentBundleID)
     }
 
@@ -1170,6 +1171,7 @@ final class AutoCorrectionService {
                 candidates: Array(newCandidates.prefix(settingsManager.autoCompletionMaxSuggestions)),
                 caretRect: liveCaret,
                 acceptKeyHint: hint,
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
@@ -1296,6 +1298,7 @@ final class AutoCorrectionService {
                 candidates: candidates,
                 caretRect: caretRect ?? accessibilityService.focusedFieldScreenRect(),
                 acceptKeyHint: hint,
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
@@ -1467,6 +1470,7 @@ final class AutoCorrectionService {
             role: focus?.role,
             subrole: focus?.subrole,
             bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            text: bufferedWord,
             excludedBundleIDs: Set(settingsManager.excludedAppBundleIDs)
         )
         // Conversion and spell checking log text. The gate must run before either
@@ -1482,6 +1486,10 @@ final class AutoCorrectionService {
             return
         }
         let word = token.word
+        guard !AutoCorrectionGate.isPotentialSecret(word) else {
+            previousWord = nil
+            return
+        }
         if !word.isEmpty { previousWord = word.lowercased() }
         guard word.count >= 2 else { return }
 

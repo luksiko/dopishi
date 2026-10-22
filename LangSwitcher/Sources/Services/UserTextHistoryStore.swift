@@ -28,11 +28,6 @@ final class UserTextHistoryStore: ObservableObject {
     private var db: OpaquePointer?
     private static let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
-    // Privacy sanitization patterns
-    private static let creditCardRegex = try? NSRegularExpression(pattern: #"\b(?:\d[ -]*?){13,16}\b"#)
-    private static let emailRegex = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
-    private static let secretTokenRegex = try? NSRegularExpression(pattern: #"(?:ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})"#)
-    
     init(databasePath: String? = nil) {
         openDatabase(at: databasePath ?? Self.defaultDatabasePath)
         createTableIfNeeded()
@@ -101,30 +96,19 @@ final class UserTextHistoryStore: ObservableObject {
         
         // Truncate to reasonable snippet size
         let cleanText = String(trimmed.prefix(400))
-        let range = NSRange(location: 0, length: cleanText.utf16.count)
         
-        // 1. Drop secret tokens / API keys / Bearer JWTs
-        if let secretTokenRegex, secretTokenRegex.firstMatch(in: cleanText, range: range) != nil {
+        // 1. Drop sensitive data via AutoCorrectionGate (Cotypist-grade Secret Sanitizer)
+        guard !AutoCorrectionGate.containsSensitiveInformation(cleanText) else {
             return nil
         }
         
-        // 2. Drop credit cards
-        if let creditCardRegex, creditCardRegex.firstMatch(in: cleanText, range: range) != nil {
-            return nil
-        }
-        
-        // 3. Drop single passwords or verification codes
+        // 2. Drop single passwords or verification codes
         if words.count <= 4 && words.allSatisfy({ $0.allSatisfy(\.isNumber) || ($0.count > 10 && $0.contains(where: \.isPunctuation)) }) {
             return nil
         }
         
-        // 4. Redact emails
-        var sanitized = cleanText
-        if let emailRegex {
-            sanitized = emailRegex.stringByReplacingMatches(in: sanitized, range: range, withTemplate: "[email]")
-        }
-        
-        return sanitized
+        // 3. Delegate to AutoCorrectionGate for redaction (e.g. emails)
+        return AutoCorrectionGate.sanitize(text: cleanText)
     }
     
     // MARK: - Insert & Learning

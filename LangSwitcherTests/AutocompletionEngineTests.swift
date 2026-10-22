@@ -166,6 +166,181 @@ final class AutocompletionEngineTests: XCTestCase {
         overlay.hide()
         XCTAssertFalse(overlay.isVisible)
     }
+
+    // MARK: - Caret Stabilization Tests (Cotypist Algorithm)
+
+    func testCaretStabilization_initialPlacementWithoutProvider() {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 200, y: 500, width: 2, height: 18)
+        
+        overlay.show(
+            candidates: [candidate],
+            caretRect: caret,
+            acceptKeyHint: "⇥",
+            onSelect: { _ in }
+        )
+        
+        XCTAssertTrue(overlay.isVisible)
+        XCTAssertEqual(overlay.pendingCaretAnchor, caret)
+        XCTAssertNil(overlay.pendingCaretPollTask)
+        overlay.hide()
+    }
+
+    func testCaretStabilization_staleAnchorStartsPolling() {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 200, y: 500, width: 2, height: 18)
+        
+        // First show sets the anchor
+        overlay.show(
+            candidates: [candidate],
+            caretRect: caret,
+            acceptKeyHint: "⇥",
+            onSelect: { _ in }
+        )
+        XCTAssertEqual(overlay.pendingCaretAnchor, caret)
+        
+        // Second show with the exact same caret simulates delayed AX update in Electron
+        overlay.show(
+            candidates: [candidate],
+            caretRect: caret,
+            acceptKeyHint: "⇥",
+            caretProvider: { caret },
+            onSelect: { _ in }
+        )
+        
+        XCTAssertNotNil(overlay.pendingCaretPollTask)
+        XCTAssertNotNil(overlay.pendingCaretPollDeadline)
+        overlay.hide()
+        XCTAssertNil(overlay.pendingCaretPollTask)
+    }
+
+    func testCaretStabilization_pollResolvesWhenCaretMoves() async {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let initialCaret = CGRect(x: 200, y: 500, width: 2, height: 18)
+        let movedCaret = CGRect(x: 208, y: 500, width: 2, height: 18)
+        
+        var currentProviderCaret = initialCaret
+        
+        overlay.show(
+            candidates: [candidate],
+            caretRect: initialCaret,
+            acceptKeyHint: "⇥",
+            onSelect: { _ in }
+        )
+        
+        // Show with stale caret and provider that will move to movedCaret
+        overlay.show(
+            candidates: [candidate],
+            caretRect: initialCaret,
+            acceptKeyHint: "⇥",
+            caretProvider: { currentProviderCaret },
+            onSelect: { _ in }
+        )
+        XCTAssertNotNil(overlay.pendingCaretPollTask)
+        
+        // Simulate Electron AX updating the caret
+        currentProviderCaret = movedCaret
+        for _ in 0..<15 {
+            if overlay.pendingCaretPollTask == nil { break }
+            try? await Task.sleep(nanoseconds: 15_000_000)
+        }
+        
+        XCTAssertEqual(overlay.pendingCaretAnchor, movedCaret)
+        XCTAssertNil(overlay.pendingCaretPollTask)
+        overlay.hide()
+    }
+
+    func testCaretStabilization_fieldFallbackTriggersPollingAndUpgradesToCaret() async {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let fieldRect = CGRect(x: 100, y: 200, width: 400, height: 300)
+        let trueCaret = CGRect(x: 150, y: 450, width: 2, height: 18)
+        
+        var currentProviderCaret: CGRect? = nil
+        
+        overlay.show(
+            candidates: [candidate],
+            caretRect: fieldRect,
+            acceptKeyHint: "⇥",
+            caretProvider: { currentProviderCaret },
+            onSelect: { _ in }
+        )
+        
+        // Since initial rect is field fallback (> 50 pt), poll starts immediately
+        XCTAssertNotNil(overlay.pendingCaretPollTask)
+        
+        // Provider now returns the true caret
+        currentProviderCaret = trueCaret
+        for _ in 0..<15 {
+            if overlay.pendingCaretPollTask == nil { break }
+            try? await Task.sleep(nanoseconds: 15_000_000)
+        }
+        
+        XCTAssertEqual(overlay.pendingCaretAnchor, trueCaret)
+        XCTAssertNil(overlay.pendingCaretPollTask)
+        overlay.hide()
+    }
+
+    func testCaretStabilization_initialNilCaretDisplaysWhenProviderResolves() async {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let trueCaret = CGRect(x: 150, y: 450, width: 2, height: 18)
+        
+        var currentProviderCaret: CGRect? = nil
+        
+        overlay.show(
+            candidates: [candidate],
+            caretRect: nil,
+            acceptKeyHint: "⇥",
+            caretProvider: { currentProviderCaret },
+            onSelect: { _ in }
+        )
+        
+        // Not visible yet because caret is unknown
+        XCTAssertFalse(overlay.isVisible)
+        XCTAssertNotNil(overlay.pendingCaretPollTask)
+        
+        // Provider provides real caret
+        currentProviderCaret = trueCaret
+        for _ in 0..<15 {
+            if overlay.pendingCaretPollTask == nil { break }
+            try? await Task.sleep(nanoseconds: 15_000_000)
+        }
+        
+        XCTAssertTrue(overlay.isVisible)
+        XCTAssertEqual(overlay.pendingCaretAnchor, trueCaret)
+        XCTAssertNil(overlay.pendingCaretPollTask)
+        overlay.hide()
+    }
+
+    func testCaretStabilization_hideCancelsPollTaskAndCleansUp() {
+        let overlay = AutocompletionOverlayController()
+        let candidate = AutocompletionCandidate(word: "test", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 200, y: 500, width: 2, height: 18)
+        
+        overlay.show(
+            candidates: [candidate],
+            caretRect: caret,
+            acceptKeyHint: "⇥",
+            onSelect: { _ in }
+        )
+        overlay.show(
+            candidates: [candidate],
+            caretRect: caret,
+            acceptKeyHint: "⇥",
+            caretProvider: { caret },
+            onSelect: { _ in }
+        )
+        XCTAssertNotNil(overlay.pendingCaretPollTask)
+        
+        overlay.hide()
+        XCTAssertNil(overlay.pendingCaretPollTask)
+        XCTAssertNil(overlay.pendingCaretAnchor)
+        XCTAssertFalse(overlay.isVisible)
+    }
     
     func testSuggestFiltersOutProfanityByDefault() {
         // "fuc" prefix matches "fuck", "fucker", etc. in wordlist

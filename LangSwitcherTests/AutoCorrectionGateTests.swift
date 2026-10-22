@@ -129,6 +129,100 @@ final class AutoCorrectionGateTests: XCTestCase {
         }, focusedChild: { _ in nil }, children: { $0 == 0 ? [1] + Array(2..<50) : [] }, limit: 5), 1)
     }
 
+    // MARK: - Secret Sanitizer Tests (Cotypist-grade Privacy Protection)
+
+    func testDetectsPrivateKeys() {
+        let rsaKey = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0...\n-----END RSA PRIVATE KEY-----"
+        XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation(rsaKey))
+        XCTAssertTrue(AutoCorrectionGate.isPotentialSecret(rsaKey))
+        XCTAssertNil(AutoCorrectionGate.sanitize(text: rsaKey))
+        XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(
+            role: "AXTextField", subrole: nil, bundleID: textEdit, text: rsaKey))
+    }
+
+    func testDetectsPasswordAssignments() {
+        let cases = [
+            "password: mysecretpassword123",
+            "passwd = Admin2026!",
+            "пароль: qwerty12345",
+            "secret=s3cr3t",
+            "kennwort: geheim123"
+        ]
+        for c in cases {
+            XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation(c), "Failed to detect password in: \(c)")
+            XCTAssertNil(AutoCorrectionGate.sanitize(text: c))
+            XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(
+                role: "AXTextField", subrole: nil, bundleID: textEdit, text: c))
+        }
+    }
+
+    func testDetectsShellExportSecrets() {
+        let cases = [
+            "export API_KEY=sk-proj-1234567890abcdef1234",
+            "DB_PASSWORD=secret",
+            "export GITHUB_TOKEN=ghp_12345678901234567890"
+        ]
+        for c in cases {
+            XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation(c), "Failed to detect shell secret in: \(c)")
+            XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(
+                role: "AXTextField", subrole: nil, bundleID: textEdit, text: c))
+        }
+    }
+
+    func testDetectsApiTokensAndKeys() {
+        let tokens = [
+            "sk-proj-abcdefghijklmnopqrstuvwxyz1234",
+            "sk_live_1234567890abcdef12",
+            "AKIAIOSFODNN7EXAMPLE",
+            "ghp_123456789012345678901234",
+            "AIzaSyD-1234567890abcdefghijklmnopqrstu",
+            "xoxb-1234567890-1234567890-abcdef",
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozGz_abcdef"
+        ]
+        for t in tokens {
+            XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation(t), "Failed on token: \(t)")
+            XCTAssertTrue(AutoCorrectionGate.isPotentialSecret(t), "Failed potential secret on: \(t)")
+            XCTAssertFalse(AutoCorrectionGate.allowsAutoCorrection(
+                role: "AXTextField", subrole: nil, bundleID: textEdit, text: t))
+        }
+    }
+
+    func testDetectsFinancialAndAuthData() {
+        XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation("DE89 3704 0044 0532 0130 00"))
+        XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation("https://admin:p@ssword@example.com/api"))
+        XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation("4532 1234 5678 9012"))
+    }
+
+    func testNormalTextAllowed() {
+        let normalTexts = [
+            "Hello world, how are you today?",
+            "Привет как твои дела?",
+            "ghbdtn rfr ltkf",
+            "let x = 42 + y",
+            "function calculateTotal(items: [Item]) -> Double"
+        ]
+        for txt in normalTexts {
+            XCTAssertFalse(AutoCorrectionGate.containsSensitiveInformation(txt), "False positive on: \(txt)")
+            XCTAssertFalse(AutoCorrectionGate.isPotentialSecret(txt), "False positive on: \(txt)")
+            XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(
+                role: "AXTextField", subrole: nil, bundleID: textEdit, text: txt))
+        }
+    }
+
+    func testHighEntropyPasswordHeuristic() {
+        let password = "P@ssw0rd2026!#"
+        XCTAssertTrue(AutoCorrectionGate.isPotentialSecret(password))
+
+        let normalWord = "Supercalifragilistic"
+        XCTAssertFalse(AutoCorrectionGate.isPotentialSecret(normalWord))
+    }
+
+    func testSanitizesEmails() {
+        let input = "Please contact support@example.com for help."
+        let sanitized = AutoCorrectionGate.sanitize(text: input)
+        XCTAssertEqual(sanitized, "Please contact [email] for help.")
+    }
+
 }
 
 

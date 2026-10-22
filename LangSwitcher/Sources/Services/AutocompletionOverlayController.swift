@@ -4,6 +4,8 @@ import SwiftUI
 
 // MARK: - Autocompletion Overlay Controller
 // Manages the non-activating floating NSPanel displaying AutocompletionPopupView.
+// Features Cotypist-inspired asynchronous caret stabilization to eliminate lag
+// in Electron apps (VSCode, Slack, Discord) and webviews.
 
 @MainActor
 final class AutocompletionOverlayController: NSObject {
@@ -16,8 +18,20 @@ final class AutocompletionOverlayController: NSObject {
     private var onSelectCallback: ((AutocompletionCandidate) -> Void)?
     private var currentAcceptKeyHint: String = "⇥"
     
+    // MARK: - Caret Stabilization (Cotypist Algorithm)
+    /// The expected text anchor position.
+    private(set) var pendingCaretAnchor: CGRect?
+    /// High-frequency polling task tracking AX caret updates.
+    private(set) var pendingCaretPollTask: Task<Void, Never>?
+    /// Hard deadline timeout for the caret poll task (typically 120ms).
+    private(set) var pendingCaretPollDeadline: Date?
+    
     var isVisible: Bool {
         panel?.isVisible == true
+    }
+    
+    var panelFrame: NSRect? {
+        panel?.frame
     }
     
     func containsPoint(_ point: NSPoint) -> Bool {
@@ -40,9 +54,11 @@ final class AutocompletionOverlayController: NSObject {
         candidates: [AutocompletionCandidate],
         caretRect: CGRect?,
         acceptKeyHint: String,
+        caretProvider: (() -> CGRect?)? = nil,
         onSelect: @escaping (AutocompletionCandidate) -> Void
     ) {
-        guard !candidates.isEmpty, caretRect != nil else {
+        let hasValidInitialCaret = Self.isValidCaretRect(caretRect)
+        guard !candidates.isEmpty, (hasValidInitialCaret || caretProvider != nil) else {
             hide()
             return
         }
@@ -55,17 +71,37 @@ final class AutocompletionOverlayController: NSObject {
         let p = getOrCreatePanel()
         updateContent()
         
-        // Position panel
-        positionPanel(caretRect: caretRect)
+        let initialCaret = hasValidInitialCaret ? caretRect : nil
+        let previousAnchor = pendingCaretAnchor
         
-        p.orderFrontRegardless()
+        if let initialCaret = initialCaret {
+            pendingCaretAnchor = initialCaret
+            positionPanel(caretRect: initialCaret)
+            p.orderFrontRegardless()
+            
+            let isStaleAnchor = previousAnchor != nil && Self.isCaretEqual(initialCaret, previousAnchor)
+            let isFieldFallback = Self.isFieldRect(initialCaret)
+            
+            if (isStaleAnchor || isFieldFallback), let provider = caretProvider {
+                // The caret bounds haven't moved yet after keystroke (typical in Electron apps)
+                // or we only have coarse field bounds. Poll until updated caret arrives.
+                startPendingCaretPoll(anchor: initialCaret, provider: provider)
+            } else {
+                cancelPendingCaretPoll()
+            }
+        } else if let provider = caretProvider {
+            // Initial caret rect was not immediately available. Start polling immediately.
+            startPendingCaretPoll(anchor: nil, provider: provider)
+        }
     }
     
     func hide() {
+        cancelPendingCaretPoll()
         panel?.orderOut(nil)
         candidates.removeAll()
         selectedIndex = 0
         onSelectCallback = nil
+        pendingCaretAnchor = nil
     }
     
     func selectNext() {
@@ -91,6 +127,88 @@ final class AutocompletionOverlayController: NSObject {
         let callback = onSelectCallback
         hide()
         callback?(candidate)
+    }
+    
+    // MARK: - Caret Stabilization Polling Implementation
+    
+    func cancelPendingCaretPoll() {
+        pendingCaretPollTask?.cancel()
+        pendingCaretPollTask = nil
+        pendingCaretPollDeadline = nil
+    }
+    
+    func startPendingCaretPoll(anchor: CGRect?, provider: @escaping () -> CGRect?) {
+        cancelPendingCaretPoll()
+        
+        let deadline = Date().addingTimeInterval(0.12) // 120ms hard timeout
+        self.pendingCaretPollDeadline = deadline
+        
+        pendingCaretPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000) // 15ms poll interval
+                guard !Task.isCancelled, let self = self else { return }
+                
+                if let currentDeadline = self.pendingCaretPollDeadline, Date() >= currentDeadline {
+                    if self.panel?.isVisible != true {
+                        self.hide()
+                    } else {
+                        self.cancelPendingCaretPoll()
+                    }
+                    return
+                }
+                
+                if let newRect = provider(), Self.isValidCaretRect(newRect), !Self.isFieldRect(newRect) {
+                    let hasResolved: Bool
+                    if let anchor = anchor {
+                        if Self.isFieldRect(anchor) {
+                            hasResolved = true
+                        } else {
+                            hasResolved = !Self.isCaretEqual(newRect, anchor)
+                        }
+                    } else {
+                        hasResolved = true
+                    }
+                    
+                    if hasResolved {
+                        self.pendingCaretAnchor = newRect
+                        self.positionPanel(caretRect: newRect)
+                        if let p = self.panel, !p.isVisible {
+                            p.orderFrontRegardless()
+                        }
+                        self.cancelPendingCaretPoll()
+                        return
+                    }
+                }
+            }
+        }
+    }
+    
+    static func isValidCaretRect(_ rect: CGRect?) -> Bool {
+        guard let rect = rect, !rect.isEmpty, !rect.isNull else { return false }
+        guard rect.width > 0 && rect.height > 0 else { return false }
+        guard rect.origin.x.isFinite && rect.origin.y.isFinite else { return false }
+        if rect.origin == .zero && rect.size.width <= 1.0 && rect.size.height <= 1.0 {
+            return false
+        }
+        return true
+    }
+    
+    // MARK: - Caret vs Field Boundary Thresholds
+    /// Maximum dimensions for an insertion point caret. Any rect exceeding these
+    /// dimensions is treated as a coarse field/container bounding box fallback.
+    static let maxCaretWidth: CGFloat = 40
+    static let maxCaretHeight: CGFloat = 60
+    
+    static func isFieldRect(_ rect: CGRect) -> Bool {
+        return rect.width > maxCaretWidth || rect.height > maxCaretHeight
+    }
+    
+    static func isCaretEqual(_ a: CGRect?, _ b: CGRect?) -> Bool {
+        guard let a = a, let b = b else { return a == nil && b == nil }
+        return abs(a.origin.x - b.origin.x) < 0.5 &&
+               abs(a.origin.y - b.origin.y) < 0.5 &&
+               abs(a.size.width - b.size.width) < 0.5 &&
+               abs(a.size.height - b.size.height) < 0.5
     }
     
     private func updateContent() {
@@ -122,6 +240,9 @@ final class AutocompletionOverlayController: NSObject {
                 var frame = p.frame
                 frame.size = fittingSize
                 p.setFrame(frame, display: true)
+                if let anchor = pendingCaretAnchor {
+                    positionPanel(caretRect: anchor)
+                }
             }
         }
     }
