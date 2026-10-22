@@ -12,6 +12,7 @@ struct AIAssistantSettingsTab: View {
     @StateObject private var inferenceEngine = AIInferenceEngine.shared
     @StateObject private var profiler = AIModelProfiler.shared
     @StateObject private var textHistoryStore = UserTextHistoryStore.shared
+    @ObservedObject private var attentionCenter = AttentionCenter.shared
 
     @State private var modelToDelete: RecommendedAIModel?
     @State private var showDeleteAlert = false
@@ -83,6 +84,35 @@ struct AIAssistantSettingsTab: View {
                         }
                     }
                     .padding(.top, 2)
+
+                    // Inline Prediction Conflict Warning
+                    if attentionCenter.activeIssues.contains(where: { $0.id == .inlinePredictionConflict }) {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.body)
+                                .foregroundStyle(.orange)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(l10n.t("attention.inlinePredictionConflict.title"))
+                                    .font(.subheadline)
+                                    .bold()
+                                Text(l10n.t("attention.inlinePredictionConflict.desc"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Button(l10n.t("attention.inlinePredictionConflict.action")) {
+                                    InlinePredictionManager.disableAutomaticInlinePrediction()
+                                    attentionCenter.refreshIssues()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .padding(.top, 2)
+                            }
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                 }
                 .padding(.vertical, 4)
             }

@@ -18,6 +18,24 @@ enum Strings_ru {
         "menu.quit":                     "Завершить Dopishi",
         "menu.tooltip":                  "Dopishi — %@ для конвертации",
 
+        // ── Attention Center ─────────────────────────────────────────
+        "attention.header":                      "Требуется внимание",
+        "attention.inlinePredictionConflict.title": "Конфликт с подсказками macOS",
+        "attention.inlinePredictionConflict.desc": "Встроенный предиктивный ввод macOS накладывается на подсказки Dopishi и перехватывает Space/Tab.",
+        "attention.inlinePredictionConflict.action": "Отключить подсказки macOS",
+        "attention.accessibility.title":         "Требуется доступ к Универсальному доступу",
+        "attention.accessibility.desc":          "Dopishi необходим доступ к Универсальному доступу для распознавания ввода и замены текста.",
+        "attention.accessibility.action":        "Открыть Системные настройки",
+        "attention.noModel.title":               "Локальная ИИ-модель не установлена",
+        "attention.noModel.desc":                "ИИ-подсказки включены, но файл модели не загружен.",
+        "attention.noModel.action":              "Открыть настройки ИИ",
+        "attention.screenRecording.title":       "Требуется доступ к Записи экрана",
+        "attention.screenRecording.desc":        "Для контекста экрана требуется разрешение на запись экрана.",
+        "attention.screenRecording.action":      "Открыть Системные настройки",
+        "attention.clipboard.title":             "Включить контекст буфера обмена",
+        "attention.clipboard.desc":              "Контекст буфера обмена повышает точность подсказок.",
+        "attention.clipboard.action":            "Включить в настройках",
+
         // ── Окно настроек ───────────────────────────────────────────
         "settings.windowTitle":          "Настройки Dopishi",
         "settings.tab.general":          "Основные",

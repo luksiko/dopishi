@@ -63,6 +63,8 @@
 		E10000010000000000000048 /* TerminalPromptExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000048 /* TerminalPromptExtractor.swift */; };
 		E10000010000000000000050 /* AILocalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000049 /* AILocalEngine.swift */; };
 		E10000010000000000000051 /* TransientPasteboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000004A /* TransientPasteboard.swift */; };
+		E10000010000000000000052 /* InlinePredictionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000004B /* InlinePredictionManager.swift */; };
+		E10000010000000000000053 /* AttentionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000004C /* AttentionCenter.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -87,6 +89,7 @@
 		E10000010000000000000122 /* TerminalPromptExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000122 /* TerminalPromptExtractorTests.swift */; };
 		E10000010000000000000124 /* AILocalEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000123 /* AILocalEngineTests.swift */; };
 		E10000010000000000000126 /* TransientPasteboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000125 /* TransientPasteboardTests.swift */; };
+		E10000010000000000000127 /* AttentionCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000127 /* AttentionCenterTests.swift */; };
 		E10000010000000000000049 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
 		E10000010000000000000123 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
 /* End PBXBuildFile section */
@@ -158,6 +161,8 @@
 		E10000020000000000000048 /* TerminalPromptExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPromptExtractor.swift; sourceTree = "<group>"; };
 		E10000020000000000000049 /* AILocalEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILocalEngine.swift; sourceTree = "<group>"; };
 		E1000002000000000000004A /* TransientPasteboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientPasteboard.swift; sourceTree = "<group>"; };
+		E1000002000000000000004B /* InlinePredictionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlinePredictionManager.swift; sourceTree = "<group>"; };
+		E1000002000000000000004C /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -182,6 +187,7 @@
 		E10000020000000000000122 /* TerminalPromptExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPromptExtractorTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000123 /* AILocalEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILocalEngineTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000125 /* TransientPasteboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientPasteboardTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000127 /* AttentionCenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenterTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -302,6 +308,8 @@
 				E10000020000000000000048 /* TerminalPromptExtractor.swift */,
 				E10000020000000000000049 /* AILocalEngine.swift */,
 				E1000002000000000000004A /* TransientPasteboard.swift */,
+				E1000002000000000000004B /* InlinePredictionManager.swift */,
+				E1000002000000000000004C /* AttentionCenter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -374,6 +382,7 @@
 				E10000020000000000000122 /* TerminalPromptExtractorTests.swift */,
 				E10000020000000000000123 /* AILocalEngineTests.swift */,
 				E10000020000000000000125 /* TransientPasteboardTests.swift */,
+				E10000020000000000000127 /* AttentionCenterTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -541,6 +550,8 @@
 				E10000010000000000000048 /* TerminalPromptExtractor.swift in Sources */,
 				E10000010000000000000050 /* AILocalEngine.swift in Sources */,
 				E10000010000000000000051 /* TransientPasteboard.swift in Sources */,
+				E10000010000000000000052 /* InlinePredictionManager.swift in Sources */,
+				E10000010000000000000053 /* AttentionCenter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -572,6 +583,7 @@
 				E10000010000000000000122 /* TerminalPromptExtractorTests.swift in Sources */,
 				E10000010000000000000124 /* AILocalEngineTests.swift in Sources */,
 				E10000010000000000000126 /* TransientPasteboardTests.swift in Sources */,
+				E10000010000000000000127 /* AttentionCenterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

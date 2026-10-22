@@ -18,6 +18,7 @@ if [[ "$BUNDLE_ID" != "com.dopishi.app" && "$BUNDLE_ID" != "com.langswitcher.app
 fi
 if [[ -d "$APP_PATH/Contents/Frameworks" ]]; then
     find "$APP_PATH/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) -exec /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" {} + 2>/dev/null || true
+    find "$APP_PATH/Contents/Frameworks" -type d -name "*.framework" -exec /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" {} + 2>/dev/null || true
 fi
 if [[ -d "$APP_PATH/Contents/Helpers" ]]; then
     find "$APP_PATH/Contents/Helpers" -type f -perm +111 -exec /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" {} + 2>/dev/null || true

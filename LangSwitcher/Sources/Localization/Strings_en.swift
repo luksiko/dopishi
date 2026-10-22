@@ -19,6 +19,24 @@ enum Strings_en {
         "menu.quit":                     "Quit Dopishi",
         "menu.tooltip":                  "Dopishi — %@ to convert",
 
+        // ── Attention Center ─────────────────────────────────────────
+        "attention.header":                      "Attention Needed",
+        "attention.inlinePredictionConflict.title": "macOS Text Predictions Conflict",
+        "attention.inlinePredictionConflict.desc": "macOS inline prediction draws over Dopishi suggestions and intercepts Space/Tab keys.",
+        "attention.inlinePredictionConflict.action": "Turn Off macOS Predictions",
+        "attention.accessibility.title":         "Accessibility Permission Required",
+        "attention.accessibility.desc":          "Dopishi needs Accessibility permission to detect input and replace text.",
+        "attention.accessibility.action":        "Open System Settings",
+        "attention.noModel.title":               "Local AI Model Not Downloaded",
+        "attention.noModel.desc":                "AI completions are enabled but no local model file is installed.",
+        "attention.noModel.action":              "Open AI Settings",
+        "attention.screenRecording.title":       "Screen Context Permission Needed",
+        "attention.screenRecording.desc":        "Screen Recording permission is required for contextual awareness.",
+        "attention.screenRecording.action":      "Open System Settings",
+        "attention.clipboard.title":             "Enable Clipboard Context",
+        "attention.clipboard.desc":              "Clipboard context helps improve autocompletion accuracy.",
+        "attention.clipboard.action":            "Enable in Settings",
+
         // ── Settings Window ─────────────────────────────────────────
         "settings.windowTitle":          "Dopishi Settings",
         "settings.tab.general":          "General",
