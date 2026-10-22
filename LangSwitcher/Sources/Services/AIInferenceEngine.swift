@@ -406,7 +406,12 @@ final class AIInferenceEngine: ObservableObject {
             "stream": isStreaming,
             "prompt": prompt,
             "n_predict": Self.predictionTokenBudget(context: context, maxWords: maxWords),
-            "stop": ["<|im_end|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>"]
+            "stop": [
+                "<|im_end|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
+                "[User", "[user", "[USER", "User:", "user:", "USER:",
+                "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
+                "\n[User", "\nUser", "\n["
+            ]
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         let started = Date()
@@ -528,16 +533,27 @@ final class AIInferenceEngine: ObservableObject {
             return nil
         }
         
-        // Stop at ChatML control tags
-        for tag in ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>"] {
+        // Strip leading newlines/carriage returns that the model generated after <|im_start|>assistant
+        while text.hasPrefix("\n") || text.hasPrefix("\r") {
+            text = String(text.dropFirst())
+        }
+
+        // Stop at ChatML control tags and dialogue role tokens occurring in generation
+        let stopTags = [
+            "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
+            "[User", "[user", "[USER", "User:", "user:", "USER:",
+            "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
+            "[System", "[system", "System:", "system:"
+        ]
+        for tag in stopTags {
             if let idx = text.range(of: tag) {
                 text = String(text[..<idx.lowerBound])
             }
         }
-        
-        // Strip leading newlines/carriage returns that the model generated after <|im_start|>assistant
-        while text.hasPrefix("\n") || text.hasPrefix("\r") {
-            text = String(text.dropFirst())
+
+        // Also stop at [User 001] or any bracketed role/turn tag
+        if let roleMatch = text.range(of: "\\[(User|user|Assistant|assistant|System|system).*?\\]", options: .regularExpression) {
+            text = String(text[..<roleMatch.lowerBound])
         }
         
         // Take the first line of content (if multiple lines were generated)
