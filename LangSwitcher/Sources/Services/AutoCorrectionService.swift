@@ -701,6 +701,56 @@ final class AutoCorrectionService {
             return
         }
 
+        // Intercept keys if Word Alternatives Carousel is active
+        if WordAlternativesController.shared.isVisible {
+            if keyCode == 0x35 { // Escape
+                WordAlternativesController.shared.hide()
+                return
+            }
+            if keyCode == 0x24 || keyCode == 0x30 { // Enter or Tab
+                if WordAlternativesController.shared.confirmCurrentSelection() {
+                    return
+                }
+            }
+            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
+                if WordAlternativesController.shared.handleNumericInput(digit) {
+                    return
+                }
+            }
+        }
+
+        // Intercept Option + Down Arrow (0x7D) for Word Alternatives Carousel
+        if flags.contains(.maskAlternate) && keyCode == 0x7D {
+            let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+            if WordAlternativesController.shared.isVisible {
+                WordAlternativesController.shared.cycleNext(anchor: caret)
+                return
+            } else if activeGhostState != nil || ghostTextController.isVisible {
+                let currentWord = ghostTextController.currentCandidate?.word ?? ""
+                let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
+                let candidates = autocompletionEngine.suggest(
+                    for: wordBuffer,
+                    previousWord: previousWord,
+                    activeLayoutID: activeLayoutID,
+                    enabledLayouts: settingsManager.enabledLayouts,
+                    maxSuggestions: 6,
+                    includeCrossLayout: settingsManager.autoCompletionIncludeCrossLayout,
+                    allowProfanity: settingsManager.autoCompletionSuggestProfanity,
+                    bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                )
+                let alts = WordAlternativesEngine.alternatives(currentSuggestion: currentWord, candidates: candidates.map(\.word))
+                if !alts.isEmpty {
+                    WordAlternativesController.shared.show(alternatives: alts, anchor: caret) { [weak self] chosen in
+                        guard let self else { return }
+                        let targetLayoutID = self.ghostTextController.currentCandidate?.targetLayoutID ?? activeLayoutID
+                        let chosenCand = AutocompletionCandidate(word: chosen, targetLayoutID: targetLayoutID)
+                        self.acceptCandidate(chosenCand, appendSpace: false, entirePhrase: true)
+                    }
+                    return
+                }
+            }
+        }
+
         // Intercept keys if Thesaurus HUD is active
         if ThesaurusController.shared.isVisible {
             if keyCode == 0x35 { // Escape
