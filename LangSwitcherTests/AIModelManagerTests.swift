@@ -63,6 +63,8 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-0.5b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "smollm2-360m" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "llama-3.2-1b" }))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-coder-1.5b" }))
+        XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "smollm2-1.7b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-1.5b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "gemma-2-2b" }))
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "gemma-4-e2b" }))

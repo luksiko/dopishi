@@ -1243,3 +1243,45 @@ extension CompletionInsertionPlanTests {
         XCTAssertEqual(text.remaining, ", продолжаем")
     }
 }
+
+final class WebKitTextMarkerExtractionTests: XCTestCase {
+    func testCaretBoundsFallsBackToMarkerBoundsWhenRangeIsNil() {
+        let markerRect = CGRect(x: 150, y: 300, width: 1, height: 16)
+        let resolved = AccessibilityService.resolveCaretBounds(
+            selectedRange: nil,
+            primaryScreenMaxY: 900,
+            rangeBounds: { _ in nil },
+            markerBounds: { markerRect }
+        )
+        XCTAssertNotNil(resolved)
+        XCTAssertEqual(resolved?.origin.x, 150)
+        XCTAssertEqual(resolved?.origin.y, 900 - 300 - 16)
+    }
+
+    func testMarkerBoundsRejectedIfWideSelection() {
+        let wideRect = CGRect(x: 150, y: 300, width: 50, height: 16)
+        let resolved = AccessibilityService.resolveCaretBounds(
+            selectedRange: nil,
+            primaryScreenMaxY: 900,
+            rangeBounds: { _ in nil },
+            markerBounds: { wideRect }
+        )
+        XCTAssertNil(resolved)
+    }
+
+    func testCaretContextFromSurroundingText() {
+        let context = CaretContext(
+            fieldIdentifier: "webkit:123",
+            textBeforeCaret: "hello ",
+            textAfterCaret: "world",
+            selectedText: "",
+            caretLocation: 6,
+            fullTextLength: 11
+        )
+        XCTAssertEqual(context.fieldIdentifier, "webkit:123")
+        XCTAssertEqual(context.textBeforeCaret, "hello ")
+        XCTAssertEqual(context.textAfterCaret, "world")
+        XCTAssertEqual(context.caretLocation, 6)
+        XCTAssertEqual(context.fullTextLength, 11)
+    }
+}

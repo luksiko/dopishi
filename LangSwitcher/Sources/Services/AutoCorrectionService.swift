@@ -481,19 +481,29 @@ final class AutoCorrectionService {
         guard let firstChar = state.remainingSuffix.first else {
             activeGhostState = nil
             ghostTextController.hide()
+            overlayController.hide()
+            Task { await AILocalEngine.shared.resetStitch() }
             return false
         }
 
-        guard firstChar == char else {
+        let matches = firstChar == char || firstChar.lowercased() == char.lowercased()
+        guard matches else {
             activeGhostState = nil
             ghostTextController.hide()
+            overlayController.hide()
             dismissSuggestionsOnly()
             scheduleAIDebounce()
+            Task { await AILocalEngine.shared.resetStitch() }
             return false
         }
 
         // MATCH:
         state.remainingSuffix.removeFirst()
+
+        // Advance native Metal engine stitch session in background
+        Task {
+            _ = await AILocalEngine.shared.attemptStitch(typedText: String(char))
+        }
 
         let isBoundary = char.isWhitespace || (!char.isLetter && !char.isNumber && !isAlternativeLetterKey(char))
         if isBoundary {
@@ -512,8 +522,10 @@ final class AutoCorrectionService {
         if state.remainingSuffix.isEmpty {
             activeGhostState = nil
             ghostTextController.hide()
+            overlayController.hide()
             dismissSuggestionsOnly()
             scheduleAIDebounce()
+            Task { await AILocalEngine.shared.resetStitch() }
             return true
         }
 
@@ -530,9 +542,26 @@ final class AutoCorrectionService {
         )
 
         let currentCaret = accessibilityService.caretScreenRect() ?? state.caretRect
-        ghostTextController.show(candidate: updatedCandidate, suffix: state.remainingSuffix, caretRect: currentCaret)
+        let displayMode = settingsManager.autoCompletionDisplayMode
+        if displayMode == .ghostText || displayMode == .both {
+            ghostTextController.show(candidate: updatedCandidate, suffix: state.remainingSuffix, caretRect: currentCaret)
+        }
 
-        overlayController.hide()
+        if (displayMode == .popup || displayMode == .both) && overlayController.isVisible {
+            let hint = settingsManager.autoCompletionAcceptKey.shortcutHint(
+                customKeyCode: settingsManager.autoCompletionCustomKeyCode,
+                customModifiers: settingsManager.autoCompletionCustomModifiers
+            )
+            overlayController.show(
+                candidates: [updatedCandidate],
+                caretRect: currentCaret,
+                acceptKeyHint: hint,
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                onSelect: { [weak self] candidate in
+                    self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
+                }
+            )
+        }
 
         let wordCount = state.remainingSuffix.split(separator: " ").count
         if wordCount <= 2 {
@@ -723,6 +752,12 @@ final class AutoCorrectionService {
 
         let char = chars.first!
 
+        // If an active ghost completion is visible, check if typing this character advances it
+        if activeGhostState != nil && handleTypeAhead(char: char) {
+            updateFieldAnchor()
+            return
+        }
+
         // Check if it's a word boundary (punctuation)
         if !char.isLetter && !char.isNumber && !isAlternativeLetterKey(char) {
             dismissSuggestionsOnly()
@@ -768,6 +803,7 @@ final class AutoCorrectionService {
         overlayController.hide()
         ghostTextController.hide()
         fieldAnchorController.updateContextState(hasScreenContext: false, hasPendingQuestion: false)
+        Task { await AILocalEngine.shared.resetStitch() }
     }
 
     /// Full dismissal called on Escape, App switch, or deactivation.

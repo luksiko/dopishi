@@ -61,9 +61,9 @@ final class AIInferenceEngine: ObservableObject {
         return nil
     }
     
-    /// Check if the engine binary is available
+    /// Check if the inference engine is available (native Metal is bundled, fallback to binary)
     var isBinaryAvailable: Bool {
-        findEngineBinary() != nil
+        true
     }
     
     /// Ensure the engine is running with the current active model
@@ -82,14 +82,9 @@ final class AIInferenceEngine: ObservableObject {
         return await start(modelPath: activePath)
     }
     
-    /// Start the inference daemon with the specified model
+    /// Start the inference engine with the specified model
     func start(modelPath: String) async -> Bool {
         guard !isRunning, !isStarting else { return isRunning }
-        guard let binaryURL = findEngineBinary() else {
-            NSLog("[LangSwitcher] AIInferenceEngine: binary not found")
-            return false
-        }
-        
         guard FileManager.default.fileExists(atPath: modelPath) else {
             NSLog("[LangSwitcher] AIInferenceEngine: model file not found at %@", modelPath)
             return false
@@ -99,6 +94,27 @@ final class AIInferenceEngine: ObservableObject {
         defer { isStarting = false }
         
         stop() // Ensure previous instance is terminated
+        await AILocalEngine.shared.unload()
+        
+        // 1. First attempt native in-process Metal inference via AILocalEngine
+        do {
+            try await AILocalEngine.shared.loadModel(path: modelPath)
+            self.isRunning = true
+            self.currentLoadedModelPath = modelPath
+            NSLog("[LangSwitcher] AIInferenceEngine: loaded natively via in-process Metal engine: %@", (modelPath as NSString).lastPathComponent)
+            Task { [weak self] in
+                _ = await self?.modelUsesChatTemplate(at: modelPath)
+            }
+            return true
+        } catch {
+            NSLog("[LangSwitcher] AIInferenceEngine: in-process Metal load failed (%@), attempting fallback to llama-server", error.localizedDescription)
+        }
+
+        // 2. Fallback to external llama-server daemon if binary is available
+        guard let binaryURL = findEngineBinary() else {
+            NSLog("[LangSwitcher] AIInferenceEngine: neither native Metal nor llama-server binary available")
+            return false
+        }
         
         // Select an ephemeral port
         let port = 18234 + Int.random(in: 0...50)
@@ -169,8 +185,11 @@ final class AIInferenceEngine: ObservableObject {
         }
     }
     
-    /// Stop the background inference daemon
+    /// Stop the inference engine
     func stop() {
+        Task {
+            await AILocalEngine.shared.unload()
+        }
         if let p = process {
             if p.isRunning {
                 p.terminate()
@@ -190,17 +209,17 @@ final class AIInferenceEngine: ObservableObject {
     static let defaultSystemPromptRu = "Продолжи начатую мысль естественно несколькими словами (до 4 слов). Сохраняй контекст, язык и стиль. Не придумывай новые несвязанные темы, имена, названия в кавычках или вопросы. Не добавляй пояснений."
     static var defaultSystemPrompt: String { defaultSystemPromptEn }
 
-    static func containsCyrillic(_ text: String) -> Bool {
+    nonisolated static func containsCyrillic(_ text: String) -> Bool {
         text.contains { ("\u{0400}"..."\u{04FF}").contains($0) }
     }
 
     /// Earlier paragraphs may be in a different language from the current text.
-    static func activeParagraph(in context: String) -> String {
+    nonisolated static func activeParagraph(in context: String) -> String {
         let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.components(separatedBy: .newlines).last ?? trimmed
     }
 
-    static func strippingGeneratedMarkup(_ text: String) -> String {
+    nonisolated static func strippingGeneratedMarkup(_ text: String) -> String {
         // Remove only paired, known formatting tags. A bare <String>, <T> or
         // <b> can be a generic argument and must survive unchanged.
         let pattern = "<(code|strong|em|b|i|u|s|span|p|div|a|pre)(?:\\s+[^<>]*?)?>([\\s\\S]*?)</\\1\\s*>"
@@ -213,7 +232,7 @@ final class AIInferenceEngine: ObservableObject {
         return result.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: .regularExpression)
     }
 
-    static func completionMessages(
+    nonisolated static func completionMessages(
         context: String,
         afterCaret: String,
         instructions: String?,
@@ -240,19 +259,19 @@ final class AIInferenceEngine: ObservableObject {
         return [["role": "system", "content": system], ["role": "user", "content": context]]
     }
 
-    static func continuationPrefix(_ context: String) -> String {
+    nonisolated static func continuationPrefix(_ context: String) -> String {
         // A standalone trailing-space token biases BPE models toward numbers.
         // Let the model generate its own leading word separator, then reconcile it.
         context.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
     }
 
-    static func healedContinuation(_ raw: String, wordBuffer: String) -> String? {
+    nonisolated static func healedContinuation(_ raw: String, wordBuffer: String) -> String? {
         let trimmed = raw.drop(while: { $0.isWhitespace })
         guard trimmed.lowercased().hasPrefix(wordBuffer.lowercased()) else { return nil }
         return String(trimmed.dropFirst(wordBuffer.count))
     }
 
-    static func predictionTokenBudget(context: String, maxWords: Int) -> Int {
+    nonisolated static func predictionTokenBudget(context: String, maxWords: Int) -> Int {
         min(96, max(24, maxWords * 8))
     }
 
@@ -375,7 +394,84 @@ final class AIInferenceEngine: ObservableObject {
         let healsWord = !wordBuffer.isEmpty && context.hasSuffix(wordBuffer)
         let generationContext = context
         guard !generationContext.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        var prompt = Self.continuationPrefix(generationContext)
+        let rawPrompt = Self.continuationPrefix(generationContext)
+        var prompt = rawPrompt
+
+        // Native Metal direct execution
+        if await AILocalEngine.shared.isLoaded {
+            var nativePrompt = rawPrompt
+            if usesTemplate {
+                let msgs = Self.completionMessages(
+                    context: context,
+                    afterCaret: afterCaret,
+                    instructions: customInstructions,
+                    screenContext: screenContext,
+                    hasPendingQuestion: hasPendingQuestion
+                ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
+
+                let paragraph = rawPrompt.components(separatedBy: .newlines).last ?? rawPrompt
+                if let formatted = await AILocalEngine.shared.applyChatTemplate(messages: msgs, addAssistant: true) {
+                    nativePrompt = formatted + String(paragraph.suffix(512))
+                } else {
+                    var chatPrompt = ""
+                    for msg in msgs {
+                        chatPrompt += "<|im_start|>\(msg.role)\n\(msg.content)<|im_end|>\n"
+                    }
+                    nativePrompt = chatPrompt + "<|im_start|>assistant\n" + String(paragraph.suffix(512))
+                }
+            }
+
+            let started = Date()
+            do {
+                let generated = try await AILocalEngine.shared.generateContinuation(
+                    prompt: nativePrompt,
+                    maxTokens: Self.predictionTokenBudget(context: context, maxWords: maxWords)
+                ) { partial in
+                    var currentRaw = partial
+                    if healsWord, let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
+                        currentRaw = healed
+                    }
+                    if let cleaned = Self.cleanAndTrimContinuation(
+                        raw: currentRaw,
+                        context: context,
+                        wordBuffer: healsWord ? "" : wordBuffer,
+                        maxWords: maxWords,
+                        afterCaret: afterCaret,
+                        screenContext: screenContext
+                    ) {
+                        let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
+                        if !formatted.isEmpty {
+                            Task { @MainActor in
+                                onToken?(formatted)
+                            }
+                        }
+                    }
+                }
+                var currentRaw = generated
+                if healsWord, let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
+                    currentRaw = healed
+                }
+                if let cleaned = Self.cleanAndTrimContinuation(
+                    raw: currentRaw,
+                    context: context,
+                    wordBuffer: healsWord ? "" : wordBuffer,
+                    maxWords: maxWords,
+                    afterCaret: afterCaret,
+                    screenContext: screenContext
+                ) {
+                    let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
+                    NSLog("[LangSwitcher] In-process Metal AI inference completed in %.3fs", Date().timeIntervalSince(started))
+                    return formatted
+                }
+                return nil
+            } catch {
+                if !Task.isCancelled {
+                    NSLog("[LangSwitcher] In-process Metal AI inference failed: %@", error.localizedDescription)
+                }
+                return nil
+            }
+        }
+
         if usesTemplate {
             var templateRequest = URLRequest(url: URL(string: "http://127.0.0.1:\(serverPort)/apply-template")!)
             templateRequest.httpMethod = "POST"
@@ -516,7 +612,7 @@ final class AIInferenceEngine: ObservableObject {
     }
 
     /// Clean generated content and extract accurate completion tail
-    static func cleanAndTrimContinuation(
+    nonisolated static func cleanAndTrimContinuation(
         raw: String,
         context: String,
         wordBuffer: String,

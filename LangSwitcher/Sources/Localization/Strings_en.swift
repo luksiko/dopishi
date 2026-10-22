@@ -367,6 +367,8 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.model.tier.custom":                  "Custom GGUF",
         "ai.model.desc.qwen05b":                 "Ultra-fast Qwen 0.5B, ideal for low-latency completions on any Mac.",
         "ai.model.desc.smollm360m":               "Extremely lightweight 360M model with minimal RAM footprint (~229 MB).",
+        "ai.model.desc.qwencoder15b":            "Specialized coding & text completion model, outstanding for technical terminology, code, and natural languages.",
+        "ai.model.desc.smollm17b":               "High performance 1.7B reasoning model with rich vocabulary and strong bilingual fluency.",
         "ai.model.desc.qwen15b":                 "High quality reasoning and vocabulary, best on Apple Silicon with 16GB+ RAM.",
         "ai.model.desc.llama1b":                 "Compact Meta Llama 3.2 model optimized for natural English text.",
         "ai.model.desc.gemma2b":                 "Compact and capable Google Gemma 2 2B with high reasoning and language understanding.",

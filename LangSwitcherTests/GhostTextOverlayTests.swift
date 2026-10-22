@@ -447,6 +447,28 @@ extension GhostTextOverlayTests {
         XCTAssertFalse(ghost.isVisible)
     }
 
+    func testTypeAheadCaseInsensitive() {
+        let (service, _, _) = makeService()
+        defer { service.stop() }
+
+        let req = UUID()
+        service.presentAIPrediction(
+            suffix: "Hello World",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+
+        // Lowercase 'h' matching capital 'H'
+        XCTAssertTrue(service.handleTypeAhead(char: "h"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "ello World")
+
+        // Capital 'E' matching lowercase 'e'
+        XCTAssertTrue(service.handleTypeAhead(char: "E"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "llo World")
+    }
+
     func testEscapeDuringStreamCancelsPermanently() throws {
         let (service, ghost, _) = makeService()
         defer { service.stop() }

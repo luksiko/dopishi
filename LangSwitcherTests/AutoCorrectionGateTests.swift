@@ -171,13 +171,15 @@ final class AutoCorrectionGateTests: XCTestCase {
 
     func testDetectsApiTokensAndKeys() {
         let tokens = [
-            "sk-proj-abcdefghijklmnopqrstuvwxyz1234",
-            "sk_live_1234567890abcdef12",
-            "AKIAIOSFODNN7EXAMPLE",
-            "ghp_123456789012345678901234",
-            "AIzaSyD-1234567890abcdefghijklmnopqrstu",
-            "xoxb-1234567890-1234567890-abcdef",
-            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozGz_abcdef"
+            // Synthetic dummy tokens for secret-filter testing.
+            // Split strings to prevent false positives in GitHub Secret Scanning.
+            "sk-proj-" + "abcdefghijklmnopqrstuvwxyz1234",
+            "sk_live_" + "1234567890abcdef12",
+            "AKIA" + "IOSFODNN7EXAMPLE",
+            "ghp_" + "123456789012345678901234",
+            "AIza" + "SyD-1234567890abcdefghijklmnopqrstu",
+            "xoxb-" + "1234567890-1234567890-abcdef",
+            "eyJhbGciOiJIUzI1NiJ9" + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozGz_abcdef"
         ]
         for t in tokens {
             XCTAssertTrue(AutoCorrectionGate.containsSensitiveInformation(t), "Failed on token: \(t)")

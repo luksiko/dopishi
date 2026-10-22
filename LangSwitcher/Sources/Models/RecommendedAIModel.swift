@@ -59,12 +59,36 @@ struct RecommendedAIModel: Identifiable, Hashable, Codable {
             isDefault: false
         ),
         RecommendedAIModel(
+            id: "qwen2.5-coder-1.5b",
+            name: "Qwen 2.5 Coder 1.5B",
+            descriptionKey: "ai.model.desc.qwencoder15b",
+            sizeText: "~986 MB",
+            ramTier: "8–16 GB",
+            ramTierKey: "ai.model.tier.8_16gb",
+            estimatedSizeBytes: 1_030_000_000,
+            fileName: "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+            downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf")!,
+            isDefault: false
+        ),
+        RecommendedAIModel(
+            id: "smollm2-1.7b",
+            name: "SmolLM2 1.7B Instruct",
+            descriptionKey: "ai.model.desc.smollm17b",
+            sizeText: "~1.06 GB",
+            ramTier: "8–16 GB",
+            ramTierKey: "ai.model.tier.8_16gb",
+            estimatedSizeBytes: 1_140_000_000,
+            fileName: "smollm2-1.7b-instruct-q4_k_m.gguf",
+            downloadURL: URL(string: "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF/resolve/main/smollm2-1.7b-instruct-q4_k_m.gguf")!,
+            isDefault: false
+        ),
+        RecommendedAIModel(
             id: "qwen2.5-1.5b",
             name: "Qwen 2.5 1.5B Instruct",
             descriptionKey: "ai.model.desc.qwen15b",
             sizeText: "~986 MB",
-            ramTier: "16 GB",
-            ramTierKey: "ai.model.tier.16gb",
+            ramTier: "8–16 GB",
+            ramTierKey: "ai.model.tier.8_16gb",
             estimatedSizeBytes: 1_030_000_000,
             fileName: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
             downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf")!,

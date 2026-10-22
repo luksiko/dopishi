@@ -52,6 +52,15 @@ final class PerAppAISettingsTests: XCTestCase {
     
     func testAppDisabledAIOverridesGlobalAllowed() {
         let settings = SettingsManager.shared
+        let savedPredictive = settings.aiPredictiveEnabled
+        let savedBattery = settings.aiBatteryModeEnabled
+        defer {
+            settings.aiPredictiveEnabled = savedPredictive
+            settings.aiBatteryModeEnabled = savedBattery
+        }
+        settings.aiPredictiveEnabled = true
+        settings.aiBatteryModeEnabled = false
+
         let app = AppAISettings(
             bundleID: "test.disabled.app",
             appName: "DisabledApp",

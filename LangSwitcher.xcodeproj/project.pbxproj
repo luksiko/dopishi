@@ -61,6 +61,8 @@
 		E10000010000000000000046 /* UserTextHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000046 /* UserTextHistoryStore.swift */; };
 		E10000010000000000000047 /* ScreenContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000047 /* ScreenContextService.swift */; };
 		E10000010000000000000048 /* TerminalPromptExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000048 /* TerminalPromptExtractor.swift */; };
+		E10000010000000000000050 /* AILocalEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000049 /* AILocalEngine.swift */; };
+		E10000010000000000000051 /* TransientPasteboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000004A /* TransientPasteboard.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -83,6 +85,10 @@
 		E10000010000000000000120 /* UserTextHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000120 /* UserTextHistoryTests.swift */; };
 		E10000010000000000000121 /* ScreenContextServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000121 /* ScreenContextServiceTests.swift */; };
 		E10000010000000000000122 /* TerminalPromptExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000122 /* TerminalPromptExtractorTests.swift */; };
+		E10000010000000000000124 /* AILocalEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000123 /* AILocalEngineTests.swift */; };
+		E10000010000000000000126 /* TransientPasteboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000125 /* TransientPasteboardTests.swift */; };
+		E10000010000000000000049 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
+		E10000010000000000000123 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -150,6 +156,8 @@
 		E10000020000000000000046 /* UserTextHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTextHistoryStore.swift; sourceTree = "<group>"; };
 		E10000020000000000000047 /* ScreenContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenContextService.swift; sourceTree = "<group>"; };
 		E10000020000000000000048 /* TerminalPromptExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPromptExtractor.swift; sourceTree = "<group>"; };
+		E10000020000000000000049 /* AILocalEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILocalEngine.swift; sourceTree = "<group>"; };
+		E1000002000000000000004A /* TransientPasteboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientPasteboard.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -172,6 +180,8 @@
 		E10000020000000000000120 /* UserTextHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTextHistoryTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000121 /* ScreenContextServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenContextServiceTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000122 /* TerminalPromptExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPromptExtractorTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000123 /* AILocalEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILocalEngineTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000125 /* TransientPasteboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientPasteboardTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -183,6 +193,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E10000010000000000000049 /* LlamaSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -190,6 +201,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E10000010000000000000123 /* LlamaSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,6 +300,8 @@
 				E10000020000000000000046 /* UserTextHistoryStore.swift */,
 				E10000020000000000000047 /* ScreenContextService.swift */,
 				E10000020000000000000048 /* TerminalPromptExtractor.swift */,
+				E10000020000000000000049 /* AILocalEngine.swift */,
+				E1000002000000000000004A /* TransientPasteboard.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -358,6 +372,8 @@
 				E10000020000000000000120 /* UserTextHistoryTests.swift */,
 				E10000020000000000000121 /* ScreenContextServiceTests.swift */,
 				E10000020000000000000122 /* TerminalPromptExtractorTests.swift */,
+				E10000020000000000000123 /* AILocalEngineTests.swift */,
+				E10000020000000000000125 /* TransientPasteboardTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -378,6 +394,9 @@
 			dependencies = (
 			);
 			name = LangSwitcher;
+			packageProductDependencies = (
+				E100000D0000000000000001 /* LlamaSwift */,
+			);
 			productName = Dopishi;
 			productReference = E10000030000000000000001 /* Dopishi.app */;
 			productType = "com.apple.product-type.application";
@@ -396,6 +415,9 @@
 				E1000000B000000000000001 /* PBXTargetDependency */,
 			);
 			name = LangSwitcherTests;
+			packageProductDependencies = (
+				E100000D0000000000000001 /* LlamaSwift */,
+			);
 			productName = LangSwitcherTests;
 			productReference = E10000030000000000000101 /* LangSwitcherTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -431,6 +453,9 @@
 			productRefGroup = E10000050000000000000010 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				E100000C0000000000000001 /* XCRemoteSwiftPackageReference "llama.swift" */,
+			);
 			targets = (
 				E10000060000000000000001 /* LangSwitcher */,
 				E10000060000000000000101 /* LangSwitcherTests */,
@@ -514,6 +539,8 @@
 				E10000010000000000000046 /* UserTextHistoryStore.swift in Sources */,
 				E10000010000000000000047 /* ScreenContextService.swift in Sources */,
 				E10000010000000000000048 /* TerminalPromptExtractor.swift in Sources */,
+				E10000010000000000000050 /* AILocalEngine.swift in Sources */,
+				E10000010000000000000051 /* TransientPasteboard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -543,6 +570,8 @@
 				E10000010000000000000120 /* UserTextHistoryTests.swift in Sources */,
 				E10000010000000000000121 /* ScreenContextServiceTests.swift in Sources */,
 				E10000010000000000000122 /* TerminalPromptExtractorTests.swift in Sources */,
+				E10000010000000000000124 /* AILocalEngineTests.swift in Sources */,
+				E10000010000000000000126 /* TransientPasteboardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -694,6 +723,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.4.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"llama",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.app;
 				PRODUCT_NAME = Dopishi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -723,6 +757,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.4.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"llama",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dopishi.app;
 				PRODUCT_NAME = Dopishi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -796,6 +835,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E100000C0000000000000001 /* XCRemoteSwiftPackageReference "llama.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mattt/llama.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10549.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E100000D0000000000000001 /* LlamaSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E100000C0000000000000001 /* XCRemoteSwiftPackageReference "llama.swift" */;
+			productName = LlamaSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E10000070000000000000001 /* Project object */;
 }

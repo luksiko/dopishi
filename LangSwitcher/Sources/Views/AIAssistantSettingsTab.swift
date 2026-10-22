@@ -155,7 +155,7 @@ struct AIAssistantSettingsTab: View {
                             }
                         }
                         Section(header: Text("16–24+ GB RAM")) {
-                            ForEach(RecommendedAIModel.allModels.filter { $0.ramTier.contains("16") || $0.ramTier.contains("24") }) { model in
+                            ForEach(RecommendedAIModel.allModels.filter { $0.ramTier.contains("24") }) { model in
                                 Text(pickerTitle(for: model)).tag(model.id)
                             }
                         }

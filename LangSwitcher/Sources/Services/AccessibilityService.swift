@@ -83,8 +83,7 @@ final class AccessibilityService {
         NSLog("[LangSwitcher] getAndReplaceSelectedText: pasting converted text = '\(convertedText)'")
         
         // Paste converted text
-        pasteboard.clearContents()
-        pasteboard.setString(convertedText, forType: .string)
+        TransientPasteboard.writeString(convertedText)
         simulatePaste()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -134,8 +133,7 @@ final class AccessibilityService {
         NSLog("[LangSwitcher] selectLineAndReplace: pasting = '\(convertedText)'")
         
         // Paste (replaces the entire selection from cursor to line start)
-        pasteboard.clearContents()
-        pasteboard.setString(convertedText, forType: .string)
+        TransientPasteboard.writeString(convertedText)
         simulatePaste()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -197,8 +195,7 @@ final class AccessibilityService {
         NSLog("[LangSwitcher] selectAndReplaceLastWord: pasting converted = '\(convertedText)'")
         
         // Paste converted text (replaces the selection)
-        pasteboard.clearContents()
-        pasteboard.setString(convertedText, forType: .string)
+        TransientPasteboard.writeString(convertedText)
         simulatePaste()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -235,6 +232,44 @@ final class AccessibilityService {
     private func simulateKeystroke(virtualKey: CGKeyCode, modifiers: CGEventFlags = []) {
         postKeyEvent(virtualKey: virtualKey, keyDown: true, modifiers: modifiers)
         postKeyEvent(virtualKey: virtualKey, keyDown: false, modifiers: modifiers)
+    }
+
+    /// Types text directly into the focused field using synthetic Unicode CGEvent keystrokes.
+    /// This bypasses the clipboard completely, making it ideal for terminals (Terminal, iTerm2),
+    /// password/secure inputs, or environments where clipboard paste is prohibited or desynchronized.
+    func typeTextDirectly(_ text: String) {
+        guard !text.isEmpty else { return }
+        let source = CGEventSource(stateID: .hidSystemState)
+        let characters = Array(text)
+        var charIndex = 0
+        
+        // Chunk into slices of up to 16 UTF-16 code units (safely below macOS CGEvent limit).
+        // Extended grapheme clusters (Characters) are kept intact to prevent splitting surrogate pairs.
+        while charIndex < characters.count {
+            var chunkString = ""
+            while charIndex < characters.count {
+                let nextCount = chunkString.utf16.count + characters[charIndex].utf16.count
+                if nextCount > 16 && !chunkString.isEmpty {
+                    break
+                }
+                chunkString.append(characters[charIndex])
+                charIndex += 1
+            }
+            var chunk = Array(chunkString.utf16)
+            
+            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
+                continue
+            }
+            keyDown.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+            keyUp.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+            
+            for event in [keyDown, keyUp] {
+                event.flags = []
+                event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                event.post(tap: .cgAnnotatedSessionEventTap)
+            }
+        }
     }
     
     /// Attempts to trigger Copy via native AX menu action first; falls back to synthetic ⌘C.
@@ -382,9 +417,7 @@ final class AccessibilityService {
     /// Paste `text` into the focused app, replacing the active selection.
     /// The caller is responsible for bringing the target app to the front.
     func pasteReplacingSelection(_ text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        TransientPasteboard.writeString(text)
         NSLog("[LangSwitcher] pasteReplacingSelection: '\(text)'")
         simulatePaste()
     }
@@ -398,8 +431,9 @@ final class AccessibilityService {
             return
         }
 
-        let savedContents = savePasteboard()
-        copyToPasteboard(replacement)
+        let pasteboard = NSPasteboard.general
+        let savedContents = TransientPasteboard.snapshot(pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(replacement, pasteboard: pasteboard)
 
         for _ in 0..<count {
             simulateKeystroke(virtualKey: 0x33) // Backspace key
@@ -409,8 +443,10 @@ final class AccessibilityService {
             guard let self else { completion?(false); return }
             self.simulatePaste()
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.restorePasteboard(savedContents)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if pasteboard.changeCount == revision {
+                    TransientPasteboard.restore(savedContents, pasteboard: pasteboard)
+                }
                 completion?(true)
             }
         }
@@ -418,8 +454,7 @@ final class AccessibilityService {
 
     /// Copy text to the clipboard without touching any app.
     func copyToPasteboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        TransientPasteboard.writeString(text)
     }
 
     /// Collapse the still-active selection (right arrow) after the user 
@@ -465,6 +500,147 @@ final class AccessibilityService {
     
     // MARK: - Caret Context Inspection
     
+    // MARK: WebKit AXTextMarker Dynamic Bindings
+    private typealias AXTextMarkerRangeCopyMarkerFunc = @convention(c) (CFTypeRef) -> CFTypeRef?
+    private typealias AXTextMarkerRangeCreateFunc = @convention(c) (CFAllocator?, CFTypeRef, CFTypeRef) -> CFTypeRef?
+
+    private static let copyStartMarkerFn: AXTextMarkerRangeCopyMarkerFunc? = {
+        guard let handle = dlopen(nil, RTLD_NOW) else { return nil }
+        defer { dlclose(handle) }
+        guard let sym = dlsym(handle, "AXTextMarkerRangeCopyStartMarker") else { return nil }
+        return unsafeBitCast(sym, to: AXTextMarkerRangeCopyMarkerFunc.self)
+    }()
+
+    private static let copyEndMarkerFn: AXTextMarkerRangeCopyMarkerFunc? = {
+        guard let handle = dlopen(nil, RTLD_NOW) else { return nil }
+        defer { dlclose(handle) }
+        guard let sym = dlsym(handle, "AXTextMarkerRangeCopyEndMarker") else { return nil }
+        return unsafeBitCast(sym, to: AXTextMarkerRangeCopyMarkerFunc.self)
+    }()
+
+    private static let createRangeFn: AXTextMarkerRangeCreateFunc? = {
+        guard let handle = dlopen(nil, RTLD_NOW) else { return nil }
+        defer { dlclose(handle) }
+        guard let sym = dlsym(handle, "AXTextMarkerRangeCreate") else { return nil }
+        return unsafeBitCast(sym, to: AXTextMarkerRangeCreateFunc.self)
+    }()
+
+    private func copyStartMarker(from range: CFTypeRef, element: AXUIElement) -> CFTypeRef? {
+        if let fn = Self.copyStartMarkerFn, let marker = fn(range) {
+            return marker
+        }
+        var startRef: CFTypeRef?
+        if AXUIElementCopyParameterizedAttributeValue(element, "AXStartTextMarkerForTextMarkerRange" as CFString, range, &startRef) == .success {
+            return startRef
+        }
+        return nil
+    }
+
+    private func copyEndMarker(from range: CFTypeRef, element: AXUIElement) -> CFTypeRef? {
+        if let fn = Self.copyEndMarkerFn, let marker = fn(range) {
+            return marker
+        }
+        var endRef: CFTypeRef?
+        if AXUIElementCopyParameterizedAttributeValue(element, "AXEndTextMarkerForTextMarkerRange" as CFString, range, &endRef) == .success {
+            return endRef
+        }
+        return nil
+    }
+
+    private func createMarkerRange(start: CFTypeRef, end: CFTypeRef, element: AXUIElement) -> CFTypeRef? {
+        if let fn = Self.createRangeFn, let range = fn(kCFAllocatorDefault, start, end) {
+            return range
+        }
+        var rangeRef: CFTypeRef?
+        let pair = [start, end] as CFArray
+        if AXUIElementCopyParameterizedAttributeValue(element, "AXTextMarkerRangeForUnorderedTextMarkers" as CFString, pair, &rangeRef) == .success {
+            return rangeRef
+        }
+        return nil
+    }
+
+    /// WebKit / Safari / Apple Mail / Google Docs context extraction using AXTextMarker and AXTextMarkerRange.
+    /// Used when standard kAXSelectedTextRangeAttribute is unsupported or omitted by the web engine.
+    func captureWebKitMarkerCaretContext(element: AXUIElement, fieldIdentifier: String, maxSurroundingLength: Int = 200) -> CaretContext? {
+        var selectedMarkerRangeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &selectedMarkerRangeRef) == .success,
+              let selectedMarkerRange = selectedMarkerRangeRef else { return nil }
+        
+        var selectedTextRef: CFTypeRef?
+        var selectedText = ""
+        if AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, selectedMarkerRange, &selectedTextRef) == .success,
+           let str = selectedTextRef as? String {
+            selectedText = str
+        }
+        
+        guard let caretStartMarker = copyStartMarker(from: selectedMarkerRange, element: element),
+              let caretEndMarker = copyEndMarker(from: selectedMarkerRange, element: element) else { return nil }
+        
+        // Scope bounds: Attempt paragraph first, then line, then full element boundaries
+        var scopeStartMarker: CFTypeRef?
+        var scopeEndMarker: CFTypeRef?
+        
+        var scopeRangeRef: CFTypeRef?
+        if AXUIElementCopyParameterizedAttributeValue(element, "AXParagraphTextMarkerRangeForTextMarker" as CFString, selectedMarkerRange, &scopeRangeRef) == .success,
+           let scopeRange = scopeRangeRef {
+            scopeStartMarker = copyStartMarker(from: scopeRange, element: element)
+            scopeEndMarker = copyEndMarker(from: scopeRange, element: element)
+        }
+        
+        if scopeStartMarker == nil {
+            if AXUIElementCopyParameterizedAttributeValue(element, "AXLineTextMarkerRangeForTextMarker" as CFString, selectedMarkerRange, &scopeRangeRef) == .success,
+               let scopeRange = scopeRangeRef {
+                scopeStartMarker = copyStartMarker(from: scopeRange, element: element)
+                scopeEndMarker = copyEndMarker(from: scopeRange, element: element)
+            }
+        }
+        
+        if scopeStartMarker == nil {
+            var docStartRef: CFTypeRef?
+            var docEndRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, "AXStartTextMarker" as CFString, &docStartRef)
+            AXUIElementCopyAttributeValue(element, "AXEndTextMarker" as CFString, &docEndRef)
+            scopeStartMarker = docStartRef
+            scopeEndMarker = docEndRef
+        }
+        
+        var textBefore = ""
+        if let start = scopeStartMarker,
+           let rangeBefore = createMarkerRange(start: start, end: caretStartMarker, element: element) {
+            var strRef: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, rangeBefore, &strRef) == .success,
+               let str = strRef as? String {
+                textBefore = str
+            }
+        }
+        
+        var textAfter = ""
+        if let end = scopeEndMarker,
+           let rangeAfter = createMarkerRange(start: caretEndMarker, end: end, element: element) {
+            var strRef: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, rangeAfter, &strRef) == .success,
+               let str = strRef as? String {
+                textAfter = str
+            }
+        }
+        
+        if textBefore.count > maxSurroundingLength {
+            textBefore = String(textBefore.suffix(maxSurroundingLength))
+        }
+        if textAfter.count > maxSurroundingLength {
+            textAfter = String(textAfter.prefix(maxSurroundingLength))
+        }
+        
+        return CaretContext(
+            fieldIdentifier: fieldIdentifier,
+            textBeforeCaret: textBefore,
+            textAfterCaret: textAfter,
+            selectedText: selectedText,
+            caretLocation: textBefore.utf16.count,
+            fullTextLength: textBefore.utf16.count + selectedText.utf16.count + textAfter.utf16.count
+        )
+    }
+    
     /// Fast, lightweight identifier for currently focused text element.
     func focusedFieldIdentifier() -> String? {
         guard let element = focusedTextElement(),
@@ -487,70 +663,77 @@ final class AccessibilityService {
         
         var rangeRef: CFTypeRef?
         var selectedRange = CFRange(location: 0, length: 0)
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-              let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID(),
-              AXValueGetValue(rangeValue as! AXValue, .cfRange, &selectedRange),
-              selectedRange.location >= 0, selectedRange.length >= 0 else { return nil }
-        
-        var selectedTextRef: CFTypeRef?
-        var selectedText = ""
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selectedTextRef) == .success,
-           let str = selectedTextRef as? String {
-            selectedText = str
-        }
-        
-        var valueRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
-           let fullText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string {
-            // Do not silently clamp a stale AX caret into a newer, shorter value.
-            guard selectedRange.location <= (fullText as NSString).length,
-                  selectedRange.length <= (fullText as NSString).length - selectedRange.location else { return nil }
-            return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
-                                         selection: selectedRange, selectedText: selectedText,
-                                         maxSurroundingLength: maxSurroundingLength)
-        }
-        
-        // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
-        // use parameterized attribute kAXStringForRangeParameterizedAttribute around the caret.
-        let queryStart = max(0, selectedRange.location - maxSurroundingLength)
-        let queryLength = (selectedRange.location - queryStart) + selectedRange.length + maxSurroundingLength
-        var queryRange = CFRange(location: queryStart, length: queryLength)
-        if let rangeValue = AXValueCreate(.cfRange, &queryRange) {
-            var strRef: CFTypeRef?
-            if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, rangeValue, &strRef) == .success {
-                let chunk = (strRef as? String) ?? (strRef as? NSAttributedString)?.string
-                if let chunk = chunk, !chunk.isEmpty {
-                    let caretOffsetInChunk = min(selectedRange.location - queryStart, (chunk as NSString).length)
-                    let textBefore = (chunk as NSString).substring(to: caretOffsetInChunk)
-                    let selLengthInChunk = min(selectedRange.length, (chunk as NSString).length - caretOffsetInChunk)
-                    let textAfterStart = caretOffsetInChunk + selLengthInChunk
-                    let textAfter = textAfterStart <= (chunk as NSString).length
-                        ? (chunk as NSString).substring(from: textAfterStart)
-                        : ""
-                    let selText = selectedText.isEmpty && selLengthInChunk > 0
-                        ? (chunk as NSString).substring(with: NSRange(location: caretOffsetInChunk, length: selLengthInChunk))
-                        : selectedText
-                    
-                    return CaretContext(
-                        fieldIdentifier: fieldID,
-                        textBeforeCaret: textBefore,
-                        textAfterCaret: textAfter,
-                        selectedText: selText,
-                        caretLocation: selectedRange.location,
-                        fullTextLength: max(selectedRange.location + (chunk as NSString).length - caretOffsetInChunk, (chunk as NSString).length)
-                    )
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
+           let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID(),
+           AXValueGetValue(rangeValue as! AXValue, .cfRange, &selectedRange),
+           selectedRange.location >= 0, selectedRange.length >= 0 {
+            var selectedTextRef: CFTypeRef?
+            var selectedText = ""
+            if AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selectedTextRef) == .success,
+               let str = selectedTextRef as? String {
+                selectedText = str
+            }
+            
+            var valueRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
+               let fullText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string {
+                // Do not silently clamp a stale AX caret into a newer, shorter value.
+                guard selectedRange.location <= (fullText as NSString).length,
+                      selectedRange.length <= (fullText as NSString).length - selectedRange.location else { return nil }
+                return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
+                                             selection: selectedRange, selectedText: selectedText,
+                                             maxSurroundingLength: maxSurroundingLength)
+            }
+            
+            // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
+            // use parameterized attribute kAXStringForRangeParameterizedAttribute around the caret.
+            let queryStart = max(0, selectedRange.location - maxSurroundingLength)
+            let queryLength = (selectedRange.location - queryStart) + selectedRange.length + maxSurroundingLength
+            var queryRange = CFRange(location: queryStart, length: queryLength)
+            if let rangeValue = AXValueCreate(.cfRange, &queryRange) {
+                var strRef: CFTypeRef?
+                if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, rangeValue, &strRef) == .success {
+                    let chunk = (strRef as? String) ?? (strRef as? NSAttributedString)?.string
+                    if let chunk = chunk, !chunk.isEmpty {
+                        let caretOffsetInChunk = min(selectedRange.location - queryStart, (chunk as NSString).length)
+                        let textBefore = (chunk as NSString).substring(to: caretOffsetInChunk)
+                        let selLengthInChunk = min(selectedRange.length, (chunk as NSString).length - caretOffsetInChunk)
+                        let textAfterStart = caretOffsetInChunk + selLengthInChunk
+                        let textAfter = textAfterStart <= (chunk as NSString).length
+                            ? (chunk as NSString).substring(from: textAfterStart)
+                            : ""
+                        let selText = selectedText.isEmpty && selLengthInChunk > 0
+                            ? (chunk as NSString).substring(with: NSRange(location: caretOffsetInChunk, length: selLengthInChunk))
+                            : selectedText
+                        
+                        return CaretContext(
+                            fieldIdentifier: fieldID,
+                            textBeforeCaret: textBefore,
+                            textAfterCaret: textAfter,
+                            selectedText: selText,
+                            caretLocation: selectedRange.location,
+                            fullTextLength: max(selectedRange.location + (chunk as NSString).length - caretOffsetInChunk, (chunk as NSString).length)
+                        )
+                    }
                 }
             }
+            
+            return CaretContext(
+                fieldIdentifier: fieldID,
+                textBeforeCaret: "",
+                textAfterCaret: "",
+                selectedText: selectedText,
+                caretLocation: selectedRange.location,
+                fullTextLength: 0
+            )
         }
         
-        return CaretContext(
-            fieldIdentifier: fieldID,
-            textBeforeCaret: "",
-            textAfterCaret: "",
-            selectedText: selectedText,
-            caretLocation: selectedRange.location,
-            fullTextLength: 0
-        )
+        // WebKit / Safari / Apple Mail / Google Docs AXTextMarker fallback
+        if let markerContext = captureWebKitMarkerCaretContext(element: element, fieldIdentifier: fieldID, maxSurroundingLength: maxSurroundingLength) {
+            return markerContext
+        }
+        
+        return nil
     }
     
     /// AX ranges and stored caret locations are UTF-16 offsets. Expand only
@@ -864,11 +1047,17 @@ final class AccessibilityService {
         let element = target.element
         func caret() -> Int? {
             var value: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
-                  let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
-            var range = CFRange()
-            guard AXValueGetValue(value as! AXValue, .cfRange, &range), range.length == 0 else { return nil }
-            return range.location
+            if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
+               let value, CFGetTypeID(value) == AXValueGetTypeID() {
+                var range = CFRange()
+                if AXValueGetValue(value as! AXValue, .cfRange, &range), range.length == 0 {
+                    return range.location
+                }
+            }
+            if let context = captureWebKitMarkerCaretContext(element: element, fieldIdentifier: "") {
+                return context.caretLocation
+            }
+            return nil
         }
         func value() -> String? {
             var value: CFTypeRef?
@@ -886,15 +1075,8 @@ final class AccessibilityService {
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else { return false }
         let pasteboard = NSPasteboard.general
-        let saved = savePasteboard()
-        pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
-            restorePasteboard(saved)
-            return false
-        }
-        pasteboard.setString("", forType: .init("org.nspasteboard.TransientType"))
-        pasteboard.setString("", forType: .init("org.nspasteboard.AutoGeneratedType"))
-        let revision = pasteboard.changeCount
+        let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(text, pasteboard: pasteboard)
         let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
             self.isCurrentReplacementTarget(target) && caret() == originalCaret
                 && (original == nil || value() == original)
@@ -906,7 +1088,7 @@ final class AccessibilityService {
             }
         })
         guard sent else {
-            if pasteboard.changeCount == revision { restorePasteboard(saved) }
+            if pasteboard.changeCount == revision { TransientPasteboard.restore(saved, pasteboard: pasteboard) }
             return false
         }
         let receipt = PasteConfirmation(applied: {
@@ -916,7 +1098,7 @@ final class AccessibilityService {
             guard let self else { return }
             self.pendingPaste = nil
             if pasteboard.changeCount == revision {
-                if saved.isEmpty { pasteboard.clearContents() } else { self.restorePasteboard(saved) }
+                TransientPasteboard.restore(saved, pasteboard: pasteboard)
             }
             onApplied(applied)
         })
@@ -1021,16 +1203,8 @@ final class AccessibilityService {
                 return
             }
             let pasteboard = NSPasteboard.general
-            let saved = savePasteboard()
-            pasteboard.clearContents()
-            guard pasteboard.setString(replacement, forType: .string) else {
-                restorePasteboard(saved)
-                restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
-                completion(false); return
-            }
-            pasteboard.setString("", forType: .init("org.nspasteboard.TransientType"))
-            pasteboard.setString("", forType: .init("org.nspasteboard.AutoGeneratedType"))
-            let pasteboardRevision = pasteboard.changeCount
+            let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
+            let pasteboardRevision = TransientPasteboard.writeString(replacement, pasteboard: pasteboard)
             let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
                 guard self.isCurrentReplacementTarget(target) else { return false }
                 var selectedText: CFTypeRef?
@@ -1051,7 +1225,7 @@ final class AccessibilityService {
             })
             guard sent else {
                 if pasteboard.changeCount == pasteboardRevision {
-                    if saved.isEmpty { pasteboard.clearContents() } else { restorePasteboard(saved) }
+                    TransientPasteboard.restore(saved, pasteboard: pasteboard)
                 }
                 if isCurrentReplacementTarget(target) {
                     restoreSelectionIfUnchanged(element, selectedRange: range, original: fallbackCaret)
@@ -1084,7 +1258,7 @@ final class AccessibilityService {
                 }
                 // Restore only our clipboard contents; preserve any subsequent user copy.
                 if pasteboard.changeCount == pasteboardRevision {
-                    if saved.isEmpty { pasteboard.clearContents() } else { self.restorePasteboard(saved) }
+                    TransientPasteboard.restore(saved, pasteboard: pasteboard)
                 }
             })
             pendingPaste = confirmation
@@ -1162,25 +1336,11 @@ final class AccessibilityService {
     // MARK: - Pasteboard Save/Restore
     
     private func savePasteboard() -> [[(NSPasteboard.PasteboardType, Data)]] {
-        let pasteboard = NSPasteboard.general
-        return pasteboard.pasteboardItems?.map { item in
-            item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            }
-        } ?? []
+        TransientPasteboard.snapshot()
     }
     
     private func restorePasteboard(_ items: [[(NSPasteboard.PasteboardType, Data)]]) {
-        guard !items.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        for itemData in items {
-            let item = NSPasteboardItem()
-            for (type, data) in itemData {
-                item.setData(data, forType: type)
-            }
-            pasteboard.writeObjects([item])
-        }
+        TransientPasteboard.restore(items)
     }
 }
 
