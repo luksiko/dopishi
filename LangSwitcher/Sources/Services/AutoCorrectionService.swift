@@ -946,6 +946,7 @@ final class AutoCorrectionService {
 
             var screenContextText: String?
             var hasPendingQuestion = false
+            var webDomain: String?
             if self.settingsManager.aiScreenContextEnabled {
                 if let screenCtx = await ScreenContextService.shared.extractScreenContextAsync(
                     frontmostApp: NSWorkspace.shared.frontmostApplication,
@@ -954,7 +955,16 @@ final class AutoCorrectionService {
                 ) {
                     screenContextText = screenCtx.formattedContext
                     hasPendingQuestion = screenCtx.hasPendingQuestion
+                    webDomain = screenCtx.webDomain
                 }
+            }
+            if webDomain == nil, let app = NSWorkspace.shared.frontmostApplication,
+               BrowserDomainExtractor.isBrowser(bundleID: app.bundleIdentifier) {
+                webDomain = BrowserDomainExtractor.shared.extractDomain(
+                    pid: app.processIdentifier,
+                    bundleID: app.bundleIdentifier ?? "",
+                    focusedElement: self.accessibilityService.focusedTextElement()
+                )
             }
 
             guard self.currentAIRequestId == requestId else { return }
@@ -987,7 +997,8 @@ final class AutoCorrectionService {
                     screenContext: screenContextText,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
-                    windowTitle: windowTitle
+                    windowTitle: windowTitle,
+                    webDomain: webDomain
                 ) { [weak self] partialSuffix in
                     guard let self else { return }
                     guard self.currentAIRequestId == requestId else { return }
@@ -1057,7 +1068,8 @@ final class AutoCorrectionService {
                     screenContext: screenContextText,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
-                    windowTitle: windowTitle
+                    windowTitle: windowTitle,
+                    webDomain: webDomain
                 ) else {
                     guard self.currentAIRequestId == requestId else { return }
                     if self.accessibilityService.focusedFieldIdentifier() != fieldID {

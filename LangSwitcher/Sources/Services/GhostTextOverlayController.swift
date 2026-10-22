@@ -33,7 +33,8 @@ final class GhostTextOverlayController: NSObject {
         candidate: AutocompletionCandidate,
         suffix: String,
         caretRect: CGRect?,
-        caretProvider: (() -> CGRect?)? = nil
+        caretProvider: (() -> CGRect?)? = nil,
+        bundleID: String? = nil
     ) {
         guard !suffix.isEmpty else {
             hide()
@@ -61,7 +62,7 @@ final class GhostTextOverlayController: NSObject {
                 cancelPendingCaretPoll()
                 pendingCaretAnchor = initialCaret
                 lastCaretRect = initialCaret
-                positionAndDisplay(caret: initialCaret, suffix: suffix)
+                positionAndDisplay(caret: initialCaret, suffix: suffix, bundleID: bundleID)
             }
         } else if let provider = caretProvider {
             // Initial caret rect not available yet (e.g. during fast typing in webviews).
@@ -71,7 +72,7 @@ final class GhostTextOverlayController: NSObject {
         }
     }
 
-    private func positionAndDisplay(caret: CGRect, suffix: String) {
+    private func positionAndDisplay(caret: CGRect, suffix: String, bundleID: String? = nil) {
         let p = getOrCreatePanel()
 
         if textView == nil {
@@ -81,6 +82,9 @@ final class GhostTextOverlayController: NSObject {
         }
 
         guard let tv = textView else { return }
+
+        let targetBundleID = bundleID ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        tv.customFont = EditorFontCustomizer.shared.font(for: targetBundleID, caretHeight: caret.height)
 
         if caret.height > 10, caret.height < 40 {
             tv.fontSize = max(12.0, min(16.0, caret.height - 3))
@@ -261,6 +265,12 @@ private final class GhostTextView: NSView {
         }
     }
 
+    var customFont: NSFont? {
+        didSet {
+            needsDisplay = true
+        }
+    }
+
     var fontSize: CGFloat = 13.5 {
         didSet {
             font = NSFont.systemFont(ofSize: fontSize, weight: .regular)
@@ -269,6 +279,9 @@ private final class GhostTextView: NSView {
     }
 
     private var font = NSFont.systemFont(ofSize: 13.5, weight: .regular)
+    private var activeFont: NSFont {
+        customFont ?? font
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -276,7 +289,7 @@ private final class GhostTextView: NSView {
 
         // Delicate native ghost styling: zero background rectangle, matching ambient editor text
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
+            .font: activeFont,
             .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.50)
         ]
 
@@ -292,7 +305,7 @@ private final class GhostTextView: NSView {
 
     func idealSize() -> CGSize {
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font
+            .font: activeFont
         ]
         let textSize = (text as NSString).size(withAttributes: attrs)
         return CGSize(width: ceil(textSize.width) + 2, height: max(16, ceil(textSize.height)))

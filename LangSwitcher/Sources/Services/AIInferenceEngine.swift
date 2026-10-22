@@ -239,7 +239,8 @@ final class AIInferenceEngine: ObservableObject {
         screenContext: String? = nil,
         hasPendingQuestion: Bool = false,
         appName: String? = nil,
-        windowTitle: String? = nil
+        windowTitle: String? = nil,
+        webDomain: String? = nil
     ) -> [[String: String]] {
         let isCyrillic = containsCyrillic(activeParagraph(in: context))
         var system = isCyrillic ? defaultSystemPromptRu : defaultSystemPromptEn
@@ -254,6 +255,29 @@ final class AIInferenceEngine: ObservableObject {
                 ? "Контекст/тема окна: \"\(title)\"."
                 : "Window context: \"\(title)\"."
             system += "\n" + titlePrompt
+        }
+        if let domain = webDomain?.trimmingCharacters(in: .whitespacesAndNewlines), !domain.isEmpty {
+            let domainPrompt = isCyrillic
+                ? "Веб-домен / сайт: \(domain)."
+                : "Web domain / site: \(domain)."
+            system += "\n" + domainPrompt
+
+            if domain.contains("github.com") || domain.contains("gitlab.com") || domain.contains("stackoverflow.com") {
+                let codePrompt = isCyrillic
+                    ? "Контекст: разработка ПО, Git и код. Отдавай предпочтение техническим терминам, именам веток, Markdown и коммитам."
+                    : "Context: software engineering, Git, and code. Prefer technical terminology, branch names, Markdown, and commit messages."
+                system += "\n" + codePrompt
+            } else if domain.contains("jira") || domain.contains("linear.app") || domain.contains("asana.com") {
+                let taskPrompt = isCyrillic
+                    ? "Контекст: трекер задач / тикеты. Отдавай предпочтение описанию задач, баг-репортам и лаконичным заметкам."
+                    : "Context: issue tracking. Prefer concise task descriptions, bug reports, and acceptance criteria."
+                system += "\n" + taskPrompt
+            } else if domain.contains("docs.google.com") || domain.contains("notion.so") {
+                let docPrompt = isCyrillic
+                    ? "Контекст: текстовый документ. Продолжай связными, естественными предложениями делового или публицистического стиля."
+                    : "Context: document editing. Continue with coherent, natural sentences in professional or editorial style."
+                system += "\n" + docPrompt
+            }
         }
         let extra = instructions?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !extra.isEmpty { system += "\n" + extra }
@@ -369,7 +393,8 @@ final class AIInferenceEngine: ObservableObject {
         screenContext: String? = nil,
         hasPendingQuestion: Bool = false,
         appName: String? = nil,
-        windowTitle: String? = nil
+        windowTitle: String? = nil,
+        webDomain: String? = nil
     ) async -> String? {
         await predictContinuationStream(
             context: context,
@@ -381,6 +406,7 @@ final class AIInferenceEngine: ObservableObject {
             hasPendingQuestion: hasPendingQuestion,
             appName: appName,
             windowTitle: windowTitle,
+            webDomain: webDomain,
             onToken: nil
         )
     }
@@ -395,6 +421,7 @@ final class AIInferenceEngine: ObservableObject {
         hasPendingQuestion: Bool = false,
         appName: String? = nil,
         windowTitle: String? = nil,
+        webDomain: String? = nil,
         onToken: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> String? {
         guard !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, maxWords > 0 else { return nil }
@@ -428,7 +455,8 @@ final class AIInferenceEngine: ObservableObject {
                     screenContext: screenContext,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
-                    windowTitle: windowTitle
+                    windowTitle: windowTitle,
+                    webDomain: webDomain
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
                 let paragraph = rawPrompt.components(separatedBy: .newlines).last ?? rawPrompt
@@ -506,7 +534,8 @@ final class AIInferenceEngine: ObservableObject {
                     screenContext: screenContext,
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
-                    windowTitle: windowTitle
+                    windowTitle: windowTitle,
+                    webDomain: webDomain
                 )])
             do {
                 let (data, response) = try await session.data(for: templateRequest)
