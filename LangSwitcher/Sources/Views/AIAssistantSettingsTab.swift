@@ -13,6 +13,7 @@ struct AIAssistantSettingsTab: View {
     @StateObject private var profiler = AIModelProfiler.shared
     @StateObject private var textHistoryStore = UserTextHistoryStore.shared
     @ObservedObject private var attentionCenter = AttentionCenter.shared
+    @ObservedObject private var batteryManager = BatteryPowerManager.shared
 
     @State private var modelToDelete: RecommendedAIModel?
     @State private var showDeleteAlert = false
@@ -391,17 +392,30 @@ struct AIAssistantSettingsTab: View {
 
             // MARK: - Section 4: Battery Mode
             Section(l10n.t("ai.battery.title")) {
-                Toggle(l10n.t("ai.battery.title"), isOn: $settingsManager.aiBatteryModeEnabled)
+                Toggle(l10n.t("ai.battery.adaptiveManagement"), isOn: $settingsManager.aiBatteryModeEnabled)
 
                 Text(l10n.t("ai.battery.desc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                HStack {
+                if settingsManager.aiBatteryModeEnabled {
+                    Picker(l10n.t("ai.battery.policy.label"), selection: $settingsManager.aiBatteryPolicy) {
+                        ForEach(BatteryPowerPolicy.allCases) { policy in
+                            Text(policy.displayName).tag(policy)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(settingsManager.aiBatteryPolicy.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
                     Circle()
                         .fill(powerService.isOnBattery ? Color.orange : Color.green)
                         .frame(width: 8, height: 8)
-                    Text(powerStatusText)
+                    Text(batteryManager.statusDescription(l10n: l10n))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

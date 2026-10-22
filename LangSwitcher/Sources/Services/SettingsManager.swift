@@ -344,6 +344,16 @@ final class SettingsManager: ObservableObject {
     @Published var aiBatteryModeEnabled: Bool {
         didSet {
             defaults.set(aiBatteryModeEnabled, forKey: Keys.aiBatteryModeEnabled)
+            BatteryPowerManager.shared.updateEffectiveState()
+            NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+        }
+    }
+
+    /// Battery power management policy (adaptiveEco, throttleOnly, pauseInference, unrestricted). Default: .adaptiveEco.
+    @Published var aiBatteryPolicy: BatteryPowerPolicy {
+        didSet {
+            defaults.set(aiBatteryPolicy.rawValue, forKey: Keys.aiBatteryPolicy)
+            BatteryPowerManager.shared.updateEffectiveState()
             NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
         }
     }
@@ -412,11 +422,62 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(savedClicksCount, forKey: Keys.savedClicksCount) }
     }
 
+    // MARK: - Navigation & Temporary Pause
+
+    /// Selected settings tab index (0: General, 1: Layout, 2: AI, 3: Apps, 4: History).
+    @Published var selectedSettingsTab: Int = 0
+
+    /// Temporary pause expiration date (if active).
+    @Published var temporaryPauseUntil: Date?
+
+    var isTemporarilyPaused: Bool {
+        guard let until = temporaryPauseUntil else { return false }
+        if Date() >= until {
+            temporaryPauseUntil = nil
+            return false
+        }
+        return true
+    }
+
+    func pauseTemporarily(minutes: Int) {
+        temporaryPauseUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+    }
+
+    func resumeFromPause() {
+        temporaryPauseUntil = nil
+        NotificationCenter.default.post(name: .autoCompletionSettingsChanged, object: nil)
+    }
+
+    // MARK: - Pro Capabilities
+
+    /// Whether iCloud E2EE sync is enabled for user vocabulary and settings.
+    @Published var iCloudSyncEnabled: Bool {
+        didSet { defaults.set(iCloudSyncEnabled, forKey: Keys.iCloudSyncEnabled) }
+    }
+
+    /// Whether multi-language automatic layout switching (3+ languages) is enabled.
+    @Published var proMultiLanguageAutoDetect: Bool {
+        didSet { defaults.set(proMultiLanguageAutoDetect, forKey: Keys.proMultiLanguageAutoDetect) }
+    }
+
+    /// Whether Fill-In-The-Middle (FIM) generation is enabled.
+    @Published var proFimEnabled: Bool {
+        didSet { defaults.set(proFimEnabled, forKey: Keys.proFimEnabled) }
+    }
+
+    /// Whether deep clipboard context (last 5 min) is incorporated into AI prompts.
+    @Published var proDeepContextEnabled: Bool {
+        didSet { defaults.set(proDeepContextEnabled, forKey: Keys.proDeepContextEnabled) }
+    }
+
     /// Computed check: whether AI inference is allowed based on preferences and battery state.
     var isAIAllowed: Bool {
         guard aiPredictiveEnabled else { return false }
         if aiBatteryModeEnabled && PowerService.shared.isOnBattery {
-            return false
+            if aiBatteryPolicy == .pauseInference {
+                return false
+            }
         }
         return true
     }
@@ -686,6 +747,7 @@ final class SettingsManager: ObservableObject {
         static let aiPredictiveEnabled = "aiPredictiveEnabled"
         static let showFieldAnchorBadge = "showFieldAnchorBadge"
         static let aiBatteryModeEnabled = "aiBatteryModeEnabled"
+        static let aiBatteryPolicy = "aiBatteryPolicy"
         static let aiMaxContinuationWords = "aiMaxContinuationWords"
         static let aiDebounceDelay = "aiDebounceDelay"
         static let aiStreamingEnabled = "aiStreamingEnabled"
@@ -697,6 +759,10 @@ final class SettingsManager: ObservableObject {
         static let customModelPath = "customModelPath"
         static let savedCharactersCount = "savedCharactersCount"
         static let savedClicksCount = "savedClicksCount"
+        static let iCloudSyncEnabled = "iCloudSyncEnabled"
+        static let proMultiLanguageAutoDetect = "proMultiLanguageAutoDetect"
+        static let proFimEnabled = "proFimEnabled"
+        static let proDeepContextEnabled = "proDeepContextEnabled"
     }
     
     // MARK: - Init
@@ -784,6 +850,7 @@ final class SettingsManager: ObservableObject {
         self.aiPredictiveEnabled = defaults.object(forKey: Keys.aiPredictiveEnabled) as? Bool ?? true   // Default: ON
         self.showFieldAnchorBadge = defaults.object(forKey: Keys.showFieldAnchorBadge) as? Bool ?? true // Default: ON
         self.aiBatteryModeEnabled = defaults.object(forKey: Keys.aiBatteryModeEnabled) as? Bool ?? true // Default: ON
+        self.aiBatteryPolicy = defaults.string(forKey: Keys.aiBatteryPolicy).flatMap { BatteryPowerPolicy(rawValue: $0) } ?? .adaptiveEco
         self.aiMaxContinuationWords = defaults.object(forKey: Keys.aiMaxContinuationWords) as? Int ?? 3  // Default: 3 words
         self.aiDebounceDelay = defaults.object(forKey: Keys.aiDebounceDelay) as? Double ?? 0.350        // Default: 350 ms
         self.aiStreamingEnabled = defaults.object(forKey: Keys.aiStreamingEnabled) as? Bool ?? true     // Default: ON
@@ -800,6 +867,10 @@ final class SettingsManager: ObservableObject {
         self.customModelPath = defaults.string(forKey: Keys.customModelPath) ?? ""
         self.savedCharactersCount = defaults.integer(forKey: Keys.savedCharactersCount)
         self.savedClicksCount = defaults.integer(forKey: Keys.savedClicksCount)
+        self.iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSyncEnabled)
+        self.proMultiLanguageAutoDetect = defaults.bool(forKey: Keys.proMultiLanguageAutoDetect)
+        self.proFimEnabled = defaults.bool(forKey: Keys.proFimEnabled)
+        self.proDeepContextEnabled = defaults.bool(forKey: Keys.proDeepContextEnabled)
         
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge

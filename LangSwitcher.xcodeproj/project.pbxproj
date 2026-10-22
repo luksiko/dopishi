@@ -67,6 +67,8 @@
 		E10000010000000000000053 /* AttentionCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000004C /* AttentionCenter.swift */; };
 		E10000010000000000000054 /* EditorFontCustomizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000054 /* EditorFontCustomizer.swift */; };
 		E10000010000000000000055 /* BrowserDomainExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000055 /* BrowserDomainExtractor.swift */; };
+		E10000010000000000000056 /* BatteryPowerPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000056 /* BatteryPowerPolicy.swift */; };
+		E10000010000000000000057 /* BatteryPowerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000057 /* BatteryPowerManager.swift */; };
 		E10000010000000000000101 /* LayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000101 /* LayoutMapperTests.swift */; };
 		E10000010000000000000102 /* TextConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000102 /* TextConverterTests.swift */; };
 		E10000010000000000000103 /* SingleKeyLayoutSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */; };
@@ -94,6 +96,7 @@
 		E10000010000000000000127 /* AttentionCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000127 /* AttentionCenterTests.swift */; };
 		E10000010000000000000128 /* EditorFontCustomizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000128 /* EditorFontCustomizerTests.swift */; };
 		E10000010000000000000129 /* BrowserDomainExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000129 /* BrowserDomainExtractorTests.swift */; };
+		E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000130 /* BatteryPowerManagerTests.swift */; };
 		E10000010000000000000049 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
 		E10000010000000000000123 /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E100000D0000000000000001 /* LlamaSwift */; };
 /* End PBXBuildFile section */
@@ -169,6 +172,8 @@
 		E1000002000000000000004C /* AttentionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenter.swift; sourceTree = "<group>"; };
 		E10000020000000000000054 /* EditorFontCustomizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorFontCustomizer.swift; sourceTree = "<group>"; };
 		E10000020000000000000055 /* BrowserDomainExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserDomainExtractor.swift; sourceTree = "<group>"; };
+		E10000020000000000000056 /* BatteryPowerPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerPolicy.swift; sourceTree = "<group>"; };
+		E10000020000000000000057 /* BatteryPowerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManager.swift; sourceTree = "<group>"; };
 		E10000020000000000000101 /* LayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMapperTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000102 /* TextConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextConverterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000103 /* SingleKeyLayoutSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleKeyLayoutSwitcherTests.swift; sourceTree = "<group>"; };
@@ -196,6 +201,7 @@
 		E10000020000000000000127 /* AttentionCenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionCenterTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000128 /* EditorFontCustomizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorFontCustomizerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000129 /* BrowserDomainExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserDomainExtractorTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -320,6 +326,7 @@
 				E1000002000000000000004C /* AttentionCenter.swift */,
 				E10000020000000000000054 /* EditorFontCustomizer.swift */,
 				E10000020000000000000055 /* BrowserDomainExtractor.swift */,
+				E10000020000000000000057 /* BatteryPowerManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -334,6 +341,7 @@
 				E10000020000000000000038 /* AutocompletionDisplayMode.swift */,
 				E10000020000000000000041 /* RecommendedAIModel.swift */,
 				E10000020000000000000044 /* AppAISettings.swift */,
+				E10000020000000000000056 /* BatteryPowerPolicy.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -395,6 +403,7 @@
 				E10000020000000000000127 /* AttentionCenterTests.swift */,
 				E10000020000000000000128 /* EditorFontCustomizerTests.swift */,
 				E10000020000000000000129 /* BrowserDomainExtractorTests.swift */,
+				E10000020000000000000130 /* BatteryPowerManagerTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -566,6 +575,8 @@
 				E10000010000000000000053 /* AttentionCenter.swift in Sources */,
 				E10000010000000000000054 /* EditorFontCustomizer.swift in Sources */,
 				E10000010000000000000055 /* BrowserDomainExtractor.swift in Sources */,
+				E10000010000000000000056 /* BatteryPowerPolicy.swift in Sources */,
+				E10000010000000000000057 /* BatteryPowerManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -600,6 +611,7 @@
 				E10000010000000000000127 /* AttentionCenterTests.swift in Sources */,
 				E10000010000000000000128 /* EditorFontCustomizerTests.swift in Sources */,
 				E10000010000000000000129 /* BrowserDomainExtractorTests.swift in Sources */,
+				E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

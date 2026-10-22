@@ -103,12 +103,16 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         selectModel(custom)
     }
     
-    /// Path to current active model if downloaded and ready
+    /// Path to current active model if downloaded and ready, taking into account adaptive battery policy
     var activeModelPath: String? {
-        if case .ready(let path, _) = state {
-            return path
+        let targetModel = BatteryPowerManager.shared.effectiveModel(standardModel: currentModel)
+        if targetModel.id == currentModel.id {
+            if case .ready(let path, _) = state {
+                return path
+            }
+            return modelPath(for: currentModel)
         }
-        return modelPath(for: currentModel)
+        return modelPath(for: targetModel) ?? modelPath(for: currentModel)
     }
     
     /// Candidate paths on disk to search for model weights

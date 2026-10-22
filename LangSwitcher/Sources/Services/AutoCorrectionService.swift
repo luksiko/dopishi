@@ -659,6 +659,7 @@ final class AutoCorrectionService {
 
     private func processKey(keyCode: UInt16, flags: CGEventFlags, characters: String?) {
         guard settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled else { return }
+        guard !settingsManager.isTemporarilyPaused else { return }
 
         // Ignore events with Command or Control modifier (⌘C, ⌘V, ⌃Space layout switch, etc.)
         if flags.contains(.maskCommand) || flags.contains(.maskControl) {
@@ -918,7 +919,8 @@ final class AutoCorrectionService {
         let instructions = settingsManager.aiInstructions(for: frontmostBundleID)
         let maxWords = settingsManager.aiMaxContinuationWords
 
-        aiDebounceTimer.schedule(delay: force ? 0 : settingsManager.aiDebounceDelay) { [weak self] in
+        let effectiveDelay = force ? 0 : BatteryPowerManager.shared.effectiveDebounceDelay(baseDelay: settingsManager.aiDebounceDelay)
+        aiDebounceTimer.schedule(delay: effectiveDelay) { [weak self] in
             guard let self = self else { return }
             guard self.physicalInputRevision == captureRevision else { return }
             guard self.settingsManager.isAIAllowed else { return }
