@@ -7,13 +7,13 @@
     <language>en</language>
     <item>
       <title>Dopishi 1.5.1</title>
-      <pubDate>Fri, 23 Oct 2026 18:45:02 +0500</pubDate>
+      <pubDate>Fri, 23 Oct 2026 19:39:08 +0500</pubDate>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <enclosure
         url="https://github.com/luksiko/dopishi/releases/download/v1.5.1/Dopishi-1.5.1-universal.zip"
         sparkle:version="1.5.1"
         sparkle:shortVersionString="1.5.1"
-        length="33649592"
+        length="33649598"
         type="application/octet-stream" />
     </item>
   </channel>
