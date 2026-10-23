@@ -281,5 +281,23 @@
 - Added `scripts/bump-cask.sh` for automated sha256 calculation and single-step synchronization between releases and the tap repository.
 - Modern Cask syntax (`depends_on macos: :ventura`, `livecheck`, `zap trash`) verified with `brew info --cask dopishi`.
 
+---
+
+## Session 8: macOS Input Stability & Deadlock Prevention
+
+### 1. The Anatomy of macOS WindowServer Deadlocks with CGEventTap
+- **The Symptom**: Hardware mouse cursor continues moving smoothly, but mouse clicks, text selection, and window switching (`⌘+Tab`, `Escape`) stop functioning system-wide across all applications.
+- **Root Cause**:
+  1. Registering active event taps (`CGEvent.tapCreate(..., options: .defaultTap)`) halts WindowServer event dispatch until the tap's callback function returns.
+  2. If the callback ever invokes `DispatchQueue.main.sync` while the main thread is executing synchronous Accessibility IPC (`AXUIElementCopyAttributeValue`), a distributed deadlock occurs: WindowServer waits for the tap callback, the tap callback waits for the main thread, and the main thread waits for Mach IPC from an external app.
+  3. Including mouse events (`leftMouseDown`, `rightMouseDown`, `otherMouseDown`) in `.defaultTap` routes every click in the OS through the client process.
+- **Strict Architecture Invariants**:
+  1. **Never monitor mouse clicks via active `CGEventTap`**: Mouse clicks must be monitored passively and asynchronously using `NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown])`. Global monitors live outside the WindowServer blocking queue and can never stall system clicks.
+  2. **Never call `DispatchQueue.main.sync` in a `CGEventTap` callback**: Event tap callbacks must complete in <1ms without synchronous dispatches to other queues.
+  3. **Strict Accessibility IPC Timeouts**: All cross-process `AXUIElement` queries must set `AXUIElementSetMessagingTimeout(element, 0.05)` (50ms). Unresponsive apps or system dialogs (like `System Settings`) must never block the client's main thread.
+  4. **No Continuous Accessibility Polling Timers**: Never poll `AXUIElementCreateSystemWide()` on a short timer loop (e.g. 250ms). Refresh positions reactively on user typing or application focus notifications.
+  5. **Background Floating HUDs (`LSUIElement`)**: Non-activating panels displayed by menu bar utilities while external apps are focused must use `orderFrontRegardless()` instead of `orderFront(nil)`.
+
+
 
 

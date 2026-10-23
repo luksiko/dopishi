@@ -91,7 +91,7 @@ final class ThesaurusController: NSObject {
         }
 
         panel?.setFrame(NSRect(x: panelX, y: panelY, width: fittingSize.width, height: fittingSize.height), display: true)
-        panel?.orderFront(nil)
+        panel?.orderFrontRegardless()
     }
 
     func hide() {

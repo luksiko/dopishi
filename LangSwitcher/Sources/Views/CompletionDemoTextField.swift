@@ -204,9 +204,9 @@ struct DemoKeyCapturingField: NSViewRepresentable {
         textView.ghostText = ghostText
         textView.onTab = onTabPressed
         textView.onEscape = onEscapePressed
-        textView.onFocusChange = { focused in
+        textView.onFocusChange = { [weak coordinator = context.coordinator] focused in
             DispatchQueue.main.async {
-                self.isFocused = focused
+                coordinator?.parent.isFocused = focused
             }
         }
         textView.onTextChange = { newText in
