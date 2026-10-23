@@ -107,6 +107,12 @@ final class ThesaurusController: NSObject {
         return true
     }
 
+    func confirmFirstCandidate() -> Bool {
+        guard isVisible, let first = activeCandidates.first else { return false }
+        applyReplacement(first.synonym)
+        return true
+    }
+
     func applyReplacement(_ replacement: String) {
         guard let word = activeWord else {
             hide()

@@ -1285,3 +1285,74 @@ final class WebKitTextMarkerExtractionTests: XCTestCase {
         XCTAssertEqual(context.fullTextLength, 11)
     }
 }
+
+@MainActor
+final class AuxiliaryHUDInterceptionTests: XCTestCase {
+    func testAuxiliaryHUDsInterceptKeyEventsSynchronously() throws {
+        let settings = SettingsManager.shared
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings)
+        )
+        let dummyAnchor = CGRect(x: 100, y: 100, width: 10, height: 10)
+
+        // Ensure initially hidden
+        SmartRepliesController.shared.hide()
+        WordAlternativesController.shared.hide()
+        ThesaurusController.shared.hide()
+
+        let escEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: true))
+        let num1Event = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x12, keyDown: true)) // Key "1"
+        let enterEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x24, keyDown: true)) // Enter
+
+        // 1. Without active HUDs, events pass through
+        XCTAssertFalse(service.interceptCompletionKeyEvent(escEvent))
+        XCTAssertFalse(service.interceptCompletionKeyEvent(num1Event))
+
+        // 2. Smart Replies HUD
+        let replies = SmartRepliesEngine.generateReplies(for: "Are you free today?")
+        SmartRepliesController.shared.show(replies: replies, anchor: dummyAnchor)
+        XCTAssertTrue(SmartRepliesController.shared.isVisible)
+
+        // Intercepts numeric selection
+        XCTAssertTrue(service.interceptCompletionKeyEvent(num1Event))
+        XCTAssertFalse(SmartRepliesController.shared.isVisible) // selected and closed
+
+        // Intercepts escape
+        SmartRepliesController.shared.show(replies: replies, anchor: dummyAnchor)
+        XCTAssertTrue(SmartRepliesController.shared.isVisible)
+        XCTAssertTrue(service.interceptCompletionKeyEvent(escEvent))
+        XCTAssertFalse(SmartRepliesController.shared.isVisible)
+
+        // 3. Word Alternatives HUD
+        let alts = [WordAlternativesEngine.Alternative(id: 1, text: "apple"),
+                    WordAlternativesEngine.Alternative(id: 2, text: "banana")]
+        WordAlternativesController.shared.show(alternatives: alts, anchor: dummyAnchor) { _ in }
+        XCTAssertTrue(WordAlternativesController.shared.isVisible)
+
+        // Intercepts numeric selection
+        XCTAssertTrue(service.interceptCompletionKeyEvent(num1Event))
+        XCTAssertFalse(WordAlternativesController.shared.isVisible)
+
+        // Intercepts escape
+        WordAlternativesController.shared.show(alternatives: alts, anchor: dummyAnchor) { _ in }
+        XCTAssertTrue(WordAlternativesController.shared.isVisible)
+        XCTAssertTrue(service.interceptCompletionKeyEvent(escEvent))
+        XCTAssertFalse(WordAlternativesController.shared.isVisible)
+
+        // 4. Thesaurus HUD
+        let candidates = ThesaurusEngine.candidates(for: "быстрый")
+        ThesaurusController.shared.show(word: "быстрый", candidates: candidates, anchor: dummyAnchor)
+        XCTAssertTrue(ThesaurusController.shared.isVisible)
+
+        // Intercepts Enter confirmation
+        XCTAssertTrue(service.interceptCompletionKeyEvent(enterEvent))
+        XCTAssertFalse(ThesaurusController.shared.isVisible)
+
+        // Intercepts escape
+        ThesaurusController.shared.show(word: "быстрый", candidates: candidates, anchor: dummyAnchor)
+        XCTAssertTrue(ThesaurusController.shared.isVisible)
+        XCTAssertTrue(service.interceptCompletionKeyEvent(escEvent))
+        XCTAssertFalse(ThesaurusController.shared.isVisible)
+    }
+}

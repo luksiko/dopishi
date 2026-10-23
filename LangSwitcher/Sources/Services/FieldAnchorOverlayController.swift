@@ -84,7 +84,7 @@ final class FieldAnchorOverlayController: NSObject {
         p.isOpaque = false
         p.hasShadow = true
         p.isReleasedWhenClosed = false
-        p.ignoresMouseEvents = false // Allow clicking the badge to open quick actions
+        p.ignoresMouseEvents = true // Pass all clicks straight to the underlying text view
         
         let v = FieldAnchorBadgeView(frame: NSRect(x: 0, y: 0, width: 22, height: 22))
         v.hasScreenContext = self.hasScreenContext
@@ -140,36 +140,5 @@ private final class FieldAnchorBadgeView: NSView {
             )
             symbol.draw(in: iconRect)
         }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        showAccessoryMenu(with: event)
-    }
-
-    private func showAccessoryMenu(with event: NSEvent) {
-        let menu = NSMenu()
-        menu.addItem(withTitle: LocalizationManager.shared.t("menu.thesaurus"), action: #selector(triggerThesaurus), keyEquivalent: "")
-        menu.addItem(withTitle: LocalizationManager.shared.t("menu.smartReplies"), action: #selector(triggerSmartReplies), keyEquivalent: "")
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: LocalizationManager.shared.t("menu.convertText"), action: #selector(triggerConvert), keyEquivalent: "")
-
-        for item in menu.items {
-            item.target = self
-        }
-
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
-    }
-
-    @objc private func triggerThesaurus() {
-        ThesaurusController.shared.triggerForCurrentSelection()
-    }
-
-    @objc private func triggerSmartReplies() {
-        SmartRepliesController.shared.triggerSmartReplies()
-    }
-
-    @objc private func triggerConvert() {
-        let appDelegate = NSApp.delegate as? AppDelegate
-        appDelegate?.performConversion()
     }
 }

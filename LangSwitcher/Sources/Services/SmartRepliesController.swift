@@ -100,6 +100,12 @@ final class SmartRepliesController: NSObject {
         updateView(anchor: anchor)
     }
 
+    func cyclePrevious(anchor: CGRect) {
+        guard !activeReplies.isEmpty else { return }
+        selectedIndex = (selectedIndex - 1 + activeReplies.count) % activeReplies.count
+        updateView(anchor: anchor)
+    }
+
     func handleNumericInput(_ digit: Int) -> Bool {
         guard isVisible, digit >= 1, digit <= activeReplies.count else { return false }
         let chosen = activeReplies[digit - 1].text

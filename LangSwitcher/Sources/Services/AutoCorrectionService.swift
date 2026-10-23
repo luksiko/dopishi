@@ -352,12 +352,169 @@ final class AutoCorrectionService {
             // Recover from a missed release while the tap was disabled.
             consumedAcceptanceKeys.remove(key)
         }
+
+        // Intercept keys for auxiliary HUDs (Smart Replies, Word Alternatives, Thesaurus)
+        if interceptKeyIfAuxiliaryHUDVisible(event: event) {
+            consumedAcceptanceKeys.insert(key)
+            return true
+        }
+
         let isAcceptanceKey = settingsManager.isAutocompletionAcceptKey(keyCode: key, flags: event.flags)
             || settingsManager.isAutocompletionAcceptAllKey(keyCode: key, flags: event.flags)
         let consumed = interceptKeyIfOverlayVisible(event: event)
             || checkGlobalAutocompletionShortcuts(event: event)
         if consumed && isAcceptanceKey { consumedAcceptanceKeys.insert(key) }
         return consumed
+    }
+
+    /// Intercept keys for auxiliary HUDs (Smart Replies, Word Alternatives, Thesaurus) synchronously in the CGEvent tap.
+    /// Returns true if consumed (tap callback returns nil).
+    func interceptKeyIfAuxiliaryHUDVisible(event: CGEvent) -> Bool {
+        guard !isProcessingCorrection else { return false }
+
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+        let nonModFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl])
+        let noModifierFlags = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
+
+        let digit: Int? = {
+            guard noModifierFlags.isEmpty else { return nil }
+            let numberKeyCodes: [UInt16: Int] = [
+                0x12: 1, // 1
+                0x13: 2, // 2
+                0x14: 3, // 3
+                0x15: 4, // 4
+                0x17: 5, // 5
+                0x16: 6, // 6
+                0x1A: 7, // 7
+                0x1C: 8, // 8
+                0x19: 9  // 9
+            ]
+            if let d = numberKeyCodes[keyCode] { return d }
+            if let char = getCharactersFromEvent(event)?.first, let d = Int(String(char)), d >= 1 && d <= 9 {
+                return d
+            }
+            return nil
+        }()
+
+        // 1. Smart Replies HUD
+        if SmartRepliesController.shared.isVisible {
+            if keyCode == 0x35 && nonModFlags.isEmpty { // Escape
+                SmartRepliesController.shared.hide()
+                return true
+            }
+            if (keyCode == 0x24 || keyCode == 0x30) && nonModFlags.isEmpty { // Enter or Tab
+                if SmartRepliesController.shared.confirmCurrentSelection() {
+                    return true
+                }
+            }
+            if (keyCode == 0x7E || keyCode == 0x7B) && nonModFlags.isEmpty { // Up or Left Arrow
+                let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+                SmartRepliesController.shared.cyclePrevious(anchor: caret)
+                return true
+            }
+            if (keyCode == 0x7D || keyCode == 0x7C) && nonModFlags.isEmpty { // Down or Right Arrow
+                let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+                SmartRepliesController.shared.cycleNext(anchor: caret)
+                return true
+            }
+            if let digit = digit {
+                if SmartRepliesController.shared.handleNumericInput(digit) {
+                    return true
+                }
+            }
+        }
+
+        // 2. Word Alternatives HUD
+        if WordAlternativesController.shared.isVisible {
+            if keyCode == 0x35 && nonModFlags.isEmpty { // Escape
+                WordAlternativesController.shared.hide()
+                return true
+            }
+            if (keyCode == 0x24 || keyCode == 0x30) && nonModFlags.isEmpty { // Enter or Tab
+                if WordAlternativesController.shared.confirmCurrentSelection() {
+                    return true
+                }
+            }
+            if (keyCode == 0x7E || keyCode == 0x7B) && nonModFlags.isEmpty { // Up or Left Arrow
+                let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+                WordAlternativesController.shared.cyclePrevious(anchor: caret)
+                return true
+            }
+            if (keyCode == 0x7D || keyCode == 0x7C) && nonModFlags.isEmpty { // Down or Right Arrow
+                let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+                WordAlternativesController.shared.cycleNext(anchor: caret)
+                return true
+            }
+            if flags.contains(.maskAlternate) && (keyCode == 0x7D || keyCode == 0x7E) { // Option + Down / Up Arrow
+                let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+                if keyCode == 0x7D {
+                    WordAlternativesController.shared.cycleNext(anchor: caret)
+                } else {
+                    WordAlternativesController.shared.cyclePrevious(anchor: caret)
+                }
+                return true
+            }
+            if let digit = digit {
+                if WordAlternativesController.shared.handleNumericInput(digit) {
+                    return true
+                }
+            }
+        }
+
+        // Trigger Word Alternatives on Option + Down Arrow when ghost text / autocompletion is active
+        if flags.contains(.maskAlternate) && keyCode == 0x7D {
+            if triggerWordAlternatives() {
+                return true
+            }
+        }
+
+        // 3. Thesaurus HUD
+        if ThesaurusController.shared.isVisible {
+            if keyCode == 0x35 && nonModFlags.isEmpty { // Escape
+                ThesaurusController.shared.hide()
+                return true
+            }
+            if (keyCode == 0x24 || keyCode == 0x30) && nonModFlags.isEmpty { // Enter or Tab
+                if ThesaurusController.shared.confirmFirstCandidate() {
+                    return true
+                }
+            }
+            if let digit = digit {
+                if ThesaurusController.shared.handleNumericInput(digit) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    @discardableResult
+    func triggerWordAlternatives() -> Bool {
+        guard activeGhostState != nil || ghostTextController.isVisible else { return false }
+        let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
+        let currentWord = ghostTextController.currentCandidate?.word ?? ""
+        let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
+        let candidates = autocompletionEngine.suggest(
+            for: wordBuffer,
+            previousWord: previousWord,
+            activeLayoutID: activeLayoutID,
+            enabledLayouts: settingsManager.enabledLayouts,
+            maxSuggestions: 6,
+            includeCrossLayout: settingsManager.autoCompletionIncludeCrossLayout,
+            allowProfanity: settingsManager.autoCompletionSuggestProfanity,
+            bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        )
+        let alts = WordAlternativesEngine.alternatives(currentSuggestion: currentWord, candidates: candidates.map(\.word))
+        guard !alts.isEmpty else { return false }
+        WordAlternativesController.shared.show(alternatives: alts, anchor: caret) { [weak self] chosen in
+            guard let self else { return }
+            let targetLayoutID = self.ghostTextController.currentCandidate?.targetLayoutID ?? activeLayoutID
+            let chosenCand = AutocompletionCandidate(word: chosen, targetLayoutID: targetLayoutID)
+            self.acceptCandidate(chosenCand, appendSpace: false, entirePhrase: true)
+        }
+        return true
     }
 
     /// Check if the key should be intercepted synchronously by the autocompletion overlay.
@@ -701,85 +858,15 @@ final class AutoCorrectionService {
             return
         }
 
-        // Intercept keys if Smart Replies HUD is active
+        // Dismiss auxiliary HUDs if normal typing continues
         if SmartRepliesController.shared.isVisible {
-            if keyCode == 0x35 { // Escape
-                SmartRepliesController.shared.hide()
-                return
-            }
-            if keyCode == 0x24 || keyCode == 0x30 { // Enter or Tab
-                if SmartRepliesController.shared.confirmCurrentSelection() {
-                    return
-                }
-            }
-            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
-                if SmartRepliesController.shared.handleNumericInput(digit) {
-                    return
-                }
-            }
+            SmartRepliesController.shared.hide()
         }
-
-        // Intercept keys if Word Alternatives Carousel is active
         if WordAlternativesController.shared.isVisible {
-            if keyCode == 0x35 { // Escape
-                WordAlternativesController.shared.hide()
-                return
-            }
-            if keyCode == 0x24 || keyCode == 0x30 { // Enter or Tab
-                if WordAlternativesController.shared.confirmCurrentSelection() {
-                    return
-                }
-            }
-            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
-                if WordAlternativesController.shared.handleNumericInput(digit) {
-                    return
-                }
-            }
+            WordAlternativesController.shared.hide()
         }
-
-        // Intercept Option + Down Arrow (0x7D) for Word Alternatives Carousel
-        if flags.contains(.maskAlternate) && keyCode == 0x7D {
-            let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
-            if WordAlternativesController.shared.isVisible {
-                WordAlternativesController.shared.cycleNext(anchor: caret)
-                return
-            } else if activeGhostState != nil || ghostTextController.isVisible {
-                let currentWord = ghostTextController.currentCandidate?.word ?? ""
-                let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
-                let candidates = autocompletionEngine.suggest(
-                    for: wordBuffer,
-                    previousWord: previousWord,
-                    activeLayoutID: activeLayoutID,
-                    enabledLayouts: settingsManager.enabledLayouts,
-                    maxSuggestions: 6,
-                    includeCrossLayout: settingsManager.autoCompletionIncludeCrossLayout,
-                    allowProfanity: settingsManager.autoCompletionSuggestProfanity,
-                    bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-                )
-                let alts = WordAlternativesEngine.alternatives(currentSuggestion: currentWord, candidates: candidates.map(\.word))
-                if !alts.isEmpty {
-                    WordAlternativesController.shared.show(alternatives: alts, anchor: caret) { [weak self] chosen in
-                        guard let self else { return }
-                        let targetLayoutID = self.ghostTextController.currentCandidate?.targetLayoutID ?? activeLayoutID
-                        let chosenCand = AutocompletionCandidate(word: chosen, targetLayoutID: targetLayoutID)
-                        self.acceptCandidate(chosenCand, appendSpace: false, entirePhrase: true)
-                    }
-                    return
-                }
-            }
-        }
-
-        // Intercept keys if Thesaurus HUD is active
         if ThesaurusController.shared.isVisible {
-            if keyCode == 0x35 { // Escape
-                ThesaurusController.shared.hide()
-                return
-            }
-            if let chars = characters, let first = chars.first, let digit = Int(String(first)) {
-                if ThesaurusController.shared.handleNumericInput(digit) {
-                    return
-                }
-            }
+            ThesaurusController.shared.hide()
         }
 
         // Handle special keys
