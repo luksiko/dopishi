@@ -2,12 +2,12 @@ import Foundation
 import SwiftUI
 
 // MARK: - Autocompletion Display Mode
-// Controls whether completion suggestions are shown as a floating HUD menu,
-// inline ghost text at the caret, or both.
+// Controls whether completion suggestions are shown as inline ghost text at the caret,
+// a floating HUD menu, or both.
 
 enum AutocompletionDisplayMode: Int, CaseIterable, Identifiable, Codable {
+    case ghostText = 1    // Inline semi-transparent ghost text tail (default)
     case popup = 0        // Classic floating popup menu
-    case ghostText = 1    // Inline semi-transparent ghost text tail
     case both = 2         // Both popup menu and inline ghost text
     
     var id: Int { rawValue }
@@ -24,8 +24,8 @@ enum AutocompletionDisplayMode: Int, CaseIterable, Identifiable, Codable {
     
     private var nameKey: String {
         switch self {
-        case .popup: return "popup"
         case .ghostText: return "ghostText"
+        case .popup: return "popup"
         case .both: return "both"
         }
     }

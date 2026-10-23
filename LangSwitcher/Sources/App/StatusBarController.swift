@@ -34,6 +34,12 @@ struct StatusBarBadgeRenderer {
         if idLower.contains("french") { return "FR" }
         if idLower.contains("spanish") { return "ES" }
         if idLower.contains("italian") { return "IT" }
+        if idLower.contains("tajik") { return "TG" }
+        if idLower.contains("kazakh") { return "KZ" }
+        if idLower.contains("belarusian") { return "BE" }
+        if idLower.contains("turkish") { return "TR" }
+        if idLower.contains("hebrew") { return "HE" }
+        if idLower.contains("greek") { return "EL" }
         if idLower.contains(".us") || idLower.contains("us-") || idLower.contains("us_") || idLower.hasSuffix(".us") || idLower.contains("abc") || idLower.contains("english") {
             return "EN"
         }
@@ -151,6 +157,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // MARK: - NSMenuDelegate
 
     func menuWillOpen(_ menu: NSMenu) {
+        settingsManager.refreshSystemLayouts()
         setupMenu()
     }
 
@@ -208,6 +215,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             self,
             selector: #selector(keyboardLayoutDidChange),
             name: .keyboardLayoutSelectionChanged,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardLayoutDidChange),
+            name: .enabledLayoutsDidChange,
             object: nil
         )
 

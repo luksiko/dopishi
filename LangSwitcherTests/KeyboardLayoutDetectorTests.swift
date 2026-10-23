@@ -150,6 +150,33 @@ final class KeyboardLayoutDetectorTests: XCTestCase {
         }
     }
 
+    func testStatusBarBadgeRendererTajikMapping() {
+        let layoutTG = KeyboardLayout(id: "com.apple.keylayout.Tajik-Cyrillic", localizedName: "Tajik (Cyrillic)", languageCode: "tg")
+        XCTAssertEqual(StatusBarBadgeRenderer.languageCode(for: layoutTG), "TG")
+
+        let layoutTGUnknown = KeyboardLayout(id: "com.apple.keylayout.Tajik-Cyrillic", localizedName: "Tajik (Cyrillic)", languageCode: "unknown")
+        XCTAssertEqual(StatusBarBadgeRenderer.languageCode(for: layoutTGUnknown), "TG")
+    }
+
+    func testGetInstalledLayoutsIncludesSystemLayouts() {
+        let layouts = KeyboardLayoutDetector.getInstalledLayouts()
+        XCTAssertGreaterThanOrEqual(layouts.count, 2, "Should detect at least 2 installed keyboard layouts")
+        // Check language codes are valid uppercase/lowercase strings and not empty
+        for l in layouts {
+            XCTAssertFalse(l.id.isEmpty)
+            XCTAssertFalse(l.localizedName.isEmpty)
+            XCTAssertFalse(l.languageCode.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testSettingsManagerRefreshesAndMergesNewLayouts() {
+        let settings = SettingsManager.shared
+        let initialCount = settings.enabledLayouts.count
+        settings.refreshSystemLayouts()
+        XCTAssertGreaterThanOrEqual(settings.enabledLayouts.count, initialCount)
+    }
+
     @MainActor
     func testAutoCorrectionSwitchLayoutSetting() {
         let settings = SettingsManager.shared

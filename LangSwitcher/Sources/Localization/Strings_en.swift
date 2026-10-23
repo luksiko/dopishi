@@ -214,7 +214,7 @@ enum Strings_en {
         // ── About Window ────────────────────────────────────────────
         "about.windowTitle":             "About Dopishi",
         "about.appName":                 "Dopishi",
-        "about.version":                 "Version 1.5.1",
+        "about.version":                 "Version 1.5.2",
         "about.tagline":                 "On-device AI writing assistant, real-time typo & layout auto-corrector, and instant keyboard switcher for macOS",
         "about.howToUse":                "Key capabilities:",
         "about.step1":                   "On-device Metal AI completions & smart replies (Tab to accept)",

@@ -201,7 +201,7 @@
 - **Inline Ghost Text**:
   - `GhostTextOverlayController` and `GhostTextPreviewView` display a semi-transparent text continuation directly adjacent to the caret.
   - `ignoresMouseEvents = true` enables seamless clicking through the ghost text into the active document.
-  - Configurable `AutocompletionDisplayMode` (`.popup`, `.ghostText`, `.both`).
+  - Configurable `AutocompletionDisplayMode` (`.ghostText` [default], `.popup`, `.both`).
   - Pressing the configured Accept key (Tab, Space, Enter, etc.) inserts the ghost text candidate even when the popup HUD is not active.
 - **Application Exclusion List**:
   - `ExcludedAppsSettingsView` allows users to disable autocompletion and auto-correction in sensitive or developer applications (Terminal, iTerm, Figma, games, etc.).

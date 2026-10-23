@@ -86,6 +86,7 @@ final class LayoutMapper {
         // Simple heuristic: check which layout's character set contains most of the characters
         var bestMatch: String?
         var bestScore = 0
+        let currentLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id
         
         for layoutID in candidateLayouts {
             guard let map = LayoutCharacterMap.characterMap(for: layoutID) else {
@@ -97,6 +98,10 @@ final class LayoutMapper {
             NSLog("[LangSwitcher] detectSourceLayout: layout '\(layoutID)' score=\(score) for '\(text)'")
             if score > bestScore {
                 bestScore = score
+                bestMatch = layoutID
+            } else if score == bestScore && score > 0,
+                      let currentID = currentLayoutID,
+                      layoutID.caseInsensitiveCompare(currentID) == .orderedSame {
                 bestMatch = layoutID
             }
         }

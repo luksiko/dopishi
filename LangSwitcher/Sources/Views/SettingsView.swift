@@ -107,6 +107,7 @@ struct SettingsView: View {
         .frame(width: 620, height: 600)
         .onAppear {
             selectedTab = settingsManager.selectedSettingsTab
+            settingsManager.refreshSystemLayouts()
         }
         .onChange(of: settingsManager.selectedSettingsTab) { newTab in
             selectedTab = newTab
@@ -242,6 +243,9 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            settingsManager.refreshSystemLayouts()
+        }
         .onAppear {
             hasAccessibility = AccessibilityService.hasAccessibilityPermission
         }
@@ -514,6 +518,9 @@ struct LayoutSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            settingsManager.refreshSystemLayouts()
+        }
     }
 
     // MARK: - Mode Display Helpers

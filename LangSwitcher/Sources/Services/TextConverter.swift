@@ -46,8 +46,16 @@ final class TextConverter {
         
         NSLog("[LangSwitcher] convertSelectedText: detected source layout = '\(detectedSourceID)'")
         
-        // Find the target layout (the "other" one)
-        guard let targetLayout = layouts.first(where: { $0.id != detectedSourceID }) else {
+        // Find the target layout (prioritizing currently active layout if different from source)
+        let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id
+        let targetLayout: KeyboardLayout
+        if let currentID = activeLayoutID,
+           currentID.caseInsensitiveCompare(detectedSourceID) != .orderedSame,
+           let current = layouts.first(where: { $0.id.caseInsensitiveCompare(currentID) == .orderedSame }) {
+            targetLayout = current
+        } else if let other = layouts.first(where: { $0.id.caseInsensitiveCompare(detectedSourceID) != .orderedSame }) {
+            targetLayout = other
+        } else {
             NSLog("[LangSwitcher] convertSelectedText: no target layout found different from source")
             guard let firstLayout = layouts.first else { return nil }
             if let result = LayoutMapper.convert(text: text, from: detectedSourceID, to: firstLayout.id) {

@@ -147,12 +147,153 @@ enum LayoutCharacterMap {
         ("polishpro", polishProOption),
     ]
     
+    // Cache for dynamically generated character maps from system UCKeyboardLayout
+    private static let dynamicCacheLock = NSLock()
+    private static var dynamicCache: [String: [Character: Character]] = [:]
+    private static var dynamicOptionCache: [String: [Character: Character]] = [:]
+
+    /// Clear cached dynamic character maps (e.g. when system input sources change)
+    static func clearDynamicCache() {
+        dynamicCacheLock.lock()
+        dynamicCache.removeAll()
+        dynamicOptionCache.removeAll()
+        dynamicCacheLock.unlock()
+    }
+
+    /// Standard ANSI physical keycodes corresponding to standard QWERTY keys
+    private static let physicalKeyCodes: [(code: UInt16, unshifted: Character, shifted: Character)] = [
+        (50, "`", "~"), (18, "1", "!"), (19, "2", "@"), (20, "3", "#"), (21, "4", "$"),
+        (23, "5", "%"), (22, "6", "^"), (26, "7", "&"), (28, "8", "*"), (25, "9", "("),
+        (29, "0", ")"), (27, "-", "_"), (24, "=", "+"),
+        (12, "q", "Q"), (13, "w", "W"), (14, "e", "E"), (15, "r", "R"), (17, "t", "T"),
+        (16, "y", "Y"), (32, "u", "U"), (34, "i", "I"), (31, "o", "O"), (35, "p", "P"),
+        (33, "[", "{"), (30, "]", "}"), (42, "\\", "|"),
+        (0, "a", "A"), (1, "s", "S"), (2, "d", "D"), (3, "f", "F"), (5, "g", "G"),
+        (4, "h", "H"), (38, "j", "J"), (40, "k", "K"), (37, "l", "L"), (41, ";", ":"),
+        (39, "'", "\""),
+        (6, "z", "Z"), (7, "x", "X"), (8, "c", "C"), (9, "v", "V"), (11, "b", "B"),
+        (45, "n", "N"), (46, "m", "M"), (43, ",", "<"), (47, ".", ">"), (44, "/", "?")
+    ]
+
+    private static func translateKey(
+        uchr: UnsafePointer<UCKeyboardLayout>,
+        keyCode: UInt16,
+        modifierKeyState: UInt32
+    ) -> Character? {
+        var deadKeyState: UInt32 = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        var actualLength: Int = 0
+        let status = UCKeyTranslate(
+            uchr,
+            keyCode,
+            UInt16(kUCKeyActionDown),
+            modifierKeyState,
+            UInt32(LMGetKbdType()),
+            OptionBits(kUCKeyTranslateNoDeadKeysBit),
+            &deadKeyState,
+            4,
+            &actualLength,
+            &chars
+        )
+        if status == noErr && actualLength > 0 {
+            return Character(String(utf16CodeUnits: chars, count: actualLength))
+        }
+        return nil
+    }
+
+    /// Dynamically extract QWERTY -> layout character map from a system TISInputSource
+    static func extractCharacterMap(from source: TISInputSource) -> [Character: Character]? {
+        guard let layoutDataPtr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+            return nil
+        }
+        let layoutData = Unmanaged<CFData>.fromOpaque(layoutDataPtr).takeUnretainedValue() as Data
+        return layoutData.withUnsafeBytes { rawBuffer -> [Character: Character]? in
+            guard let uchr = rawBuffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            var map: [Character: Character] = [:]
+            for key in physicalKeyCodes {
+                if let unshiftedChar = translateKey(uchr: uchr, keyCode: key.code, modifierKeyState: 0) {
+                    map[key.unshifted] = unshiftedChar
+                }
+                if let shiftedChar = translateKey(uchr: uchr, keyCode: key.code, modifierKeyState: UInt32(shiftKey >> 8)) {
+                    map[key.shifted] = shiftedChar
+                }
+            }
+            return map.isEmpty ? nil : map
+        }
+    }
+
+    /// Dynamically extract Option-layer characters from a system TISInputSource
+    static func extractOptionCharacterMap(from source: TISInputSource) -> [Character: Character]? {
+        guard let layoutDataPtr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+            return nil
+        }
+        let layoutData = Unmanaged<CFData>.fromOpaque(layoutDataPtr).takeUnretainedValue() as Data
+        return layoutData.withUnsafeBytes { rawBuffer -> [Character: Character]? in
+            guard let uchr = rawBuffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            var map: [Character: Character] = [:]
+            for key in physicalKeyCodes {
+                if let optionChar = translateKey(uchr: uchr, keyCode: key.code, modifierKeyState: UInt32(optionKey >> 8)) {
+                    let unshifted = translateKey(uchr: uchr, keyCode: key.code, modifierKeyState: 0)
+                    if optionChar != unshifted {
+                        map[key.unshifted] = optionChar
+                    }
+                }
+            }
+            return map.isEmpty ? nil : map
+        }
+    }
+
+    /// Find system input source matching the given layout identifier
+    private static func findSystemInputSource(for layoutID: String) -> TISInputSource? {
+        guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource] else {
+            return nil
+        }
+        let targetLower = layoutID.lowercased()
+        
+        // Exact match
+        for s in sources {
+            guard let idPtr = TISGetInputSourceProperty(s, kTISPropertyInputSourceID) else { continue }
+            let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
+            if id.caseInsensitiveCompare(layoutID) == .orderedSame {
+                return s
+            }
+        }
+        
+        // Substring match
+        for s in sources {
+            guard let idPtr = TISGetInputSourceProperty(s, kTISPropertyInputSourceID) else { continue }
+            let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
+            let idLower = id.lowercased()
+            if idLower.contains(targetLower) || targetLower.contains(idLower) {
+                return s
+            }
+        }
+        return nil
+    }
+
     /// Get the Option-layer (⌥) character map for a given layout identifier.
     static func optionCharacterMap(for layoutID: String) -> [Character: Character]? {
         let lowered = layoutID.lowercased()
         for (pattern, map) in optionMaps where lowered.contains(pattern) {
             return map
         }
+        
+        dynamicCacheLock.lock()
+        if let cached = dynamicOptionCache[layoutID] ?? dynamicOptionCache[lowered] {
+            dynamicCacheLock.unlock()
+            return cached
+        }
+        dynamicCacheLock.unlock()
+        
+        if let source = findSystemInputSource(for: layoutID),
+           let dynamicOpt = extractOptionCharacterMap(from: source) {
+            dynamicCacheLock.lock()
+            dynamicOptionCache[layoutID] = dynamicOpt
+            dynamicOptionCache[lowered] = dynamicOpt
+            dynamicCacheLock.unlock()
+            return dynamicOpt
+        }
+        
         return nil
     }
     
@@ -182,6 +323,26 @@ enum LayoutCharacterMap {
                 return map
             }
         }
+        
+        // Check dynamic cache
+        dynamicCacheLock.lock()
+        if let cached = dynamicCache[layoutID] ?? dynamicCache[lowered] {
+            dynamicCacheLock.unlock()
+            return cached
+        }
+        dynamicCacheLock.unlock()
+        
+        // Dynamically build map from system input source
+        if let source = findSystemInputSource(for: layoutID),
+           let dynamic = extractCharacterMap(from: source) {
+            dynamicCacheLock.lock()
+            dynamicCache[layoutID] = dynamic
+            dynamicCache[lowered] = dynamic
+            dynamicCacheLock.unlock()
+            NSLog("[LangSwitcher] characterMap: generated dynamic map for '\(layoutID)' (\(dynamic.count) characters)")
+            return dynamic
+        }
+        
         NSLog("[LangSwitcher] characterMap: no match for '\(layoutID)'")
         return nil
     }

@@ -21,12 +21,17 @@ final class KeyboardLayoutDetector {
             guard category == kTISPropertyInputSourceCategory as String ||
                   category == (kTISCategoryKeyboardInputSource as String) else { continue }
             
+            guard let isSelectablePtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsSelectCapable),
+                  CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(isSelectablePtr).takeUnretainedValue()) else { continue }
+            
             guard let typePtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceType) else { continue }
             let type = Unmanaged<CFString>.fromOpaque(typePtr).takeUnretainedValue() as String
             guard type == (kTISTypeKeyboardLayout as String) else { continue }
             
             guard let sourceIDPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { continue }
             let sourceID = Unmanaged<CFString>.fromOpaque(sourceIDPtr).takeUnretainedValue() as String
+            
+            guard !layouts.contains(where: { $0.id.caseInsensitiveCompare(sourceID) == .orderedSame }) else { continue }
             
             guard let namePtr = TISGetInputSourceProperty(source, kTISPropertyLocalizedName) else { continue }
             let name = Unmanaged<CFString>.fromOpaque(namePtr).takeUnretainedValue() as String
@@ -36,15 +41,18 @@ final class KeyboardLayoutDetector {
                 let langs = Unmanaged<CFArray>.fromOpaque(langsPtr).takeUnretainedValue() as? [String]
                 langCode = langs?.first ?? "unknown"
             }
-            
-            // Only include if we have a character map for it
-            if LayoutCharacterMap.characterMap(for: sourceID) != nil {
-                layouts.append(KeyboardLayout(
-                    id: sourceID,
-                    localizedName: name,
-                    languageCode: langCode
-                ))
+            if langCode == "unknown" || langCode.isEmpty {
+                langCode = StatusBarBadgeRenderer.languageCode(layoutId: sourceID, languageCode: "", localizedName: name).lowercased()
             }
+            
+            // Pre-warm character map (extracts dynamic map if not static)
+            _ = LayoutCharacterMap.characterMap(for: sourceID)
+            
+            layouts.append(KeyboardLayout(
+                id: sourceID,
+                localizedName: name,
+                languageCode: langCode
+            ))
         }
         
         // If no supported layouts found, provide defaults
@@ -129,6 +137,13 @@ final class KeyboardLayoutDetector {
                 matched = true
             } else if targetLower.contains("spanish") && sourceLower.contains("spanish") {
                 matched = true
+            } else if targetLower.contains("tajik") && sourceLower.contains("tajik") {
+                matched = true
+            } else if targetLower.contains(sourceLower) || sourceLower.contains(targetLower) {
+                if !(targetLower.contains("russian") && (sourceLower.contains("us") || sourceLower.contains("abc"))) &&
+                   !(sourceLower.contains("russian") && (targetLower.contains("us") || targetLower.contains("abc"))) {
+                    matched = true
+                }
             }
             
             if matched {

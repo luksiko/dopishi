@@ -13,6 +13,14 @@ final class GhostTextOverlayTests: XCTestCase {
         XCTAssertFalse(AutocompletionDisplayMode.popup.displayName.isEmpty)
         XCTAssertFalse(AutocompletionDisplayMode.ghostText.displayName.isEmpty)
         XCTAssertFalse(AutocompletionDisplayMode.both.displayName.isEmpty)
+
+        XCTAssertEqual(AutocompletionDisplayMode.allCases.first, .ghostText, "Ghost text must be the primary/first option in CaseIterable order")
+    }
+
+    func testDisplayModeDefaultResolution() {
+        let unconfiguredRawValue: Int? = nil
+        let defaultMode = AutocompletionDisplayMode(rawValue: unconfiguredRawValue ?? AutocompletionDisplayMode.ghostText.rawValue) ?? .ghostText
+        XCTAssertEqual(defaultMode, .ghostText, "Unconfigured display mode must resolve to .ghostText by default")
     }
     
     func testGhostTextOverlayControllerState() {

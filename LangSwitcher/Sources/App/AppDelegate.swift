@@ -629,6 +629,7 @@ extension Notification.Name {
     static let autoCompletionSettingsChanged = Notification.Name("autoCompletionSettingsChanged")
     static let statusBarIconStyleChanged = Notification.Name("statusBarIconStyleChanged")
     static let keyboardLayoutSelectionChanged = Notification.Name("keyboardLayoutSelectionChanged")
+    static let enabledLayoutsDidChange = Notification.Name("enabledLayoutsDidChange")
     static let aiSettingsChanged = Notification.Name("aiSettingsChanged")
 }
 

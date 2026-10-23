@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Carbon
 
 // MARK: - Smart Conversion Mode
 /// Determines behavior when no text is selected and the hotkey is pressed
@@ -87,7 +88,10 @@ final class SettingsManager: ObservableObject {
     // MARK: - Published Properties
     
     @Published var enabledLayouts: [KeyboardLayout] {
-        didSet { saveLayouts() }
+        didSet {
+            saveLayouts()
+            NotificationCenter.default.post(name: .enabledLayoutsDidChange, object: nil)
+        }
     }
     
     /// true = double-shift mode, false = regular modifier+key hotkey
@@ -372,6 +376,9 @@ final class SettingsManager: ObservableObject {
         didSet {
             defaults.set(aiPredictiveEnabled, forKey: Keys.aiPredictiveEnabled)
             NotificationCenter.default.post(name: .aiSettingsChanged, object: nil)
+            if !aiPredictiveEnabled {
+                AIInferenceEngine.shared.stop()
+            }
         }
     }
 
@@ -522,7 +529,7 @@ final class SettingsManager: ObservableObject {
         return true
     }
 
-    /// Autocompletion display presentation style (popup HUD, inline ghost text, or both). Default: .both.
+    /// Autocompletion display presentation style (inline ghost text, popup HUD, or both). Default: .ghostText.
     @Published var autoCompletionDisplayMode: AutocompletionDisplayMode {
         didSet {
             defaults.set(autoCompletionDisplayMode.rawValue, forKey: Keys.autoCompletionDisplayMode)
@@ -892,7 +899,7 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionIncludeCrossLayout = defaults.object(forKey: Keys.autoCompletionIncludeCrossLayout) as? Bool ?? true
         self.autoCompletionSuggestProfanity = defaults.object(forKey: Keys.autoCompletionSuggestProfanity) as? Bool ?? false // Default: OFF
         let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
-        self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? 2) ?? .both
+        self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? AutocompletionDisplayMode.ghostText.rawValue) ?? .ghostText
         self.autoCompletionDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double ?? 0.035
         
         let savedExcluded = defaults.stringArray(forKey: Keys.excludedAppBundleIDs)
@@ -931,16 +938,24 @@ final class SettingsManager: ObservableObject {
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge
         
-        // Load layouts: validate against actual system installed layouts
+        // Load layouts: validate against actual system installed layouts and dynamically merge
         let systemLayouts = KeyboardLayoutDetector.getInstalledLayouts()
         let systemIDs = Set(systemLayouts.map { $0.id.lowercased() })
         
         if let data = defaults.data(forKey: Keys.enabledLayouts),
            let savedLayouts = try? JSONDecoder().decode([KeyboardLayout].self, from: data),
            !savedLayouts.isEmpty {
-            let valid = savedLayouts.filter { systemIDs.contains($0.id.lowercased()) }
-            if valid.count >= 2 {
-                self.enabledLayouts = valid
+            var merged: [KeyboardLayout] = []
+            let validSaved = savedLayouts.filter { systemIDs.contains($0.id.lowercased()) }
+            let validSavedIDs = Set(validSaved.map { $0.id.lowercased() })
+            merged.append(contentsOf: validSaved)
+            for layout in systemLayouts {
+                if !validSavedIDs.contains(layout.id.lowercased()) {
+                    merged.append(layout)
+                }
+            }
+            if merged.count >= 2 {
+                self.enabledLayouts = merged
             } else {
                 self.enabledLayouts = systemLayouts
                 if let encoded = try? JSONEncoder().encode(systemLayouts) {
@@ -950,12 +965,65 @@ final class SettingsManager: ObservableObject {
         } else {
             self.enabledLayouts = systemLayouts
         }
+
+        setupInputSourceObservers()
     }
     
     // MARK: - Methods
     
+    private func setupInputSourceObservers() {
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(systemInputSourcesDidChange),
+            name: NSNotification.Name(kTISNotifyEnabledKeyboardInputSourcesChanged as String),
+            object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(systemInputSourcesDidChange),
+            name: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(systemInputSourcesDidChange),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(systemInputSourcesDidChange),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func systemInputSourcesDidChange() {
+        Task { @MainActor in
+            LayoutCharacterMap.clearDynamicCache()
+            self.refreshSystemLayouts()
+        }
+    }
+
     func refreshSystemLayouts() {
-        enabledLayouts = KeyboardLayoutDetector.getInstalledLayouts()
+        let systemLayouts = KeyboardLayoutDetector.getInstalledLayouts()
+        guard !systemLayouts.isEmpty else { return }
+        let systemIDs = Set(systemLayouts.map { $0.id.lowercased() })
+        
+        var merged: [KeyboardLayout] = []
+        let currentValid = enabledLayouts.filter { systemIDs.contains($0.id.lowercased()) }
+        let currentValidIDs = Set(currentValid.map { $0.id.lowercased() })
+        merged.append(contentsOf: currentValid)
+        for layout in systemLayouts {
+            if !currentValidIDs.contains(layout.id.lowercased()) {
+                merged.append(layout)
+            }
+        }
+        let finalLayouts = merged.isEmpty ? systemLayouts : merged
+        if finalLayouts != enabledLayouts {
+            NSLog("[LangSwitcher] refreshSystemLayouts: updated enabledLayouts from \(enabledLayouts.count) to \(finalLayouts.count) layouts")
+            enabledLayouts = finalLayouts
+        }
     }
     
     func incrementConversionCount() {

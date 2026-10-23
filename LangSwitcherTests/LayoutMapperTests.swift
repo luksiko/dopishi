@@ -49,6 +49,20 @@ final class LayoutMapperTests: XCTestCase {
         let map = LayoutCharacterMap.characterMap(for: "com.apple.keylayout.Japanese")
         XCTAssertNil(map, "Unsupported layout should return nil")
     }
+
+    func testDynamicCharacterMapGenerationForSystemLayout() {
+        // If Tajik is installed on the system, LayoutCharacterMap should dynamically extract it
+        let tajikID = "com.apple.keylayout.Tajik-Cyrillic"
+        if let map = LayoutCharacterMap.characterMap(for: tajikID) {
+            XCTAssertFalse(map.isEmpty, "Dynamic character map should contain mapped characters")
+            // In Tajik layout, physical key 'a' (ANSI 0) is 'ф'
+            XCTAssertEqual(map["a"], "ф")
+            
+            // Convert "ghbdtn" from ABC to Tajik
+            let converted = LayoutMapper.convert(text: "ghbdtn", from: "com.apple.keylayout.ABC", to: tajikID)
+            XCTAssertEqual(converted, "привет")
+        }
+    }
     
     // CRITICAL: Pattern ordering — "russian" contains "us" so Russian must match "russian" not "us"
     func testRussianDoesNotMatchUSPattern() {
