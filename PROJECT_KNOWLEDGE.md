@@ -298,6 +298,34 @@
   4. **No Continuous Accessibility Polling Timers**: Never poll `AXUIElementCreateSystemWide()` on a short timer loop (e.g. 250ms). Refresh positions reactively on user typing or application focus notifications.
   5. **Background Floating HUDs (`LSUIElement`)**: Non-activating panels displayed by menu bar utilities while external apps are focused must use `orderFrontRegardless()` instead of `orderFront(nil)`.
 
+---
+
+## 9. Sparkle 2 Auto-Update Architecture & Release Protocol
+
+### 1. Feed Resolution Mechanics
+- `Info.plist` configures `SUFeedURL = https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml`.
+- When Sparkle makes a network request for update metadata, GitHub automatically returns HTTP 302 redirecting `releases/latest/download/appcast.xml` to `releases/download/<latest-tag>/appcast.xml`.
+- **The Pitfall**: If a new release (e.g. `v1.5.0`) is published with only the `.dmg` and `.zip` binaries, but without `appcast.xml` attached to that release, GitHub answers the redirected request with `HTTP 404 Not Found`.
+- **User Impact**: Sparkle reports: *"Update Error! An error occurred in retrieving update information. Please try again later."* to all installed copies worldwide.
+
+### 2. Standardized 3-Asset Release Pipeline
+- Always package releases with `bash scripts/package-release.sh <version>`.
+- The script automatically builds the release binary, embeds models, signs the bundle, archives both DMG and ZIP, and invokes `scripts/generate-appcast.swift` to generate `appcast.xml`.
+- When creating the release on GitHub, all 3 artifacts must be attached:
+  ```bash
+  gh release create "v${VERSION}" \
+      "Dopishi-${VERSION}-universal.dmg" \
+      "Dopishi-${VERSION}-universal.zip" \
+      "appcast.xml" \
+      --title "Dopishi v${VERSION}" \
+      --notes "..."
+  ```
+- Always verify post-release:
+  ```bash
+  curl -ILs "https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml"
+  ```
+
+
 
 
 

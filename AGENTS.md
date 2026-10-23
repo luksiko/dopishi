@@ -82,3 +82,40 @@ LangSwitcher/Sources/Localization/
 - The signing script must pass. `codesign --verify` alone is insufficient: a bare linker signature can verify while reporting `Info.plist=not bound`, `Sealed Resources=none`, or the wrong signing identifier (`Dopishi` instead of `com.dopishi.app`).
 - Prefer the same Developer ID identity across releases (`DOPISHI_SIGNING_IDENTITY`). Ad-hoc signatures do not guarantee permission persistence across rebuilds. If trust is lost, restore the existing app's Accessibility entry through System Settings and verify actual service startup; never edit the TCC database directly.
 - Do not report working auto-correction from the Accessibility toggle alone. Verify the active process and enabled keyboard taps; a real typing test is required to establish end-to-end correction.
+
+## Release Packaging & Sparkle Auto-Update Requirements
+
+The application uses the **Sparkle 2** framework for automatic in-app updates.
+The update feed URL configured in `Info.plist` is:
+`https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml`
+
+### Critical Invariants
+
+1. **`appcast.xml` MUST ALWAYS be attached to every GitHub release**:
+   GitHub redirects `/releases/latest/download/appcast.xml` to `/releases/download/<latest-tag>/appcast.xml`. If the latest release lacks `appcast.xml`, all installed apps checking for updates receive **HTTP 404** and display *"Update Error! An error occurred in retrieving update information. Please try again later."*
+2. **Always package via `scripts/package-release.sh`**:
+   The packaging script builds the universal release bundle, signs it, and automatically generates all three mandatory release assets:
+   - `Dopishi-<version>-universal.dmg` (for user manual installation and Homebrew Cask)
+   - `Dopishi-<version>-universal.zip` (for Sparkle in-place auto-update download)
+   - `appcast.xml` (Sparkle RSS feed containing the zip enclosure, byte length, and version)
+3. **Mandatory 3-Asset Release Command**:
+   When publishing a new release on GitHub, **never** omit `appcast.xml`:
+   ```bash
+   gh release create "v${VERSION}" \
+       "Dopishi-${VERSION}-universal.dmg" \
+       "Dopishi-${VERSION}-universal.zip" \
+       "appcast.xml" \
+       --title "Dopishi v${VERSION}" \
+       --notes "..."
+   ```
+4. **Post-Release Verification**:
+   Immediately verify the live appcast URL after creating the GitHub release:
+   ```bash
+   curl -ILs "https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml" | grep -E "HTTP/|location:"
+   ```
+   The final status code **MUST** be `HTTP/2 200`.
+5. **Sync Homebrew Tap**:
+   After the release is live, update `Casks/dopishi.rb` and sync with `luksiko/homebrew-tap`:
+   ```bash
+   bash scripts/bump-cask.sh "${VERSION}" "Dopishi-${VERSION}-universal.dmg"
+   ```
