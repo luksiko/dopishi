@@ -16,6 +16,8 @@ struct CompletionDemoTextField: View {
     @State private var showSuccessBanner: Bool = false
     @State private var savedCharNotice: Int = 0
     @State private var isFieldFocused: Bool = false
+    @State private var lastAcceptedGhost: String = ""
+    @State private var pendingAIQueryTask: Task<Void, Never>?
 
     // Built-in offline demo suggestions for immediate tactile response
     private let demoTemplates: [(prefix: String, completion: String)] = [
@@ -43,8 +45,10 @@ struct CompletionDemoTextField: View {
                 Spacer()
                 if !inputText.isEmpty {
                     Button(l10n.t("ai.sandbox.clear")) {
+                        pendingAIQueryTask?.cancel()
                         inputText = ""
                         ghostSuffix = ""
+                        lastAcceptedGhost = ""
                         showSuccessBanner = false
                     }
                     .buttonStyle(.link)
@@ -127,47 +131,77 @@ struct CompletionDemoTextField: View {
     }
 
     private func applyPreset(_ text: String) {
+        pendingAIQueryTask?.cancel()
+        lastAcceptedGhost = ""
         inputText = text
         updateGhostText(for: text)
     }
 
     private func updateGhostText(for text: String) {
         showSuccessBanner = false
+        pendingAIQueryTask?.cancel()
+
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
             ghostSuffix = ""
             return
         }
 
+        // 1. If real AI inference engine is running, request real contextual continuation
+        if inferenceEngine.isRunning {
+            pendingAIQueryTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 80_000_000) // 80ms typing debounce
+                guard !Task.isCancelled else { return }
+
+                if let suffix = await inferenceEngine.predictContinuation(
+                    context: text,
+                    maxWords: 4
+                ) {
+                    guard !Task.isCancelled else { return }
+                    let cleaned = suffix.trimmingCharacters(in: .newlines)
+                    if !cleaned.isEmpty, cleaned != lastAcceptedGhost {
+                        let lowerTrimmed = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        let lowerCleaned = cleaned.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !lowerTrimmed.hasSuffix(lowerCleaned) {
+                            self.ghostSuffix = cleaned
+                            return
+                        }
+                    }
+                }
+                self.ghostSuffix = ""
+            }
+            return
+        }
+
+        // 2. Offline / Mock Templates mode (when no local LLM is loaded)
         let lower = trimmed.lowercased()
         for template in demoTemplates {
             if lower.hasSuffix(template.prefix) || template.prefix.hasPrefix(lower) {
                 if template.prefix.count >= lower.count {
                     let remPrefix = String(template.prefix.dropFirst(lower.count))
-                    ghostSuffix = remPrefix + template.completion
-                    return
+                    let candidate = remPrefix + template.completion
+                    if candidate != lastAcceptedGhost && !lower.hasSuffix(candidate.lowercased()) {
+                        ghostSuffix = candidate
+                        return
+                    }
                 } else if lower.hasSuffix(template.prefix) {
-                    ghostSuffix = template.completion
-                    return
+                    let candidate = template.completion
+                    if candidate != lastAcceptedGhost && !lower.hasSuffix(candidate.lowercased()) {
+                        ghostSuffix = candidate
+                        return
+                    }
                 }
             }
         }
 
-        // Fallback generic phrase
-        if lower.count >= 2 {
-            if AIInferenceEngine.containsCyrillic(lower) {
-                ghostSuffix = ", рад вас слышать!"
-            } else {
-                ghostSuffix = " forward to hearing from you."
-            }
-        } else {
-            ghostSuffix = ""
-        }
+        // Clean finish without repetitive fallback spam
+        ghostSuffix = ""
     }
 
     private func acceptCurrentGhost() {
         guard !ghostSuffix.isEmpty else { return }
         let accepted = ghostSuffix
+        lastAcceptedGhost = accepted
         let full = inputText + accepted
         inputText = full
         ghostSuffix = ""

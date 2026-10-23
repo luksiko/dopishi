@@ -40,6 +40,27 @@ final class AIInferenceTests: XCTestCase {
             wordBuffer: "проек", maxWords: 4), "т с нашей командой")
     }
 
+    func testRejectsRepetitiveContinuationMatchingContextTail() {
+        // Direct repetition of words already at the end of the context
+        let context = "Привет, рад вас слышать!"
+        let raw = "рад вас слышать!"
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: raw, context: context, wordBuffer: "", maxWords: 4))
+    }
+
+    func testRejectsRepeatedPhraseOccurredInRecentContext() {
+        // Multi-word phrase occurred recently in sentence
+        let context = "Спасибо большое за помощь! Мы очень ценим ваше участие, спасибо большое"
+        let raw = "за помощь!"
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: raw, context: context, wordBuffer: "", maxWords: 4))
+    }
+
+    func testRejectsLeadingPunctuationAfterTerminalPunctuation() {
+        // Do not attach comma right after exclamation mark or period
+        let context = "Спасибо большое за помощь!"
+        let raw = ", рад вас слышать!"
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: raw, context: context, wordBuffer: "", maxWords: 4))
+    }
+
     func testContinuationCleaningAndTrimming() {
         let engine = AIInferenceEngine.shared
         // Test binary lookup doesn't crash

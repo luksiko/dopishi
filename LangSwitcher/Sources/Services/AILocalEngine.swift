@@ -156,6 +156,7 @@ public actor AILocalEngine {
         }
         llama_sampler_chain_add(chain, llama_sampler_init_top_k(40))
         llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9, 1))
+        llama_sampler_chain_add(chain, llama_sampler_init_penalties(llama_vocab_n_tokens(modelVocab), 64, 1.15, 0.0, 0.2))
         llama_sampler_chain_add(chain, llama_sampler_init_temp(0.2))
         llama_sampler_chain_add(chain, llama_sampler_init_dist(42))
         self.sampler = chain

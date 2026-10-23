@@ -597,6 +597,11 @@ final class AIInferenceEngine: ObservableObject {
         let isStreaming = onToken != nil
         let payload: [String: Any] = [
             "temperature": Double(LoRAAdapterManager.shared.effectiveTemperature(base: 0.2)),
+            "top_k": 40,
+            "top_p": 0.9,
+            "repeat_penalty": 1.15,
+            "repeat_last_n": 64,
+            "presence_penalty": 0.2,
             "seed": 42,
             "stream": isStreaming,
             "prompt": prompt,
@@ -845,6 +850,30 @@ final class AIInferenceEngine: ObservableObject {
             let englishFunctionWords = Set(["i", "you", "we", "they", "the", "is", "are", "a", "to", "it", "this", "very"])
             let matches = tokens.prefix(6).filter { englishFunctionWords.contains($0.lowercased()) }.count
             if matches >= 2 { return nil }
+        }
+
+        let candidateTrimmed = selected.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerCandidate = candidateTrimmed.lowercased()
+        let lowerContext = context.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Direct echo check: reject if context already ends with this exact continuation
+        if lowerContext.hasSuffix(lowerCandidate) {
+            return nil
+        }
+
+        // 2. Prevent repetition loop if multi-word phrase already occurred in recent context window
+        if tokens.count >= 2 && lowerCandidate.count >= 6 {
+            let trailingContext = String(lowerContext.suffix(160))
+            if trailingContext.contains(lowerCandidate) {
+                return nil
+            }
+        }
+
+        // 3. Punctuation continuity: do not suggest leading comma/semicolon if context already ends with terminal punctuation
+        if let lastNonWhitespace = context.trimmingCharacters(in: .whitespaces).last,
+           [".", "!", "?", "…"].contains(lastNonWhitespace),
+           candidateTrimmed.hasPrefix(",") || candidateTrimmed.hasPrefix(";") {
+            return nil
         }
 
         return (hasLeadingSpace ? " " : "") + selected
