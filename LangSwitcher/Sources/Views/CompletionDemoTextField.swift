@@ -198,14 +198,33 @@ struct CompletionDemoTextField: View {
         ghostSuffix = ""
     }
 
+    private static func splitFirstWord(from text: String) -> (word: String, remainder: String) {
+        guard !text.isEmpty else { return ("", "") }
+        var index = text.startIndex
+        while index < text.endIndex && (text[index].isWhitespace || text[index].isPunctuation) {
+            index = text.index(after: index)
+        }
+        while index < text.endIndex && !text[index].isWhitespace && !text[index].isPunctuation {
+            index = text.index(after: index)
+        }
+        let word = String(text[..<index])
+        let remainder = String(text[index...])
+        return (word, remainder)
+    }
+
     private func acceptCurrentGhost() {
         guard !ghostSuffix.isEmpty else { return }
-        let accepted = ghostSuffix
-        lastAcceptedGhost = accepted
-        let full = inputText + accepted
+        let shouldAcceptEntirePhrase = settingsManager.autoCompletionAcceptEntirePhrase
+        let (acceptedChunk, remainingChunk) = shouldAcceptEntirePhrase
+            ? (ghostSuffix, "")
+            : Self.splitFirstWord(from: ghostSuffix)
+
+        guard !acceptedChunk.isEmpty else { return }
+        lastAcceptedGhost = acceptedChunk
+        let full = inputText + acceptedChunk
         inputText = full
-        ghostSuffix = ""
-        savedCharNotice = accepted.count
+        ghostSuffix = remainingChunk
+        savedCharNotice = acceptedChunk.count
         withAnimation {
             showSuccessBanner = true
         }

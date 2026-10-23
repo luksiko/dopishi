@@ -407,4 +407,19 @@ extension AIInferenceTests {
         let running = await engine.ensureRunning()
         XCTAssertFalse(running)
     }
+
+    func testBaseModelContextPrefixFormatsNaturalContext() {
+        let prefix = AIInferenceEngine.baseModelContextPrefix(
+            context: "Привет, как твои ",
+            instructions: "Write in a friendly voice.",
+            screenContext: "Собеседник: Привет! Как дела?",
+            appName: "Telegram",
+            windowTitle: "Чат с коллегой",
+            webDomain: nil
+        )
+        XCTAssertTrue(prefix.contains("Контекст диалога:"))
+        XCTAssertTrue(prefix.contains("Собеседник: Привет! Как дела?"))
+        XCTAssertTrue(prefix.contains("Стиль и правила:"))
+        XCTAssertTrue(prefix.contains("Write in a friendly voice."))
+    }
 }

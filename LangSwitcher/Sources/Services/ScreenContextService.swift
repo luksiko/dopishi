@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import ApplicationServices
+import Vision
 
 // MARK: - Screen Context Result
 // Extracted visible dialogue and context from the frontmost window.
@@ -1021,7 +1022,7 @@ final class ScreenContextService: ObservableObject {
             }
         }
 
-        return filterAndFormat(
+        let axResult = filterAndFormat(
             attributedItems: collectedItems,
             windowTitle: windowTitle,
             appBundleID: bundleID,
@@ -1029,6 +1030,108 @@ final class ScreenContextService: ObservableObject {
             webDomain: webDomain,
             maxCharacters: maxCharacters,
             maxMessages: maxMessages
+        )
+
+        if let res = axResult, !res.messages.isEmpty {
+            return res
+        }
+
+        // Fallback to high-speed Apple Vision OCR on window screenshot when AX tree has no text
+        // (common in Electron/Qt apps like Telegram, Slack, VSCode, Chrome canvas)
+        let winFrame = elementFrame(window)
+        return performVisionOCR(
+            windowFrame: winFrame,
+            focusedRect: focusedRect,
+            bundleID: bundleID,
+            appName: appName,
+            windowTitle: windowTitle,
+            webDomain: webDomain,
+            maxMessages: maxMessages
+        ) ?? axResult
+    }
+
+    // MARK: - Apple Vision OCR Engine
+
+    nonisolated static func performVisionOCR(
+        windowFrame: CGRect?,
+        focusedRect: CGRect?,
+        bundleID: String,
+        appName: String,
+        windowTitle: String?,
+        webDomain: String?,
+        maxMessages: Int = defaultMaxMessages
+    ) -> ScreenContextResult? {
+        guard CGPreflightScreenCaptureAccess() else { return nil }
+
+        // Determine screenshot region
+        let targetRect: CGRect
+        if let f = focusedRect, f.origin.y > 60 {
+            // Region above the typing field where chat messages reside
+            let topY = max(0, f.origin.y - 450)
+            let height = f.origin.y - topY
+            let width = max(500.0, f.width + 120.0)
+            let originX = max(0, f.origin.x - 40.0)
+            targetRect = CGRect(x: originX, y: topY, width: width, height: height)
+        } else if let w = windowFrame, w.width > 100, w.height > 100 {
+            targetRect = w
+        } else {
+            return nil
+        }
+
+        guard let image = CGWindowListCreateImage(
+            targetRect,
+            .optionOnScreenOnly,
+            kCGNullWindowID,
+            [.bestResolution, .nominalResolution]
+        ) else {
+            return nil
+        }
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .fast
+        request.recognitionLanguages = ["ru-RU", "en-US", "uk-UA"]
+        request.usesLanguageCorrection = true
+
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        do {
+            try handler.perform([request])
+        } catch {
+            return nil
+        }
+
+        guard let observations = request.results, !observations.isEmpty else { return nil }
+
+        // Sort observations top-to-bottom
+        let sorted = observations.sorted { $0.boundingBox.origin.y > $1.boundingBox.origin.y }
+        var recognizedLines: [String] = []
+
+        for obs in sorted {
+            guard let candidate = obs.topCandidates(1).first else { continue }
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, text.count >= 2 else { continue }
+            if isTimestampOrDate(text) || isUINoiseText(text) { continue }
+            if let sanitized = sanitizeMessage(text) {
+                recognizedLines.append(sanitized)
+            }
+        }
+
+        guard !recognizedLines.isEmpty else { return nil }
+
+        let tailLines = Array(recognizedLines.suffix(maxMessages))
+        let joined = tailLines.joined(separator: "\n")
+        let hasQuestion = joined.contains("?")
+
+        var formatted = (appName.isEmpty ? "" : "[\(appName)]\n")
+        formatted += joined
+
+        return ScreenContextResult(
+            appBundleID: bundleID,
+            appName: appName,
+            windowTitle: windowTitle,
+            webDomain: webDomain,
+            messages: tailLines,
+            formattedContext: formatted,
+            hasPendingQuestion: hasQuestion
         )
     }
 

@@ -329,6 +329,31 @@ final class AIInferenceEngine: ObservableObject {
         return [["role": "system", "content": system], ["role": "user", "content": context]]
     }
 
+    nonisolated static func baseModelContextPrefix(
+        context: String,
+        instructions: String?,
+        screenContext: String?,
+        appName: String?,
+        windowTitle: String?,
+        webDomain: String?,
+        persona: String? = nil
+    ) -> String {
+        var prefix = ""
+        let isCyr = containsCyrillic(activeParagraph(in: context))
+
+        if let screen = screenContext?.trimmingCharacters(in: .whitespacesAndNewlines), !screen.isEmpty {
+            prefix += (isCyr ? "Контекст диалога:\n" : "Conversation context:\n") + screen + "\n\n"
+        } else if let title = windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            prefix += (isCyr ? "Тема: " : "Topic: ") + title + "\n\n"
+        }
+
+        let combined = [instructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+        if !combined.isEmpty {
+            prefix += (isCyr ? "Стиль и правила:\n" : "Style and instructions:\n") + combined + "\n\n"
+        }
+        return prefix
+    }
+
     nonisolated static func continuationPrefix(_ context: String) -> String {
         // A standalone trailing-space token biases BPE models toward numbers.
         // Let the model generate its own leading word separator, then reconcile it.
@@ -479,9 +504,9 @@ final class AIInferenceEngine: ObservableObject {
         // Native Metal direct execution
         if await AILocalEngine.shared.isLoaded {
             var nativePrompt = rawPrompt
+            let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
+            let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
             if usesTemplate {
-                let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
-                let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
                 let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
 
                 let msgs = Self.completionMessages(
@@ -505,6 +530,17 @@ final class AIInferenceEngine: ObservableObject {
                     }
                     nativePrompt = chatPrompt + "<|im_start|>assistant\n" + String(paragraph.suffix(512))
                 }
+            } else {
+                let basePrefix = Self.baseModelContextPrefix(
+                    context: context,
+                    instructions: customInstructions,
+                    screenContext: screenContext,
+                    appName: appName,
+                    windowTitle: windowTitle,
+                    webDomain: webDomain,
+                    persona: persona
+                )
+                nativePrompt = basePrefix + rawPrompt
             }
 
             let started = Date()
@@ -558,9 +594,9 @@ final class AIInferenceEngine: ObservableObject {
             }
         }
 
+        let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
+        let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
         if usesTemplate {
-            let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
-            let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
             let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
 
             var templateRequest = URLRequest(url: URL(string: "http://127.0.0.1:\(serverPort)/apply-template")!)
@@ -593,6 +629,17 @@ final class AIInferenceEngine: ObservableObject {
                 }
                 return nil
             }
+        } else {
+            let basePrefix = Self.baseModelContextPrefix(
+                context: context,
+                instructions: customInstructions,
+                screenContext: screenContext,
+                appName: appName,
+                windowTitle: windowTitle,
+                webDomain: webDomain,
+                persona: persona
+            )
+            prompt = basePrefix + prompt
         }
         let isStreaming = onToken != nil
         let payload: [String: Any] = [
