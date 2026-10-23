@@ -94,14 +94,22 @@ The update feed URL configured in `Info.plist` is:
 1. **`appcast.xml` MUST ALWAYS be attached to every GitHub release**:
    GitHub redirects `/releases/latest/download/appcast.xml` to `/releases/download/<latest-tag>/appcast.xml`. If the latest release lacks `appcast.xml`, all installed apps checking for updates receive **HTTP 404** and display *"Update Error! An error occurred in retrieving update information. Please try again later."*
 2. **Always package via `scripts/package-release.sh`**:
-   The packaging script builds the universal release bundle, signs it, and automatically generates all three mandatory release assets:
-   - `Dopishi-<version>-universal.dmg` (for user manual installation and Homebrew Cask)
-   - `Dopishi-<version>-universal.zip` (for Sparkle in-place auto-update download)
-   - `appcast.xml` (Sparkle RSS feed containing the zip enclosure, byte length, and version)
-3. **Mandatory 3-Asset Release Command**:
-   When publishing a new release on GitHub, **never** omit `appcast.xml`:
+   The packaging script builds the universal release bundle, signs it, and automatically generates all release assets:
+   - `Dopishi-<version>-arm64.dmg` (Apple Silicon: ultra-lightweight ~7.5 MB for direct download)
+   - `Dopishi-<version>-arm64.zip`
+   - `Dopishi-<version>-x86_64.dmg` (Intel Macs: ~7.8 MB for direct download)
+   - `Dopishi-<version>-x86_64.zip`
+   - `Dopishi-<version>-universal.dmg` (Universal: All Macs & Homebrew Cask)
+   - `Dopishi-<version>-universal.zip` (Universal: Sparkle in-place auto-update download)
+   - `appcast.xml` (Sparkle RSS feed referencing the universal zip)
+3. **Mandatory Multi-Asset Release Command**:
+   When publishing a new release on GitHub, attach all packages plus `appcast.xml`:
    ```bash
    gh release create "v${VERSION}" \
+       "Dopishi-${VERSION}-arm64.dmg" \
+       "Dopishi-${VERSION}-arm64.zip" \
+       "Dopishi-${VERSION}-x86_64.dmg" \
+       "Dopishi-${VERSION}-x86_64.zip" \
        "Dopishi-${VERSION}-universal.dmg" \
        "Dopishi-${VERSION}-universal.zip" \
        "appcast.xml" \

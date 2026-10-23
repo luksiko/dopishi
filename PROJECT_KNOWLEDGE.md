@@ -308,12 +308,19 @@
 - **The Pitfall**: If a new release (e.g. `v1.5.0`) is published with only the `.dmg` and `.zip` binaries, but without `appcast.xml` attached to that release, GitHub answers the redirected request with `HTTP 404 Not Found`.
 - **User Impact**: Sparkle reports: *"Update Error! An error occurred in retrieving update information. Please try again later."* to all installed copies worldwide.
 
-### 2. Standardized 3-Asset Release Pipeline
-- Always package releases with `bash scripts/package-release.sh <version>`.
-- The script automatically builds the release binary, embeds models, signs the bundle, archives both DMG and ZIP, and invokes `scripts/generate-appcast.swift` to generate `appcast.xml`.
-- When creating the release on GitHub, all 3 artifacts must be attached:
+### 2. Multi-Architecture Packaging with Universal Sparkle Updates
+- To showcase how lightweight and native Dopishi is, GitHub releases provide dedicated architecture builds alongside the universal distribution:
+  - `Dopishi-<version>-arm64.dmg` (~7.5 MB) for Apple Silicon Macs (M1/M2/M3/M4).
+  - `Dopishi-<version>-x86_64.dmg` (~7.8 MB) for Intel Macs.
+  - `Dopishi-<version>-universal.dmg` (~13 MB) for users desiring a single universal installer or Homebrew Cask.
+- **Fail-Safe Auto-Updates**: In-app Sparkle updates (`appcast.xml`) always reference `Dopishi-<version>-universal.zip`. This ensures existing users never encounter architecture mismatch errors, while direct downloaders on GitHub benefit from the tiny 7.5 MB download.
+- Packaging is automated via `bash scripts/package-release.sh <version>`:
   ```bash
   gh release create "v${VERSION}" \
+      "Dopishi-${VERSION}-arm64.dmg" \
+      "Dopishi-${VERSION}-arm64.zip" \
+      "Dopishi-${VERSION}-x86_64.dmg" \
+      "Dopishi-${VERSION}-x86_64.zip" \
       "Dopishi-${VERSION}-universal.dmg" \
       "Dopishi-${VERSION}-universal.zip" \
       "appcast.xml" \

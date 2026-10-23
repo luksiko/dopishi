@@ -150,10 +150,10 @@ langSwitcher/
 5. **Dual Localization**:
    - Whenever a string key is introduced, it must be added to **both** `Strings_en.swift` and `Strings_ru.swift`.
 
-6. **Sparkle Auto-Update & Release Assets**:
+6. **Sparkle Auto-Update & Multi-Architecture Release Assets**:
    - `Info.plist` defines `SUFeedURL` pointing to `https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml`.
    - GitHub redirects `latest/download/appcast.xml` to the latest release tag.
-   - **`appcast.xml` is a mandatory release asset**: every release MUST upload `Dopishi-<ver>-universal.dmg`, `Dopishi-<ver>-universal.zip`, and `appcast.xml`.
-   - Omitting `appcast.xml` breaks the Sparkle updater for all existing installations (causes 404 "Update Error").
+   - **`appcast.xml` is a mandatory release asset**: every release MUST upload `Dopishi-<ver>-arm64.dmg`, `Dopishi-<ver>-x86_64.dmg`, `Dopishi-<ver>-universal.dmg`, `Dopishi-<ver>-universal.zip`, and `appcast.xml`.
+   - The auto-updater feed `appcast.xml` always points to `Dopishi-<ver>-universal.zip`, ensuring zero risk of architectural mismatch or update failure.
    - Always package releases using `bash scripts/package-release.sh <version>`.
    - Always verify feed availability post-publish: `curl -ILs "https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml"`.
