@@ -214,15 +214,15 @@ enum Strings_en {
         // ── About Window ────────────────────────────────────────────
         "about.windowTitle":             "About Dopishi",
         "about.appName":                 "Dopishi",
-        "about.version":                 "Version 1.4.0",
-        "about.tagline":                 "Open-source keyboard layout text converter for macOS",
-        "about.howToUse":                "How to use:",
-        "about.step1":                   "Select text typed in wrong layout",
-        "about.step2":                   "Press ⇧⇧ (double Shift)",
-        "about.step3":                   "Text is automatically converted!",
+        "about.version":                 "Version 1.5.0",
+        "about.tagline":                 "On-device AI writing assistant, real-time typo & layout auto-corrector, and instant keyboard switcher for macOS",
+        "about.howToUse":                "Key capabilities:",
+        "about.step1":                   "On-device Metal AI completions & smart replies (Tab to accept)",
+        "about.step2":                   "Real-time typo, layout & punctuation auto-correction as you type",
+        "about.step3":                   "Instant layout conversion (⇧⇧) & single-key language switch",
         "about.github":                  "GitHub",
         "about.license":                 "MIT License",
-        "about.forkNotice":              "Forked with gratitude from langSwitcher by reg2005",
+        "about.forkNotice":              "",
 
         // ── Alerts (AppDelegate) ────────────────────────────────────
         "alert.accessibilityTitle":      "Accessibility Access Required",

@@ -50,11 +50,6 @@ struct AboutView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
-                Text(l10n.t("about.forkNotice"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
         }
         .padding(24)

@@ -4,7 +4,7 @@ cask "dopishi" do
 
   url "https://github.com/luksiko/dopishi/releases/download/v#{version}/Dopishi-#{version}-universal.dmg"
   name "Dopishi"
-  desc "Smart keyboard layout switcher, inline auto-correction and text converter"
+  desc "On-device AI writing copilot, typo & layout auto-corrector, and keyboard switcher"
   homepage "https://github.com/luksiko/dopishi"
 
   livecheck do
