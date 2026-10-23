@@ -22,6 +22,12 @@ final class SpellCheckService {
         "de": "de",
         "fr": "fr",
         "es": "es",
+        "tg": "tg",
+        "kk": "kk",
+        "be": "be",
+        "pl": "pl",
+        "it": "it",
+        "tr": "tr",
     ]
 
     // NSSpellChecker omits some ordinary application terminology and its
@@ -65,7 +71,7 @@ final class SpellCheckService {
         
         let lang = normalizeLanguage(language)
         switch lang {
-        case "ru", "uk", "ua":
+        case "ru", "uk", "ua", "tg", "kk", "be", "ky", "bg", "sr", "mk":
             // Cyrillic script: Unicode ranges U+0400...U+052F
             return letters.allSatisfy { char in
                 char.unicodeScalars.allSatisfy { scalar in

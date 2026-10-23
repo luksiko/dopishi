@@ -63,7 +63,9 @@ final class SpellCheckServiceTests: XCTestCase {
         // Correct script checks
         XCTAssertTrue(spellChecker.matchesExpectedScript(word: "auto", language: "en"))
         XCTAssertFalse(spellChecker.matchesExpectedScript(word: "auto", language: "ru"))
+        XCTAssertFalse(spellChecker.matchesExpectedScript(word: "auto", language: "tg"))
         XCTAssertTrue(spellChecker.matchesExpectedScript(word: "авто", language: "ru"))
+        XCTAssertTrue(spellChecker.matchesExpectedScript(word: "салом", language: "tg"))
         XCTAssertFalse(spellChecker.matchesExpectedScript(word: "авто", language: "en"))
     }
     
