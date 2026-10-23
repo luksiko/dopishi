@@ -288,10 +288,17 @@ final class AIInferenceEngine: ObservableObject {
         hasPendingQuestion: Bool = false,
         appName: String? = nil,
         windowTitle: String? = nil,
-        webDomain: String? = nil
+        webDomain: String? = nil,
+        allowProfanity: Bool = false
     ) -> [[String: String]] {
         let isCyrillic = containsCyrillic(activeParagraph(in: context))
         var system = isCyrillic ? defaultSystemPromptRu : defaultSystemPromptEn
+        if !allowProfanity {
+            let profanityPrompt = isCyrillic
+                ? "Ни при каких обстоятельствах не используй ненормативную лексику, мат, ругательства, грубые или оскорбительные выражения."
+                : "Never use profanity, vulgarity, obscenities, or offensive language under any circumstances."
+            system += "\n" + profanityPrompt
+        }
         if let app = appName?.trimmingCharacters(in: .whitespacesAndNewlines), !app.isEmpty {
             let appPrompt = isCyrillic
                 ? "Активное приложение: \(app)."
@@ -352,7 +359,8 @@ final class AIInferenceEngine: ObservableObject {
         appName: String?,
         windowTitle: String?,
         webDomain: String?,
-        persona: String? = nil
+        persona: String? = nil,
+        allowProfanity: Bool = false
     ) -> String {
         var prefix = ""
         let isCyr = containsCyrillic(activeParagraph(in: context))
@@ -363,7 +371,11 @@ final class AIInferenceEngine: ObservableObject {
             prefix += (isCyr ? "Тема: " : "Topic: ") + title + "\n\n"
         }
 
-        let combined = [instructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+        var styleItems = [instructions, persona].compactMap { $0 }.filter { !$0.isEmpty }
+        if !allowProfanity {
+            styleItems.append(isCyr ? "Без ненормативной лексики и мата." : "No profanity or vulgar language.")
+        }
+        let combined = styleItems.joined(separator: "\n")
         if !combined.isEmpty {
             prefix += (isCyr ? "Стиль и правила:\n" : "Style and instructions:\n") + combined + "\n\n"
         }
@@ -517,7 +529,8 @@ final class AIInferenceEngine: ObservableObject {
         hasPendingQuestion: Bool = false,
         appName: String? = nil,
         windowTitle: String? = nil,
-        webDomain: String? = nil
+        webDomain: String? = nil,
+        allowProfanity: Bool = false
     ) async -> String? {
         await predictContinuationStream(
             context: context,
@@ -530,6 +543,7 @@ final class AIInferenceEngine: ObservableObject {
             appName: appName,
             windowTitle: windowTitle,
             webDomain: webDomain,
+            allowProfanity: allowProfanity,
             onToken: nil
         )
     }
@@ -545,6 +559,7 @@ final class AIInferenceEngine: ObservableObject {
         appName: String? = nil,
         windowTitle: String? = nil,
         webDomain: String? = nil,
+        allowProfanity: Bool = false,
         onToken: (@MainActor @Sendable (String) -> Void)? = nil
     ) async -> String? {
         guard !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, maxWords > 0 else { return nil }
@@ -583,7 +598,8 @@ final class AIInferenceEngine: ObservableObject {
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
                     windowTitle: windowTitle,
-                    webDomain: webDomain
+                    webDomain: webDomain,
+                    allowProfanity: allowProfanity
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
                 let paragraph = rawPrompt.components(separatedBy: .newlines).last ?? rawPrompt
@@ -604,7 +620,8 @@ final class AIInferenceEngine: ObservableObject {
                     appName: appName,
                     windowTitle: windowTitle,
                     webDomain: webDomain,
-                    persona: persona
+                    persona: persona,
+                    allowProfanity: allowProfanity
                 )
                 nativePrompt = basePrefix + rawPrompt
             }
@@ -627,7 +644,8 @@ final class AIInferenceEngine: ObservableObject {
                         wordBuffer: healsWord ? "" : wordBuffer,
                         maxWords: maxWords,
                         afterCaret: afterCaret,
-                        screenContext: screenContext
+                        screenContext: screenContext,
+                        allowProfanity: allowProfanity
                     ) {
                         let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                         if !formatted.isEmpty {
@@ -679,7 +697,8 @@ final class AIInferenceEngine: ObservableObject {
                     hasPendingQuestion: hasPendingQuestion,
                     appName: appName,
                     windowTitle: windowTitle,
-                    webDomain: webDomain
+                    webDomain: webDomain,
+                    allowProfanity: allowProfanity
                 )])
             do {
                 let (data, response) = try await session.data(for: templateRequest)
@@ -705,7 +724,8 @@ final class AIInferenceEngine: ObservableObject {
                 appName: appName,
                 windowTitle: windowTitle,
                 webDomain: webDomain,
-                persona: persona
+                persona: persona,
+                allowProfanity: allowProfanity
             )
             prompt = basePrefix + prompt
         }
@@ -761,7 +781,8 @@ final class AIInferenceEngine: ObservableObject {
                             wordBuffer: healsWord ? "" : wordBuffer,
                             maxWords: maxWords,
                             afterCaret: afterCaret,
-                            screenContext: screenContext
+                            screenContext: screenContext,
+                            allowProfanity: allowProfanity
                         ) {
                             let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                             if formatted != lastCleanedSuffix && !formatted.isEmpty {
@@ -791,7 +812,8 @@ final class AIInferenceEngine: ObservableObject {
                         wordBuffer: healsWord ? "" : wordBuffer,
                         maxWords: maxWords,
                         afterCaret: afterCaret,
-                        screenContext: screenContext
+                        screenContext: screenContext,
+                        allowProfanity: allowProfanity
                     ) {
                         let final = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                         lastCleanedSuffix = final
@@ -820,7 +842,7 @@ final class AIInferenceEngine: ObservableObject {
                 }
                 guard let cleaned = Self.cleanAndTrimContinuation(raw: raw, context: context,
                     wordBuffer: healsWord ? "" : wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
-                    screenContext: screenContext) else { return nil }
+                    screenContext: screenContext, allowProfanity: allowProfanity) else { return nil }
                 return context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
             } catch {
                 if !Task.isCancelled {
@@ -839,7 +861,8 @@ final class AIInferenceEngine: ObservableObject {
         wordBuffer: String,
         maxWords: Int,
         afterCaret: String = "",
-        screenContext: String? = nil
+        screenContext: String? = nil,
+        allowProfanity: Bool = false
     ) -> String? {
         guard maxWords > 0 else { return nil }
         var text = raw
@@ -991,6 +1014,10 @@ final class AIInferenceEngine: ObservableObject {
             return nil
         }
 
-        return (hasLeadingSpace ? " " : "") + selected
+        let result = (hasLeadingSpace ? " " : "") + selected
+        if !allowProfanity && ProfanityFilter.isProfane(result) {
+            return nil
+        }
+        return result
     }
 }

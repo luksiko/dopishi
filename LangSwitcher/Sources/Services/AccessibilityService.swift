@@ -27,6 +27,15 @@ final class AccessibilityService {
     private var pendingPaste: PasteConfirmation?
     private var pendingSelection: PasteConfirmation?
 
+    var hasPendingPaste: Bool {
+        pendingPaste != nil
+    }
+
+    func finalizePendingPaste() {
+        pendingSelection?.cancel()
+        pendingPaste?.check(final: true)
+    }
+
     func confirmPendingPasteBeforeInput() {
         pendingSelection?.cancel()
         pendingPaste?.check()
@@ -438,9 +447,14 @@ final class AccessibilityService {
             return
         }
 
+        let appBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
+        let appendTrailingSpace = isSmartPasteApp && replacement.hasSuffix(" ")
+        let clipboardText = appendTrailingSpace ? String(replacement.dropLast()) : replacement
+
         let pasteboard = NSPasteboard.general
         let savedContents = TransientPasteboard.snapshot(pasteboard: pasteboard)
-        let revision = TransientPasteboard.writeString(replacement, pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(clipboardText, pasteboard: pasteboard)
 
         for _ in 0..<count {
             simulateKeystroke(virtualKey: 0x33) // Backspace key
@@ -449,6 +463,9 @@ final class AccessibilityService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in
             guard let self else { completion?(false); return }
             self.simulatePaste()
+            if appendTrailingSpace {
+                self.simulateKeystroke(virtualKey: 0x31) // Space key
+            }
             completion?(true)
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -830,6 +847,16 @@ final class AccessibilityService {
         return caret
     }
 
+    /// Detects applications whose rich text / paste handlers strip trailing spaces (e.g. Microsoft Word Smart Cut and Paste).
+    static func isSmartPasteApp(bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        return bundleID == "com.microsoft.Word"
+            || bundleID == "com.microsoft.Powerpoint"
+            || bundleID == "com.microsoft.Outlook"
+            || bundleID == "com.microsoft.Excel"
+            || bundleID == "com.microsoft.onenote.mac"
+    }
+
     /// Popup fallback only. This is deliberately never used for inline text.
     func focusedFieldScreenRect() -> CGRect? {
         guard let element = focusedTextElement(), let screen = NSScreen.screens.first else { return nil }
@@ -942,12 +969,17 @@ final class AccessibilityService {
               AXIsProcessTrusted() else { return }
 
         let bundlePath = app.bundleURL?.path ?? ""
+        let bundleID = app.bundleIdentifier ?? ""
         let isElectronOrChromium = bundlePath.contains("Electron") ||
                                    bundlePath.contains("Chrome") ||
                                    bundlePath.contains("Opera") ||
                                    bundlePath.contains("Brave") ||
                                    bundlePath.contains("Edge") ||
                                    bundlePath.contains("Arc") ||
+                                   bundlePath.contains("Antigravity") ||
+                                   bundleID.contains("antigravity") ||
+                                   bundleID.contains("vscode") ||
+                                   bundleID.contains("cursor") ||
                                    FileManager.default.fileExists(atPath: (app.bundleURL?.appendingPathComponent(
                                     "Contents/Frameworks/Electron Framework.framework").path) ?? "")
 
@@ -1088,6 +1120,33 @@ final class AccessibilityService {
         pendingPaste?.check(final: true)
         guard !text.isEmpty, isCurrentReplacementTarget(target) else { return false }
         let element = target.element
+        let appBundleID = NSRunningApplication(processIdentifier: target.processID)?.bundleIdentifier
+            ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
+        let source = CGEventSource(stateID: .hidSystemState)
+
+        let hasLeadingSpace = isSmartPasteApp && text.hasPrefix(" ")
+        let hasTrailingSpace = isSmartPasteApp && text.hasSuffix(" ")
+
+        var clipboardText = text
+        if hasLeadingSpace { clipboardText = String(clipboardText.dropFirst()) }
+        if hasTrailingSpace && clipboardText.hasSuffix(" ") { clipboardText = String(clipboardText.dropLast()) }
+
+        // If the destination app strips trailing spaces on paste (e.g. Word Smart Cut and Paste),
+        // pure whitespace cannot be pasted via Cmd+V and must be sent as a synthetic keystroke.
+        if isSmartPasteApp && clipboardText.isEmpty {
+            guard let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
+                  let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) else { return false }
+            spaceDown.flags = []
+            spaceUp.flags = []
+            spaceDown.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+            spaceUp.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+            spaceDown.post(tap: .cgAnnotatedSessionEventTap)
+            spaceUp.post(tap: .cgAnnotatedSessionEventTap)
+            onApplied(true)
+            return true
+        }
+
         func caret() -> Int? {
             var value: CFTypeRef?
             if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
@@ -1107,27 +1166,44 @@ final class AccessibilityService {
             AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
             return (value as? String) ?? (value as? NSAttributedString)?.string
         }
-        // Reading an empty range establishes an insertion point without the
-        // AXSelectedText setter/getter that native web editors can omit.
-        guard let originalCaret = caret() else {
-            NSLog("[LangSwitcher] Completion paste: no readable empty caret range")
-            return false
-        }
+        let originalCaret = caret()
         let original = value()
-        let source = CGEventSource(stateID: .hidSystemState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else { return false }
+
         let pasteboard = NSPasteboard.general
         let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
-        let revision = TransientPasteboard.writeString(text, pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(clipboardText, pasteboard: pasteboard)
         let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
-            self.isCurrentReplacementTarget(target) && caret() == originalCaret
+            self.isCurrentReplacementTarget(target) && (originalCaret == nil || caret() == originalCaret)
                 && (original == nil || value() == original)
         }, post: { _ in
+            if hasLeadingSpace {
+                if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
+                   let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
+                    spaceDown.flags = []
+                    spaceUp.flags = []
+                    spaceDown.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                    spaceUp.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                    spaceDown.post(tap: .cgAnnotatedSessionEventTap)
+                    spaceUp.post(tap: .cgAnnotatedSessionEventTap)
+                }
+            }
             for event in [down, up] {
                 event.flags = .maskCommand
                 event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
                 event.post(tap: .cgAnnotatedSessionEventTap)
+            }
+            if hasTrailingSpace {
+                if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
+                   let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
+                    spaceDown.flags = []
+                    spaceUp.flags = []
+                    spaceDown.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                    spaceUp.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                    spaceDown.post(tap: .cgAnnotatedSessionEventTap)
+                    spaceUp.post(tap: .cgAnnotatedSessionEventTap)
+                }
             }
         })
         guard sent else {
@@ -1135,8 +1211,16 @@ final class AccessibilityService {
             return false
         }
         let receipt = PasteConfirmation(applied: {
-            Self.continuationWasApplied(original: original, observed: value(),
-                caretBefore: originalCaret, caretAfter: caret(), inserted: text)
+            if let origCaret = originalCaret {
+                return Self.continuationWasApplied(original: original, observed: value(),
+                    caretBefore: origCaret, caretAfter: caret(), inserted: text)
+            }
+            // When the editor does not expose kAXSelectedTextRangeAttribute (e.g. Chromium/Electron custom webviews),
+            // check kAXValueAttribute if available, otherwise consider the dispatched Cmd+V applied.
+            if let orig = original, let obs = value() {
+                return obs != orig && obs.count >= orig.count + text.count
+            }
+            return true
         }, finish: { [weak self] applied in
             guard let self else { return }
             self.pendingPaste = nil
@@ -1245,9 +1329,19 @@ final class AccessibilityService {
                 completion(false)
                 return
             }
+            let appBundleID = NSRunningApplication(processIdentifier: target.processID)?.bundleIdentifier
+                ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
+            let hasLeadingSpace = isSmartPasteApp && replacement.hasPrefix(" ")
+            let hasTrailingSpace = isSmartPasteApp && replacement.hasSuffix(" ")
+
+            var clipboardReplacement = replacement
+            if hasLeadingSpace { clipboardReplacement = String(clipboardReplacement.dropFirst()) }
+            if hasTrailingSpace && clipboardReplacement.hasSuffix(" ") { clipboardReplacement = String(clipboardReplacement.dropLast()) }
+
             let pasteboard = NSPasteboard.general
             let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
-            let pasteboardRevision = TransientPasteboard.writeString(replacement, pasteboard: pasteboard)
+            let pasteboardRevision = TransientPasteboard.writeString(clipboardReplacement, pasteboard: pasteboard)
             let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
                 guard self.isCurrentReplacementTarget(target) else { return false }
                 var selectedText: CFTypeRef?
@@ -1260,10 +1354,32 @@ final class AccessibilityService {
                 return AXValueGetValue(selectedRangeValue as! AXValue, .cfRange, &currentRange)
                     && currentRange.location == range.location && currentRange.length == range.length
             }, post: { _ in
+                if hasLeadingSpace {
+                    if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
+                       let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
+                        spaceDown.flags = []
+                        spaceUp.flags = []
+                        spaceDown.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                        spaceUp.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                        spaceDown.post(tap: .cgAnnotatedSessionEventTap)
+                        spaceUp.post(tap: .cgAnnotatedSessionEventTap)
+                    }
+                }
                 for event in [down, up] {
                     event.flags = .maskCommand
                     event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
                     event.post(tap: .cgAnnotatedSessionEventTap)
+                }
+                if hasTrailingSpace {
+                    if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
+                       let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
+                        spaceDown.flags = []
+                        spaceUp.flags = []
+                        spaceDown.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                        spaceUp.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+                        spaceDown.post(tap: .cgAnnotatedSessionEventTap)
+                        spaceUp.post(tap: .cgAnnotatedSessionEventTap)
+                    }
                 }
             })
             guard sent else {

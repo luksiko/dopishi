@@ -6,14 +6,14 @@
     <description>Most recent updates for Dopishi</description>
     <language>en</language>
     <item>
-      <title>Dopishi 1.5.0</title>
-      <pubDate>Fri, 23 Oct 2026 16:26:00 +0500</pubDate>
+      <title>Dopishi 1.5.1</title>
+      <pubDate>Fri, 23 Oct 2026 18:45:02 +0500</pubDate>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/luksiko/dopishi/releases/download/v1.5.0/Dopishi-1.5.0-universal.zip"
-        sparkle:version="1.5.0"
-        sparkle:shortVersionString="1.5.0"
-        length="33500134"
+        url="https://github.com/luksiko/dopishi/releases/download/v1.5.1/Dopishi-1.5.1-universal.zip"
+        sparkle:version="1.5.1"
+        sparkle:shortVersionString="1.5.1"
+        length="33649592"
         type="application/octet-stream" />
     </item>
   </channel>

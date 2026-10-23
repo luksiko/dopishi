@@ -311,7 +311,7 @@ extension AIInferenceTests {
         let context = "Заметка о проекте.\nIn my opinion, "
         XCTAssertEqual(AIInferenceEngine.cleanAndTrimContinuation(raw: "this is working well",
             context: context, wordBuffer: "", maxWords: 4), "this is working well")
-        let messages = AIInferenceEngine.completionMessages(context: context, afterCaret: "", instructions: nil)
+        let messages = AIInferenceEngine.completionMessages(context: context, afterCaret: "", instructions: nil, allowProfanity: true)
         XCTAssertEqual(messages.first?["content"], AIInferenceEngine.defaultSystemPromptEn)
     }
 
@@ -319,7 +319,7 @@ extension AIInferenceTests {
         let context = "Project notes in English.\r\nЯ люблю "
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "I love you very much",
             context: context, wordBuffer: "", maxWords: 4))
-        let messages = AIInferenceEngine.completionMessages(context: context, afterCaret: "", instructions: nil)
+        let messages = AIInferenceEngine.completionMessages(context: context, afterCaret: "", instructions: nil, allowProfanity: true)
         XCTAssertEqual(messages.first?["content"], AIInferenceEngine.defaultSystemPromptRu)
     }
 }
@@ -437,5 +437,37 @@ extension AIInferenceTests {
             maxWords: 4
         )
         XCTAssertEqual(cleaned, "косовый сок")
+    }
+
+    func testProfanityFilteringInContinuation() {
+        // Profanity disabled by default (allowProfanity: false) -> should reject profane continuations
+        let rejected = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "это полный пиздец",
+            context: "Привет, ",
+            wordBuffer: "",
+            maxWords: 4,
+            allowProfanity: false
+        )
+        XCTAssertNil(rejected, "Expected profane continuation to be rejected when allowProfanity is false")
+
+        // Profanity allowed (allowProfanity: true) -> should keep continuation
+        let allowed = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "это полный пиздец",
+            context: "Привет, ",
+            wordBuffer: "",
+            maxWords: 4,
+            allowProfanity: true
+        )
+        XCTAssertEqual(allowed, "это полный пиздец")
+
+        // Non-profane continuation with allowProfanity: false -> should be accepted
+        let clean = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "отличная идея для проекта",
+            context: "Это ",
+            wordBuffer: "",
+            maxWords: 4,
+            allowProfanity: false
+        )
+        XCTAssertEqual(clean, "отличная идея для проекта")
     }
 }

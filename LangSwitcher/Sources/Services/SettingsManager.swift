@@ -216,6 +216,11 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionEmojiShortcodes, forKey: Keys.autoCorrectionEmojiShortcodes) }
     }
 
+    /// Whether pressing Backspace immediately after an auto-correction reverts it and adds the word to the user dictionary. Default: true.
+    @Published var autoCorrectionRevertOnBackspace: Bool {
+        didSet { defaults.set(autoCorrectionRevertOnBackspace, forKey: Keys.autoCorrectionRevertOnBackspace) }
+    }
+
     /// Whether real-time word autocompletion HUD is enabled. Default: true.
     @Published var autoCompletionEnabled: Bool {
         didSet {
@@ -753,6 +758,7 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionFixCapsLockErrors = "autoCorrectionFixCapsLockErrors"
         static let autoCorrectionFixTypos = "autoCorrectionFixTypos"
         static let autoCorrectionEmojiShortcodes = "autoCorrectionEmojiShortcodes"
+        static let autoCorrectionRevertOnBackspace = "autoCorrectionRevertOnBackspace"
         static let autoCompletionEnabled = "autoCompletionEnabled"
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
         static let autoCompletionCustomKeyCode = "autoCompletionCustomKeyCode"
@@ -847,6 +853,7 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionFixCapsLockErrors = defaults.object(forKey: Keys.autoCorrectionFixCapsLockErrors) as? Bool ?? true // Default: ON
         self.autoCorrectionFixTypos = defaults.object(forKey: Keys.autoCorrectionFixTypos) as? Bool ?? true // Default: ON
         self.autoCorrectionEmojiShortcodes = defaults.object(forKey: Keys.autoCorrectionEmojiShortcodes) as? Bool ?? true // Default: ON
+        self.autoCorrectionRevertOnBackspace = defaults.object(forKey: Keys.autoCorrectionRevertOnBackspace) as? Bool ?? true // Default: ON
         
         self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
         let savedAcceptKey = defaults.string(forKey: Keys.autoCompletionAcceptKey)

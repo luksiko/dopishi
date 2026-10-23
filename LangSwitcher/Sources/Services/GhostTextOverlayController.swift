@@ -84,10 +84,14 @@ final class GhostTextOverlayController: NSObject {
         guard let tv = textView else { return }
 
         let targetBundleID = bundleID ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        tv.customFont = EditorFontCustomizer.shared.font(for: targetBundleID, caretHeight: caret.height)
+        let customFont = EditorFontCustomizer.shared.font(for: targetBundleID, caretHeight: caret.height)
+        tv.customFont = customFont
 
-        if caret.height > 10, caret.height < 40 {
-            tv.fontSize = max(12.0, min(16.0, caret.height - 3))
+        if let font = customFont {
+            tv.fontSize = font.pointSize
+        } else if caret.height > 8, caret.height < 120 {
+            // Proportional font line-height scaling: font point size is typically ~76% of line height
+            tv.fontSize = max(11.0, min(64.0, round(caret.height * 0.76)))
         } else {
             tv.fontSize = 13.5
         }
@@ -192,6 +196,9 @@ final class GhostTextOverlayController: NSObject {
         if rect.origin == .zero && rect.size.width <= 1.0 && rect.size.height <= 1.0 {
             return false
         }
+        if rect.width > 40 || rect.height > 60 {
+            return false
+        }
         return true
     }
 
@@ -203,32 +210,80 @@ final class GhostTextOverlayController: NSObject {
                abs(a.size.height - b.size.height) < 0.5
     }
 
-    /// Retain a known continuation while AX catches up with the insertion.
-    /// Keep the panel hidden until real caret coordinates are available.
-    func showContinuation(candidate: AutocompletionCandidate, suffix: String,
-                          caretProvider: @escaping () -> CGRect?, isCurrent: @escaping () -> Bool) {
-        hide()
-        guard !suffix.isEmpty else { return }
-        currentCandidate = candidate
-        currentSuffix = suffix
-        retryContinuation(candidate: candidate, suffix: suffix, caretProvider: caretProvider,
-                          isCurrent: isCurrent, revision: presentationRevision, attemptsLeft: 3)
+    static func hasCaretAdvanced(from stale: CGRect?, to current: CGRect?) -> Bool {
+        guard let current = current, isValidCaretRect(current) else { return false }
+        guard let stale = stale, isValidCaretRect(stale) else { return true }
+        if isCaretEqual(stale, current) { return false }
+        if abs(current.origin.y - stale.origin.y) >= 4.0 { return true }
+        return current.origin.x > stale.origin.x + 1.0
     }
 
-    private func retryContinuation(candidate: AutocompletionCandidate, suffix: String,
-                                   caretProvider: @escaping () -> CGRect?, isCurrent: @escaping () -> Bool,
-                                   revision: Int, attemptsLeft: Int) {
-        guard revision == presentationRevision else { return }
-        guard isCurrent() else { hide(); return }
-        if let caret = caretProvider() {
-            show(candidate: candidate, suffix: suffix, caretRect: caret)
-        } else if attemptsLeft > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
-                self?.retryContinuation(candidate: candidate, suffix: suffix, caretProvider: caretProvider,
-                    isCurrent: isCurrent, revision: revision, attemptsLeft: attemptsLeft - 1)
-            }
-        } else {
+    /// Retain a known continuation while AX catches up with the insertion.
+    /// Keep the panel hidden until real caret coordinates have advanced past the insertion point.
+    func showContinuation(
+        candidate: AutocompletionCandidate,
+        suffix: String,
+        staleAnchor: CGRect? = nil,
+        estimatedCaret: CGRect? = nil,
+        bundleID: String? = nil,
+        caretProvider: @escaping () -> CGRect?,
+        isCurrent: @escaping () -> Bool
+    ) {
+        cancelPendingCaretPoll()
+        guard !suffix.isEmpty else {
             hide()
+            return
+        }
+
+        presentationRevision &+= 1
+        panel?.orderOut(nil)
+        currentCandidate = candidate
+        currentSuffix = suffix
+
+        // Probe caretProvider synchronously once
+        if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret) {
+            if Self.hasCaretAdvanced(from: staleAnchor, to: currentCaret) {
+                self.pendingCaretAnchor = currentCaret
+                self.lastCaretRect = currentCaret
+                self.positionAndDisplay(caret: currentCaret, suffix: suffix, bundleID: bundleID)
+                return
+            }
+        }
+
+        let revision = presentationRevision
+        let deadline = Date().addingTimeInterval(0.35)
+
+        pendingCaretPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 12_000_000)
+                guard !Task.isCancelled, let self = self else { return }
+                guard self.presentationRevision == revision, isCurrent() else {
+                    self.hide()
+                    return
+                }
+
+                if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret) {
+                    if Self.hasCaretAdvanced(from: staleAnchor, to: currentCaret) {
+                        self.cancelPendingCaretPoll()
+                        self.pendingCaretAnchor = currentCaret
+                        self.lastCaretRect = currentCaret
+                        self.positionAndDisplay(caret: currentCaret, suffix: suffix, bundleID: bundleID)
+                        return
+                    }
+                }
+
+                if Date() >= deadline {
+                    if let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
+                        self.cancelPendingCaretPoll()
+                        self.pendingCaretAnchor = estimated
+                        self.lastCaretRect = estimated
+                        self.positionAndDisplay(caret: estimated, suffix: suffix, bundleID: bundleID)
+                    } else {
+                        self.hide()
+                    }
+                    return
+                }
+            }
         }
     }
 
@@ -257,7 +312,7 @@ final class GhostTextOverlayController: NSObject {
 
 // MARK: - Native AppKit Ghost Text View
 // Ultra-lightweight native view: 0 SwiftUI constraints, 0 recursion, zero overhead.
-// Renders delicate inline completion ghost text matching native editor styling.
+// Renders delicate inline completion ghost text matching native editor styling with universal contrast.
 private final class GhostTextView: NSView {
     var text: String = "" {
         didSet {
@@ -287,10 +342,17 @@ private final class GhostTextView: NSView {
         super.draw(dirtyRect)
         guard !text.isEmpty else { return }
 
-        // Delicate native ghost styling: zero background rectangle, matching ambient editor text
+        // Neutral balanced graphite tone (~4.6:1 contrast against both pure white and pure black)
+        // with delicate micro-shadow for crisp legibility over any background.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
+        shadow.shadowOffset = NSSize(width: 0, height: -0.5)
+        shadow.shadowBlurRadius = 1.0
+
         let attrs: [NSAttributedString.Key: Any] = [
             .font: activeFont,
-            .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.50)
+            .foregroundColor: NSColor(white: 0.48, alpha: 0.88),
+            .shadow: shadow
         ]
 
         let textSize = (text as NSString).size(withAttributes: attrs)
@@ -304,10 +366,13 @@ private final class GhostTextView: NSView {
     }
 
     func idealSize() -> CGSize {
+        let shadow = NSShadow()
+        shadow.shadowBlurRadius = 1.0
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: activeFont
+            .font: activeFont,
+            .shadow: shadow
         ]
         let textSize = (text as NSString).size(withAttributes: attrs)
-        return CGSize(width: ceil(textSize.width) + 2, height: max(16, ceil(textSize.height)))
+        return CGSize(width: ceil(textSize.width) + 4, height: max(16, ceil(textSize.height)))
     }
 }

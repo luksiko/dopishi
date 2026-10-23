@@ -27,7 +27,12 @@ final class UserDictionary: ObservableObject {
     @Published private(set) var words: Set<String>
 
     /// Insertion order (oldest first) so learning cannot grow without bound.
-    private var order: [String]
+    @Published private(set) var order: [String]
+
+    /// Words in reverse chronological order (newest first).
+    var learnedWordsList: [String] {
+        order.reversed()
+    }
 
     private let defaults = UserDefaults.standard
 
@@ -57,6 +62,12 @@ final class UserDictionary: ObservableObject {
     }
 
     // MARK: - Learning
+
+    /// True if the word can be learned (at least 2 letters, not already learned).
+    func canLearn(_ word: String) -> Bool {
+        let normalized = Self.normalize(word)
+        return normalized.count >= 2 && normalized.contains(where: \.isLetter) && !words.contains(normalized)
+    }
 
     /// Learn a single word. Ignores non-word input.
     @discardableResult

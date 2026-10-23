@@ -107,7 +107,7 @@ cd dopishi
 bash scripts/test.sh
 
 # 3. Упакуйте подписанный Universal-релиз (DMG + ZIP)
-bash scripts/package-release.sh 1.5.0
+bash scripts/package-release.sh 1.5.1
 ```
 
 ---

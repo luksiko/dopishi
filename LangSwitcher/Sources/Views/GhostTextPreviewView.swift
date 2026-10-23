@@ -9,6 +9,6 @@ struct GhostTextPreviewView: View {
     var body: some View {
         Text(text)
             .font(.system(size: 13.5, weight: .regular))
-            .foregroundStyle(.secondary.opacity(0.50))
+            .foregroundStyle(Color.primary.opacity(0.55))
     }
 }

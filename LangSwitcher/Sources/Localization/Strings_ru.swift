@@ -213,7 +213,7 @@ enum Strings_ru {
         // ── Окно «О программе» ──────────────────────────────────────
         "about.windowTitle":             "О программе Dopishi",
         "about.appName":                 "Dopishi",
-        "about.version":                 "Версия 1.5.0",
+        "about.version":                 "Версия 1.5.1",
         "about.tagline":                 "Локальный AI-ассистент набора текста, автокорректор опечаток и раскладки и мгновенный переключатель языка для macOS",
         "about.howToUse":                "Основные возможности:",
         "about.step1":                   "Локальное AI-автодополнение на Metal и умные ответы (Tab)",
@@ -244,6 +244,8 @@ Dopishi нуждается в разрешении универсального 
 
         // ── Общее ───────────────────────────────────────────────────
         "common.cancel":                 "Отмена",
+        "common.delete":                 "Удалить",
+        "common.search":                 "Поиск",
         "common.ms":                     "мс",
 
         "menu.previewRecovery":          "Предпросмотр восстановления...",
@@ -310,6 +312,17 @@ Dopishi нуждается в разрешении универсального 
         "general.autoCorrectionFixCapsLockDesc":     "Исправляет слова, набранные со случайно включенным Caps Lock при первой строчной букве.",
         "general.autoCorrectionFixTypos":            "Исправлять опечатки и перепутанные буквы в словах на лету",
         "general.autoCorrectionFixTyposDesc":        "Автоматически исправляет переставленные соседние буквы, случайно задетые лишние клавиши и пропущенные буквы (например, «большоей» → «большой», «поставитьл» → «поставить», «привте» → «привет»).",
+        "general.autoCorrectionRevertOnBackspace":      "Отмена исправления по Backspace или ⌥Z",
+        "general.autoCorrectionRevertOnBackspaceDesc":  "Нажатие Backspace сразу после автоисправления возвращает исходное слово и добавляет его в словарь исключений. Также работает сочетание ⌥Z.",
+        "general.userDictionary":                      "Пользовательский словарь и исключения",
+        "general.userDictionaryDesc":                  "Слова из этого списка никогда не исправляются и не переводятся в другую раскладку.",
+        "general.userDictionaryAddPlaceholder":        "Добавить слово в исключения...",
+        "general.userDictionaryAdd":                   "Добавить",
+        "general.userDictionaryEmpty":                 "Словарь пуст. Слова добавляются автоматически при отмене исправления (Backspace / ⌥Z) или повторном вводе стёртого слова.",
+        "general.userDictionaryClearAll":              "Очистить словарь",
+        "general.userDictionaryClearConfirmTitle":      "Очистить словарь исключений?",
+        "general.userDictionaryClearConfirmMessage":    "Все выученные слова будут удалены. Они снова смогут подвергаться автоисправлению.",
+        "general.userDictionaryCount":                 "%d слов",
         "general.autoCorrectionCommaBeforeConjunctions": "Ставить запятую перед «а» и «но»",
         "general.autoCorrectionCommaBeforeConjunctionsDesc": "Автоматически добавляет запятую перед союзами «а» и «но» в середине предложения (например, «хотел а не смог » → «хотел, а не смог »).",
         "general.autoCorrectionRemoveSpaceBeforePunctuation": "Удалять пробел перед знаками препинания",

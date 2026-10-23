@@ -1189,6 +1189,18 @@ final class CompletionControlRegressionTests: XCTestCase {
         XCTAssertEqual(full.insertion, "done, next")
         XCTAssertNil(full.remaining)
     }
+
+    func testLeadingSpacePreservedInCompletionAcceptanceTextAndPhrasePlan() {
+        let plan = CompletionAcceptanceText(candidate: " правильно написать", typedPrefix: "",
+            entirePhrase: false, appendSpace: true, includePunctuation: false)
+        XCTAssertEqual(plan.insertion, " правильно ")
+        XCTAssertEqual(plan.remaining, "написать")
+
+        let phrasePlan = PhraseAcceptancePlan(buffer: "Как", continuationAnchor: nil, insertion: plan.insertion)
+        XCTAssertEqual(phrasePlan.expected, "Как")
+        XCTAssertEqual(phrasePlan.replacement, "Как правильно ")
+        XCTAssertEqual(phrasePlan.appendingSuffix, " правильно ")
+    }
 }
 
 
@@ -1357,5 +1369,210 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         XCTAssertTrue(ThesaurusController.shared.isVisible)
         XCTAssertTrue(service.interceptCompletionKeyEvent(escEvent))
         XCTAssertFalse(ThesaurusController.shared.isVisible)
+    }
+
+    func testConsecutiveTabPressesInterceptedDuringMultiWordAcceptance() throws {
+        let settings = SettingsManager.shared
+        let savedAcceptKey = settings.autoCompletionAcceptKey
+        let savedEntirePhrase = settings.autoCompletionAcceptEntirePhrase
+        let savedTrailingSpace = settings.autoCompletionIncludeTrailingSpace
+        defer {
+            settings.autoCompletionAcceptKey = savedAcceptKey
+            settings.autoCompletionAcceptEntirePhrase = savedEntirePhrase
+            settings.autoCompletionIncludeTrailingSpace = savedTrailingSpace
+        }
+        settings.autoCompletionAcceptKey = .tab
+        settings.autoCompletionAcceptEntirePhrase = false
+        settings.autoCompletionIncludeTrailingSpace = true
+
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        var acceptedWords: [String] = []
+
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings),
+            overlayController: popup,
+            ghostTextController: ghost,
+            completionRefresh: AutocompletionRefresh(),
+            acceptanceHandler: { candidate, appendSpace, entirePhrase, _ in
+                let plan = CompletionAcceptanceText(
+                    candidate: candidate.word,
+                    typedPrefix: "",
+                    entirePhrase: entirePhrase,
+                    appendSpace: appendSpace,
+                    includePunctuation: true
+                )
+                acceptedWords.append(plan.insertion)
+                if let remaining = plan.remaining, !remaining.isEmpty {
+                    let remCand = AutocompletionCandidate(word: remaining, targetLayoutID: candidate.targetLayoutID)
+                    let caret = CGRect(x: 120, y: 200, width: 2, height: 16)
+                    ghost.show(candidate: remCand, suffix: remaining, caretRect: caret)
+                    popup.show(candidates: [remCand], caretRect: caret, acceptKeyHint: "⇥", onSelect: { _ in })
+                } else {
+                    ghost.hide()
+                    popup.hide()
+                }
+                return true
+            }
+        )
+        defer { service.stop() }
+
+        let initialCandidate = AutocompletionCandidate(word: "первое второе", targetLayoutID: "com.apple.keylayout.Russian")
+        let caret = CGRect(x: 100, y: 200, width: 2, height: 16)
+        ghost.show(candidate: initialCandidate, suffix: "первое второе", caretRect: caret)
+        popup.show(candidates: [initialCandidate], caretRect: caret, acceptKeyHint: "⇥", onSelect: { _ in })
+
+        let tabDown = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
+        tabDown.flags = []
+        let tabUp = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: false))
+        tabUp.flags = []
+
+        // First Tab accepts "первое " and leaves "второе" visible in both ghost and popup
+        XCTAssertTrue(service.interceptCompletionKeyEvent(tabDown))
+        XCTAssertTrue(service.interceptCompletionKeyEvent(tabUp))
+        XCTAssertEqual(acceptedWords, ["первое "])
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertTrue(popup.isVisible)
+        XCTAssertEqual(popup.selectedCandidate?.word, "второе")
+
+        // Second Tab immediately accepts "второе " without leaking Tab to switch focus
+        XCTAssertTrue(service.interceptCompletionKeyEvent(tabDown))
+        XCTAssertTrue(service.interceptCompletionKeyEvent(tabUp))
+        XCTAssertEqual(acceptedWords, ["первое ", "второе "])
+        XCTAssertFalse(ghost.isVisible)
+        XCTAssertFalse(popup.isVisible)
+    }
+
+    func testAutoCorrectionRevertOnBackspace() throws {
+        UserDictionary.shared.removeAll()
+        defer { UserDictionary.shared.removeAll() }
+
+        let settings = SettingsManager.shared
+        let savedRevert = settings.autoCorrectionRevertOnBackspace
+        defer { settings.autoCorrectionRevertOnBackspace = savedRevert }
+        settings.autoCorrectionRevertOnBackspace = true
+
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings)
+        )
+        defer { service.stop() }
+
+        service.recordAppliedCorrection(
+            originalWord: "прошка",
+            replacedWord: "крошка",
+            fullExpected: "прошка ",
+            fullReplacement: "крошка "
+        )
+
+        XCTAssertNotNil(service.pendingRevertCorrection)
+        XCTAssertFalse(UserDictionary.shared.contains("прошка"))
+
+        let backspaceDown = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x33, keyDown: true))
+        backspaceDown.flags = []
+        let backspaceUp = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x33, keyDown: false))
+        backspaceUp.flags = []
+
+        // Backspace should be intercepted and consumed
+        XCTAssertTrue(service.interceptCompletionKeyEvent(backspaceDown))
+        XCTAssertTrue(service.interceptCompletionKeyEvent(backspaceUp))
+
+        // Word should be learned to UserDictionary
+        XCTAssertTrue(UserDictionary.shared.contains("прошка"))
+        XCTAssertNil(service.pendingRevertCorrection)
+
+        // Subsequent backspace should NOT be intercepted (normal editing resumes)
+        XCTAssertFalse(service.interceptCompletionKeyEvent(backspaceDown))
+    }
+
+    func testAutoCorrectionRevertOnOptionZ() throws {
+        UserDictionary.shared.removeAll()
+        defer { UserDictionary.shared.removeAll() }
+
+        let settings = SettingsManager.shared
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings)
+        )
+        defer { service.stop() }
+
+        service.recordAppliedCorrection(
+            originalWord: "слово",
+            replacedWord: "олово",
+            fullExpected: "слово ",
+            fullReplacement: "олово "
+        )
+
+        XCTAssertNotNil(service.pendingRevertCorrection)
+        XCTAssertFalse(UserDictionary.shared.contains("слово"))
+
+        let optZDown = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x06, keyDown: true))
+        optZDown.flags = [.maskAlternate]
+        let optZUp = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x06, keyDown: false))
+        optZUp.flags = [.maskAlternate]
+
+        // Option+Z should be intercepted and consumed
+        XCTAssertTrue(service.interceptCompletionKeyEvent(optZDown))
+        XCTAssertTrue(service.interceptCompletionKeyEvent(optZUp))
+
+        // Word should be learned to UserDictionary
+        XCTAssertTrue(UserDictionary.shared.contains("слово"))
+        XCTAssertNil(service.pendingRevertCorrection)
+    }
+
+    func testRetypingCorrectedWordAutoLearnsToUserDictionary() {
+        UserDictionary.shared.removeAll()
+        defer { UserDictionary.shared.removeAll() }
+
+        let settings = SettingsManager.shared
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings)
+        )
+        defer { service.stop() }
+
+        // Simulate an applied auto-correction
+        service.recordAppliedCorrection(
+            originalWord: "прошка",
+            replacedWord: "крошка",
+            fullExpected: "прошка ",
+            fullReplacement: "крошка "
+        )
+
+        XCTAssertFalse(UserDictionary.shared.contains("прошка"))
+        XCTAssertNotNil(service.lastAutoCorrection)
+
+        // Simulate user re-typing "прошка"
+        let retypedLearned = service.checkAndLearnRetypedWord("прошка")
+        XCTAssertTrue(retypedLearned)
+
+        // "прошка" should now be automatically learned into UserDictionary!
+        XCTAssertTrue(UserDictionary.shared.contains("прошка"))
+        XCTAssertNil(service.lastAutoCorrection)
+
+        // Now that "прошка" is in UserDictionary, TypoCorrectionEngine must veto it!
+        let typoCorrection = TypoCorrectionEngine.correctTypo("прошка")
+        XCTAssertNil(typoCorrection, "TypoCorrectionEngine must not touch words in UserDictionary")
+
+        // And TextConverter must also veto it!
+        let converter = TextConverter(settingsManager: settings)
+        XCTAssertFalse(converter.looksLikeWrongLayout("прошка"), "TextConverter must not convert words in UserDictionary")
+    }
+
+    func testUserDictionaryHelpers() {
+        UserDictionary.shared.removeAll()
+        defer { UserDictionary.shared.removeAll() }
+
+        XCTAssertTrue(UserDictionary.shared.canLearn("новоеслово"))
+        XCTAssertFalse(UserDictionary.shared.canLearn("а")) // single letter rejected
+        XCTAssertFalse(UserDictionary.shared.canLearn("123")) // non-letters rejected
+
+        XCTAssertTrue(UserDictionary.shared.learn("новоеслово"))
+        XCTAssertFalse(UserDictionary.shared.canLearn("новоеслово")) // already learned
+        XCTAssertEqual(UserDictionary.shared.learnedWordsList.first, "новоеслово")
+
+        UserDictionary.shared.forget("новоеслово")
+        XCTAssertFalse(UserDictionary.shared.contains("новоеслово"))
     }
 }

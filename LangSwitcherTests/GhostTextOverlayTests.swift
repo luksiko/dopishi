@@ -255,6 +255,20 @@ extension GhostTextOverlayTests {
         XCTAssertEqual(none, rawCaret)
     }
 
+    func testSmartPasteAppDetection() {
+        XCTAssertTrue(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.Word"))
+        XCTAssertTrue(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.Powerpoint"))
+        XCTAssertTrue(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.Outlook"))
+        XCTAssertTrue(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.Excel"))
+        XCTAssertTrue(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.onenote.mac"))
+
+        XCTAssertFalse(AccessibilityService.isSmartPasteApp(bundleID: "com.microsoft.VSCode"))
+        XCTAssertFalse(AccessibilityService.isSmartPasteApp(bundleID: "com.google.Chrome"))
+        XCTAssertFalse(AccessibilityService.isSmartPasteApp(bundleID: "com.apple.dt.Xcode"))
+        XCTAssertFalse(AccessibilityService.isSmartPasteApp(bundleID: "com.apple.TextEdit"))
+        XCTAssertFalse(AccessibilityService.isSmartPasteApp(bundleID: nil))
+    }
+
     func testFieldAnchorContextStateUpdates() {
         let anchor = FieldAnchorOverlayController()
         defer { anchor.hide() }
@@ -850,5 +864,114 @@ extension GhostTextOverlayTests {
         textView.display() // Draw with Cyrillic text and emoji ghost text
         XCTAssertEqual(textView.string, "прив")
         XCTAssertEqual(textView.ghostText, "ет, мир! 🚀")
+    }
+
+    func testHasCaretAdvancedRejectsStaleAndBackwardPositions() {
+        let stale = CGRect(x: 100, y: 200, width: 2, height: 16)
+
+        // Same position -> false
+        XCTAssertFalse(GhostTextOverlayController.hasCaretAdvanced(from: stale, to: stale))
+        XCTAssertFalse(AutocompletionOverlayController.hasCaretAdvanced(from: stale, to: stale))
+
+        // Moved backwards (to the left) -> false
+        let backward = CGRect(x: 90, y: 200, width: 2, height: 16)
+        XCTAssertFalse(GhostTextOverlayController.hasCaretAdvanced(from: stale, to: backward))
+        XCTAssertFalse(AutocompletionOverlayController.hasCaretAdvanced(from: stale, to: backward))
+
+        // Advanced to the right -> true
+        let advanced = CGRect(x: 160, y: 200, width: 2, height: 16)
+        XCTAssertTrue(GhostTextOverlayController.hasCaretAdvanced(from: stale, to: advanced))
+        XCTAssertTrue(AutocompletionOverlayController.hasCaretAdvanced(from: stale, to: advanced))
+
+        // Line wrap (vertical change >= 4) -> true
+        let nextLine = CGRect(x: 20, y: 220, width: 2, height: 16)
+        XCTAssertTrue(GhostTextOverlayController.hasCaretAdvanced(from: stale, to: nextLine))
+        XCTAssertTrue(AutocompletionOverlayController.hasCaretAdvanced(from: stale, to: nextLine))
+
+        // Stale anchor nil -> true if valid
+        XCTAssertTrue(GhostTextOverlayController.hasCaretAdvanced(from: nil, to: advanced))
+        XCTAssertTrue(AutocompletionOverlayController.hasCaretAdvanced(from: nil, to: advanced))
+
+        // Coarse field rect -> rejected by AutocompletionOverlayController
+        let fieldRect = CGRect(x: 100, y: 200, width: 300, height: 100)
+        XCTAssertFalse(AutocompletionOverlayController.hasCaretAdvanced(from: stale, to: fieldRect))
+    }
+
+    func testContinuationWaitsForCaretAdvanceBeforeDisplaying() async throws {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let stale = CGRect(x: 100, y: 200, width: 2, height: 16)
+        let advanced = CGRect(x: 160, y: 200, width: 2, height: 16)
+        var currentReported = stale
+
+        let cand = AutocompletionCandidate(word: "мир", targetLayoutID: "com.apple.keylayout.Russian")
+        ghost.showContinuation(
+            candidate: cand,
+            suffix: "мир",
+            staleAnchor: stale,
+            caretProvider: { currentReported },
+            isCurrent: { true }
+        )
+
+        // While caret is still reported at stale anchor, ghost must NOT be visible
+        XCTAssertFalse(ghost.isVisible)
+
+        // Caret now advances after paste
+        currentReported = advanced
+
+        // Wait for polling task to detect advance
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.lastCaretRect, advanced)
+    }
+
+    func testOverlayControllerContinuationWaitsForCaretAdvance() async throws {
+        let popup = AutocompletionOverlayController()
+        defer { popup.hide() }
+
+        let stale = CGRect(x: 100, y: 200, width: 2, height: 16)
+        let advanced = CGRect(x: 160, y: 200, width: 2, height: 16)
+        var currentReported = stale
+
+        let cand = AutocompletionCandidate(word: "мир", targetLayoutID: "com.apple.keylayout.Russian")
+        popup.showContinuation(
+            candidates: [cand],
+            staleAnchor: stale,
+            acceptKeyHint: "Tab",
+            caretProvider: { currentReported },
+            isCurrent: { true },
+            onSelect: { _ in }
+        )
+
+        // Popup must NOT be visible while caret is stale
+        XCTAssertFalse(popup.isVisible)
+
+        // Caret now advances
+        currentReported = advanced
+
+        // Wait for polling task
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(popup.isVisible)
+        XCTAssertEqual(popup.pendingCaretAnchor, advanced)
+    }
+
+    func testGhostTextDisplayOnLightAndDarkBackground() {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let cand = AutocompletionCandidate(word: "testing", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 150, y: 250, width: 2, height: 20)
+
+        ghost.show(candidate: cand, suffix: "sting", caretRect: caret)
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.currentSuffix, "sting")
+
+        if let panel = ghost.panelFrame {
+            XCTAssertGreaterThan(panel.width, 0)
+            XCTAssertGreaterThan(panel.height, 0)
+        }
     }
 }

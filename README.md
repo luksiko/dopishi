@@ -108,7 +108,7 @@ cd dopishi
 bash scripts/test.sh
 
 # 3. Package a signed Universal release (DMG + ZIP)
-bash scripts/package-release.sh 1.5.0
+bash scripts/package-release.sh 1.5.1
 ```
 
 ---

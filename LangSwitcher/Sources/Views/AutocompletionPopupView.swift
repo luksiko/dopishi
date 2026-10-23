@@ -25,7 +25,7 @@ struct AutocompletionPopupView: View {
                             )
                         
                         // Candidate word
-                        Text(candidate.word)
+                        Text(candidate.word.trimmingCharacters(in: .whitespaces))
                             .font(.system(size: 13, weight: index == selectedIndex ? .semibold : .regular))
                             .foregroundStyle(index == selectedIndex ? .primary : .secondary)
                         
@@ -103,12 +103,16 @@ struct AutocompletionPopupView: View {
         .frame(minWidth: 170, maxWidth: 260)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.96))
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.regularMaterial)
+                )
+                .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.15), lineWidth: 1)
         )
     }
     

@@ -2,16 +2,14 @@ import Foundation
 
 // MARK: - Profanity Filter
 // Detects offensive words, profanity, and curse words (Russian mat, English, Ukrainian, etc.).
-// Used by AutocompletionEngine to filter out vulgar suggestions by default unless enabled by user.
+// Used by AutocompletionEngine and AIInferenceEngine to filter out vulgar suggestions and completions.
 
 public enum ProfanityFilter {
     
     /// Normalizes input string for comparison: lowercase, trim whitespace/punctuation,
     /// and normalize 'ё' to 'е' for simplified Cyrillic root matching.
     private static func normalize(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: .punctuationCharacters)
-            .lowercased()
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return trimmed.replacingOccurrences(of: "ё", with: "е")
     }
     
@@ -30,7 +28,7 @@ public enum ProfanityFilter {
         
         // Russian base forms & common colloquial mat
         "бля", "блять", "блядь", "бляди", "блядей", "блядям", "блядство", "блядский", "блядина", "блядовать",
-        "мудак", "мудака", "мудаку", "мудаком", "мудаки", "мудаков", "мудила", "мудило", "мудень", "мудозвон",
+        "мудак", "мудака", "мудаку", "мудаком", "мудаки", "мудаков", "мудила", "мудило", "мудень", "мудозвон", "мудачье",
         "гондон", "гондона", "гондону", "гондоном", "гондоны", "гондонов",
         "гандон", "гандона", "гандону", "гандоном", "гандоны", "гандонов",
         "пидор", "пидора", "пидору", "пидором", "пидоры", "пидоров", "пидорас", "пидораса", "пидорасы", "пидарас", "пидараса", "пидарасы", "пидар", "пидара", "пидары", "пидрила",
@@ -44,6 +42,7 @@ public enum ProfanityFilter {
         "жопа", "жопы", "жопе", "жопу", "жопой", "жоп", "жопам", "жопами", "жопах", "жопный", "жополиз",
         "срать", "сру", "срешь", "срете", "срет", "срут", "срал", "срала", "срали", "обосрался", "обосралась", "обосрались", "засранец", "засранка", "срань", "сраный", "сраная", "сраное", "сраные",
         "пердеть", "пердит", "пердят", "пернул", "пердун", "пердеж",
+        "хер", "хера", "херу", "хером", "херы",
         
         // Ukrainian
         "курва", "курви", "курві", "курву", "курвою", "курвище",
@@ -67,18 +66,16 @@ public enum ProfanityFilter {
             "dickhead",
             "cocksucker",
             
-            // Russian 'хуй' / 'хуе' / 'хуя' / 'хуи' / 'хую' (including prefixed forms like охуе, похуй, нахуй, etc.)
-            "(^|[а-яa-z])(хуй|хуе|хуя|хуи|хую)",
+            // Russian 'хуй' / 'хуе' / 'хуя' / 'хуи' / 'хую' (matches as root anywhere in word: похуй, нахуй, охуеть, etc.)
+            "(хуй|хуе|хуя|хуи|хую)",
             
             // Russian/Ukrainian 'пизд' / 'пізд'
             "(пизд|пізд)",
             
             // Russian 'еб' (note: ё is normalized to е)
-            // Starts with еб followed by vowel or l/n: e.g. ебать, ебет, ебу, ебли, ебаный, еблан, etc.
-            "^еб[аеиоулн]",
-            
-            // Prefixed Russian 'еб': (вы|за|на|не|до|от|ото|отъ|пере|по|под|подо|подъ|при|про|раз|разо|разъ|с|со|съ|у)(еб|ъеб)[аеиоулнщяь]
-            "(вы|за|на|не|до|от|ото|отъ|пере|по|под|подо|подъ|при|про|раз|разо|разъ|с|со|съ|у)(еб|ъеб)[аеиоулнщяь]",
+            // Covers base forms (ебать, ебет, ебу, еблан, ебнутый) and prefixed forms (въебать, съебать, заебись, долбоеб, etc.)
+            // Prefix 'с' requires 'ъ' or 'ь' to avoid false positives on legitimate 'себя', 'себе'.
+            "(^|[^а-яa-z0-9])(еб[аеиоулнщяь]|(вы|до|за|из[ъь]?|ис|на|не|об[ъь]|от[ъь]|пере|по|под[ъь]?|подо|при|про|раз[ъь]?|разо|с[ъь]|у|в[ъь]|во|долбо|мозго)еб[аеиоулнщяь]?)",
             
             // Ukrainian 'їб', 'єб', 'йоб'
             "(їб|єб|йоб)",
@@ -87,38 +84,83 @@ public enum ProfanityFilter {
             "бляд",
             
             // 'блять' or standalone 'бля'
-            "(^|[^а-яa-z])бля($|[^а-яa-z])",
-            "(^|[^а-яa-z])блять"
+            "(^|[^а-яa-z0-9])бля($|[^а-яa-z0-9])",
+            "(^|[^а-яa-z0-9])блять",
+            
+            // Russian 'хер' derivatives
+            "(^|[^а-яa-z0-9])(похер|нахер|херня|нихера|захерач)"
         ]
         return regexStrings.compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
     }()
     
-    /// Returns true if the word is detected as offensive or profane.
+    /// Checks if a word is a known legitimate word with common false-positive prefixes.
+    private static func isWhitelisted(_ word: String) -> Bool {
+        if word.hasPrefix("бляшк") { return true }
+        if word.hasPrefix("худо") || word.hasPrefix("худе") || word.hasPrefix("хутор") || word.hasPrefix("хулиган") || word.hasPrefix("хунт") || word.hasPrefix("хурм") {
+            return true
+        }
+        return false
+    }
+    
+    /// Finds the full surrounding word token around a given character range in text.
+    private static func wordSurrounding(range: Range<String.Index>, in text: String) -> String {
+        var start = range.lowerBound
+        while start > text.startIndex {
+            let prev = text.index(before: start)
+            if text[prev].isLetter || text[prev].isNumber {
+                start = prev
+            } else {
+                break
+            }
+        }
+        var end = range.upperBound
+        while end < text.endIndex {
+            if text[end].isLetter || text[end].isNumber {
+                end = text.index(after: end)
+            } else {
+                break
+            }
+        }
+        return String(text[start..<end])
+    }
+    
+    /// Returns true if the text (word, phrase, or sentence) is detected as offensive or profane.
     public static func isProfane(_ text: String) -> Bool {
         let norm = normalize(text)
         guard !norm.isEmpty else { return false }
         
-        // Whitelist for common non-profane words that share prefixes
-        // e.g. 'бляшка' (medical / anatomical plate)
-        if norm.hasPrefix("бляшк") { return false }
-        // e.g. 'художник', 'худой', 'худеть', 'хутор', 'хулиган', 'хунта', 'хурма'
-        if norm.hasPrefix("худо") || norm.hasPrefix("худе") || norm.hasPrefix("хутор") || norm.hasPrefix("хулиган") || norm.hasPrefix("хунт") || norm.hasPrefix("хурм") {
-            return false
+        // 1. Token check: check individual words against exact list and patterns
+        let tokens = norm.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }
+        for token in tokens {
+            if isWhitelisted(token) { continue }
+            if exactWords.contains(token) { return true }
+            let range = NSRange(location: 0, length: (token as NSString).length)
+            for regex in patterns {
+                if regex.firstMatch(in: token, options: [], range: range) != nil {
+                    return true
+                }
+            }
         }
         
-        // Exact words check
-        if exactWords.contains(norm) {
-            return true
-        }
-        
-        // Productive pattern check
-        let range = NSRange(location: 0, length: (norm as NSString).length)
+        // 2. Full text scan for multi-token phrases or boundary-sensitive regex patterns
+        let fullRange = NSRange(location: 0, length: (norm as NSString).length)
         for regex in patterns {
-            if regex.firstMatch(in: norm, options: [], range: range) != nil {
-                return true
+            let matches = regex.matches(in: norm, options: [], range: fullRange)
+            for match in matches {
+                if let swiftRange = Range(match.range, in: norm) {
+                    let word = wordSurrounding(range: swiftRange, in: norm)
+                    if !isWhitelisted(word) {
+                        return true
+                    }
+                }
             }
         }
         
         return false
+    }
+    
+    /// Convenience alias for `isProfane(_:)` to check if a sentence or passage contains profanity.
+    public static func containsProfanity(in text: String) -> Bool {
+        isProfane(text)
     }
 }

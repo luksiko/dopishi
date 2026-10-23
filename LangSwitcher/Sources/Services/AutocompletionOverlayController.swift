@@ -94,6 +94,76 @@ final class AutocompletionOverlayController: NSObject {
             startPendingCaretPoll(anchor: nil, provider: provider)
         }
     }
+
+    /// Retain a known continuation candidate popup while AX catches up with the insertion.
+    /// Keep the popup hidden until real caret coordinates have advanced past the insertion point.
+    func showContinuation(
+        candidates: [AutocompletionCandidate],
+        staleAnchor: CGRect? = nil,
+        estimatedCaret: CGRect? = nil,
+        acceptKeyHint: String,
+        caretProvider: @escaping () -> CGRect?,
+        isCurrent: @escaping () -> Bool,
+        onSelect: @escaping (AutocompletionCandidate) -> Void
+    ) {
+        cancelPendingCaretPoll()
+        guard !candidates.isEmpty else {
+            hide()
+            return
+        }
+
+        self.candidates = candidates
+        self.selectedIndex = 0
+        self.currentAcceptKeyHint = acceptKeyHint
+        self.onSelectCallback = onSelect
+
+        panel?.orderOut(nil)
+        updateContent()
+
+        // Probe caretProvider synchronously once
+        if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret), !Self.isFieldRect(currentCaret) {
+            if Self.hasCaretAdvanced(from: staleAnchor, to: currentCaret) {
+                self.pendingCaretAnchor = currentCaret
+                self.positionPanel(caretRect: currentCaret)
+                self.getOrCreatePanel().orderFrontRegardless()
+                return
+            }
+        }
+
+        let deadline = Date().addingTimeInterval(0.35)
+        pendingCaretPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000)
+                guard !Task.isCancelled, let self = self else { return }
+                guard isCurrent() else {
+                    self.hide()
+                    return
+                }
+
+                if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret), !Self.isFieldRect(currentCaret) {
+                    if Self.hasCaretAdvanced(from: staleAnchor, to: currentCaret) {
+                        self.cancelPendingCaretPoll()
+                        self.pendingCaretAnchor = currentCaret
+                        self.positionPanel(caretRect: currentCaret)
+                        self.getOrCreatePanel().orderFrontRegardless()
+                        return
+                    }
+                }
+
+                if Date() >= deadline {
+                    if let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
+                        self.cancelPendingCaretPoll()
+                        self.pendingCaretAnchor = estimated
+                        self.positionPanel(caretRect: estimated)
+                        self.getOrCreatePanel().orderFrontRegardless()
+                    } else {
+                        self.hide()
+                    }
+                    return
+                }
+            }
+        }
+    }
     
     func hide() {
         cancelPendingCaretPoll()
@@ -209,6 +279,14 @@ final class AutocompletionOverlayController: NSObject {
                abs(a.origin.y - b.origin.y) < 0.5 &&
                abs(a.size.width - b.size.width) < 0.5 &&
                abs(a.size.height - b.size.height) < 0.5
+    }
+
+    static func hasCaretAdvanced(from stale: CGRect?, to current: CGRect?) -> Bool {
+        guard let current = current, isValidCaretRect(current), !isFieldRect(current) else { return false }
+        guard let stale = stale, isValidCaretRect(stale) else { return true }
+        if isCaretEqual(stale, current) { return false }
+        if abs(current.origin.y - stale.origin.y) >= 4.0 { return true }
+        return current.origin.x > stale.origin.x + 1.0
     }
     
     private func updateContent() {

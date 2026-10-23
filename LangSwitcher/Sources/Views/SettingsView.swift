@@ -371,6 +371,11 @@ struct LayoutSettingsTab: View {
                         Text(l10n.t("general.autoCorrectionFixTyposDesc"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionRevertOnBackspace"), isOn: $settingsManager.autoCorrectionRevertOnBackspace)
+                        Text(l10n.t("general.autoCorrectionRevertOnBackspaceDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.top, 4)
 
@@ -429,6 +434,11 @@ struct LayoutSettingsTab: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+
+            // ── 4. User Dictionary & Exceptions ─────────────────────
+            Section {
+                UserDictionarySettingsSection()
             }
 
             // ── 5. Thought Recovery Buffer ──────────────────────────
@@ -547,6 +557,142 @@ struct LayoutSettingsTab: View {
 
 typealias LayoutsSettingsTab = LayoutSettingsTab
 typealias HotkeySettingsTab = LayoutSettingsTab
+
+// MARK: - User Dictionary Settings Section
+
+struct UserDictionarySettingsSection: View {
+    @ObservedObject var userDictionary = UserDictionary.shared
+    @EnvironmentObject var l10n: LocalizationManager
+    @State private var newWord: String = ""
+    @State private var searchText: String = ""
+    @State private var isExpanded: Bool = false
+    @State private var showClearAlert: Bool = false
+
+    var filteredWords: [String] {
+        let all = userDictionary.learnedWordsList
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return all }
+        return all.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(l10n.t("general.userDictionaryDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    TextField(l10n.t("general.userDictionaryAddPlaceholder"), text: $newWord)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit {
+                            addWord()
+                        }
+
+                    Button(l10n.t("general.userDictionaryAdd")) {
+                        addWord()
+                    }
+                    .disabled(!userDictionary.canLearn(newWord))
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+
+                if userDictionary.words.isEmpty {
+                    Text(l10n.t("general.userDictionaryEmpty"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                } else {
+                    if userDictionary.words.count > 6 {
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            TextField(l10n.t("common.search"), text: $searchText)
+                                .textFieldStyle(.plain)
+                                .font(.caption)
+                            if !searchText.isEmpty {
+                                Button {
+                                    searchText = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(5)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(6)
+                    }
+
+                    ScrollView {
+                        LazyVStack(spacing: 4) {
+                            ForEach(filteredWords, id: \.self) { word in
+                                HStack {
+                                    Text(word)
+                                        .font(.system(.body, design: .monospaced))
+                                    Spacer()
+                                    Button {
+                                        userDictionary.forget(word)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help(l10n.t("common.delete"))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.secondary.opacity(0.06))
+                                .cornerRadius(4)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 180)
+
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            showClearAlert = true
+                        } label: {
+                            Text(l10n.t("general.userDictionaryClearAll"))
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack {
+                Text(l10n.t("general.userDictionary"))
+                Spacer()
+                Text(l10n.t("general.userDictionaryCount").replacingOccurrences(of: "%d", with: "\(userDictionary.words.count)"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .alert(l10n.t("general.userDictionaryClearConfirmTitle"), isPresented: $showClearAlert) {
+            Button(l10n.t("common.cancel"), role: .cancel) { }
+            Button(l10n.t("general.userDictionaryClearAll"), role: .destructive) {
+                userDictionary.removeAll()
+            }
+        } message: {
+            Text(l10n.t("general.userDictionaryClearConfirmMessage"))
+        }
+    }
+
+    private func addWord() {
+        let trimmed = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
+        if userDictionary.learn(trimmed) {
+            newWord = ""
+        }
+    }
+}
 
 // MARK: - Launch at Login Helper
 

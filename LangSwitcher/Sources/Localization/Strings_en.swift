@@ -214,7 +214,7 @@ enum Strings_en {
         // ── About Window ────────────────────────────────────────────
         "about.windowTitle":             "About Dopishi",
         "about.appName":                 "Dopishi",
-        "about.version":                 "Version 1.5.0",
+        "about.version":                 "Version 1.5.1",
         "about.tagline":                 "On-device AI writing assistant, real-time typo & layout auto-corrector, and instant keyboard switcher for macOS",
         "about.howToUse":                "Key capabilities:",
         "about.step1":                   "On-device Metal AI completions & smart replies (Tab to accept)",
@@ -245,6 +245,8 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
 
         // ── Common ──────────────────────────────────────────────────
         "common.cancel":                 "Cancel",
+        "common.delete":                 "Delete",
+        "common.search":                 "Search",
         "common.ms":                     "ms",
 
         "menu.previewRecovery":          "Preview Recovery...",
@@ -311,6 +313,17 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "general.autoCorrectionFixCapsLockDesc":     "Corrects words accidentally typed when Caps Lock is active and the first letter is lowercase.",
         "general.autoCorrectionFixTypos":            "Fix word typos and transposed letters on the fly",
         "general.autoCorrectionFixTyposDesc":        "Automatically fixes swapped adjacent letters, accidental extra keys, and single missing letters in words (e.g. 'большоей' → 'большой', 'поставитьл' → 'поставить', 'привте' → 'привет').",
+        "general.autoCorrectionRevertOnBackspace":      "Undo correction with Backspace or ⌥Z",
+        "general.autoCorrectionRevertOnBackspaceDesc":  "Pressing Backspace immediately after an auto-correction reverts to the original word and adds it to the user dictionary. ⌥Z also reverts the last correction.",
+        "general.userDictionary":                      "User Dictionary & Exceptions",
+        "general.userDictionaryDesc":                  "Words saved here are never auto-corrected or converted to other layouts.",
+        "general.userDictionaryAddPlaceholder":        "Add word to exceptions...",
+        "general.userDictionaryAdd":                   "Add",
+        "general.userDictionaryEmpty":                 "Dictionary is empty. Words are learned automatically when you undo an auto-correction or retype a deleted word.",
+        "general.userDictionaryClearAll":              "Clear All",
+        "general.userDictionaryClearConfirmTitle":      "Clear User Dictionary?",
+        "general.userDictionaryClearConfirmMessage":    "This will permanently delete all learned words. They will no longer be protected from auto-correction.",
+        "general.userDictionaryCount":                 "%d words",
         "general.autoCorrectionCommaBeforeConjunctions": "Insert comma before conjunctions 'а' and 'но'",
         "general.autoCorrectionCommaBeforeConjunctionsDesc": "Automatically places a comma before Russian coordinating conjunctions 'а' and 'но' when typed in the middle of a sentence.",
         "general.autoCorrectionRemoveSpaceBeforePunctuation": "Remove space before punctuation marks",
