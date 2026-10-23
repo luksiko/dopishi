@@ -473,6 +473,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         aboutItem.target = self
         menu.addItem(aboutItem)
 
+        let updateItem = NSMenuItem(
+            title: l10n.t("menu.checkForUpdates"),
+            action: #selector(checkForUpdates),
+            keyEquivalent: ""
+        )
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
@@ -609,6 +617,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         window.makeKeyAndOrderFront(nil)
 
         aboutWindow = window
+    }
+
+    @objc private func checkForUpdates() {
+        UpdateManager.shared.checkForUpdates()
     }
 
     /// Refresh the menu (call after settings change)

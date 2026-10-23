@@ -3,7 +3,12 @@
 set -euo pipefail
 
 project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-exec xcodebuild test \
+cleanup() {
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$project_root/build/tests/Build/Products/Debug/Dopishi.app" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+xcodebuild test \
   -project "$project_root/LangSwitcher.xcodeproj" \
   -scheme LangSwitcher \
   -destination 'platform=macOS' \

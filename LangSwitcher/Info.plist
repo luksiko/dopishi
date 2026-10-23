@@ -32,5 +32,13 @@
 	<string></string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/luksiko/dopishi/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MsZRN8OExsTi4d5F3XoGpwo9cxsrFiAMaHDMSzUVI9I=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

@@ -541,6 +541,17 @@ jobs:
         echo "=== Release assets ==="
         ls -la flat_release/
 
+    - name: Generate Sparkle Appcast
+      env:
+        SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_ED_KEY }}
+      run: |
+        UNIVERSAL_ZIP=$(ls flat_release/Dopishi-*-universal.zip 2>/dev/null | head -1 || true)
+        if [ -n "$UNIVERSAL_ZIP" ]; then
+          VERSION="${GITHUB_REF_NAME#v}"
+          swift scripts/generate-appcast.swift "$VERSION" "$GITHUB_REF_NAME" "$UNIVERSAL_ZIP" flat_release/appcast.xml
+          cp flat_release/appcast.xml ./appcast.xml
+        fi
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:

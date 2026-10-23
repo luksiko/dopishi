@@ -123,6 +123,7 @@ struct GeneralSettingsTab: View {
     @Binding var selectedTab: Int
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
+    @ObservedObject private var updateManager = UpdateManager.shared
 
     @State private var hasAccessibility = AccessibilityService.hasAccessibilityPermission
     @State private var showPermissionsGuide = false
@@ -158,6 +159,18 @@ struct GeneralSettingsTab: View {
                 Text(l10n.t("general.iCloudSyncDesc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            // ── Updates ─────────────────────────────────────────────
+            Section(l10n.t("general.updates")) {
+                Toggle(l10n.t("general.autoUpdateCheck"), isOn: $updateManager.automaticallyChecksForUpdates)
+                Text(l10n.t("general.updatesDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button(l10n.t("general.checkNow")) {
+                    updateManager.checkForUpdates()
+                }
             }
 
             // ── Accessibility Permissions Status ────────────────────
