@@ -793,4 +793,62 @@ extension GhostTextOverlayTests {
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(pollCalls, finalCalls, "Poll task should have ceased execution after hide()")
     }
+
+    // MARK: - Interactive Sandbox CustomDemoNSTextView Tests
+
+    func testCustomDemoNSTextViewAttributesAndFocus() {
+        let textView = CustomDemoNSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 36))
+        XCTAssertTrue(textView.isEditable, "Demo sandbox text view must be editable")
+        XCTAssertTrue(textView.isSelectable, "Demo sandbox text view must be selectable")
+        XCTAssertTrue(textView.acceptsFirstResponder, "Demo sandbox text view must accept first responder")
+        XCTAssertFalse(textView.drawsBackground, "Background drawing should be disabled for SwiftUI container styling")
+        XCTAssertEqual(textView.textContainer?.maximumNumberOfLines, 1, "Must be single line")
+    }
+
+    func testCustomDemoNSTextViewTabInterception() {
+        let textView = CustomDemoNSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 36))
+        var tabCount = 0
+        textView.onTab = {
+            tabCount += 1
+        }
+
+        // When ghostText is empty, insertTab should not trigger onTab
+        textView.ghostText = ""
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        XCTAssertEqual(tabCount, 0, "Tab should not trigger completion when ghost text is empty")
+
+        // When ghostText is present, insertTab must trigger onTab
+        textView.ghostText = "ет! Как дела?"
+        textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        XCTAssertEqual(tabCount, 1, "Tab must trigger onTab when ghost text is active")
+    }
+
+    func testCustomDemoNSTextViewEscapeAndNewlineInterception() {
+        let textView = CustomDemoNSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 36))
+        var tabCount = 0
+        var escapeCount = 0
+        textView.onTab = { tabCount += 1 }
+        textView.onEscape = { escapeCount += 1 }
+
+        // Test Escape
+        textView.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+        XCTAssertEqual(escapeCount, 1, "Escape must call onEscape")
+
+        // Test Newline / Return with ghost text
+        textView.ghostText = " world"
+        textView.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        XCTAssertEqual(tabCount, 1, "Return/Newline should accept active ghost text")
+    }
+
+    func testCustomDemoNSTextViewDrawingDoesNotCrash() {
+        let textView = CustomDemoNSTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 36))
+        textView.placeholderText = "Placeholder test"
+        textView.display() // Draw empty state with placeholder
+
+        textView.string = "прив"
+        textView.ghostText = "ет, мир! 🚀"
+        textView.display() // Draw with Cyrillic text and emoji ghost text
+        XCTAssertEqual(textView.string, "прив")
+        XCTAssertEqual(textView.ghostText, "ет, мир! 🚀")
+    }
 }
