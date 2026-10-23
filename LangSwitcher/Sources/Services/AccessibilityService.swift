@@ -833,6 +833,7 @@ final class AccessibilityService {
     /// Popup fallback only. This is deliberately never used for inline text.
     func focusedFieldScreenRect() -> CGRect? {
         guard let element = focusedTextElement(), let screen = NSScreen.screens.first else { return nil }
+        AXUIElementSetMessagingTimeout(element, 0.05)
         var positionValue: CFTypeRef?
         var sizeValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
@@ -854,16 +855,21 @@ final class AccessibilityService {
     func focusedTextElement() -> AXUIElement? {
         prepareBrowserAccessibility()
         let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, 0.05)
         var value: CFTypeRef?
         if AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &value) != .success,
            let app = NSWorkspace.shared.frontmostApplication {
-            AXUIElementCopyAttributeValue(AXUIElementCreateApplication(app.processIdentifier),
+            let appElement = AXUIElementCreateApplication(app.processIdentifier)
+            AXUIElementSetMessagingTimeout(appElement, 0.05)
+            AXUIElementCopyAttributeValue(appElement,
                                           kAXFocusedUIElementAttribute as CFString, &value)
         }
         guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         let root = value as! AXUIElement
+        AXUIElementSetMessagingTimeout(root, 0.05)
         let deadline = ProcessInfo.processInfo.systemUptime + 0.04
         return Self.resolveFocusedTextNode(root: root, attributes: { element in
+            AXUIElementSetMessagingTimeout(element, 0.05)
             var role: CFTypeRef?
             var subrole: CFTypeRef?
             var focused: CFTypeRef?
@@ -872,6 +878,7 @@ final class AccessibilityService {
             AXUIElementCopyAttributeValue(element, kAXFocusedAttribute as CFString, &focused)
             return (role as? String, subrole as? String, (focused as? Bool) == true)
         }, focusedChild: { element in
+            AXUIElementSetMessagingTimeout(element, 0.05)
             var child: CFTypeRef?
             guard AXUIElementCopyAttributeValue(element, kAXFocusedUIElementAttribute as CFString,
                                                 &child) == .success,

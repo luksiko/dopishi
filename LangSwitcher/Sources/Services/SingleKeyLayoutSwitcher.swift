@@ -174,10 +174,7 @@ final class SingleKeyLayoutSwitcher {
     
     private func installEventTap() -> Bool {
         let mask = (1 << CGEventType.flagsChanged.rawValue) |
-                   (1 << CGEventType.keyDown.rawValue) |
-                   (1 << CGEventType.leftMouseDown.rawValue) |
-                   (1 << CGEventType.rightMouseDown.rawValue) |
-                   (1 << CGEventType.otherMouseDown.rawValue)
+                   (1 << CGEventType.keyDown.rawValue)
         
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
             guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
@@ -203,6 +200,21 @@ final class SingleKeyLayoutSwitcher {
         self.eventTap = tap
         self.runLoopSource = source
         CGEvent.tapEnable(tap: tap, enable: true)
+
+        // Install passive mouse monitors so clicks notify the detector without intercepting in CGEventTap
+        if mouseGlobalMonitor == nil {
+            let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            mouseGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self] _ in
+                self?.detector.notifyOtherEventOccurred()
+            }
+        }
+        if mouseLocalMonitor == nil {
+            let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            mouseLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+                self?.detector.notifyOtherEventOccurred()
+                return event
+            }
+        }
         
         NSLog("[LangSwitcher] SingleKeyLayoutSwitcher: CGEventTap installed successfully for key \(detector.targetKey.rawValue)")
         return true
@@ -220,7 +232,7 @@ final class SingleKeyLayoutSwitcher {
             return Unmanaged.passUnretained(event)
         }
         
-        if type == .keyDown || type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
+        if type == .keyDown {
             detector.notifyOtherEventOccurred()
             return Unmanaged.passUnretained(event)
         }

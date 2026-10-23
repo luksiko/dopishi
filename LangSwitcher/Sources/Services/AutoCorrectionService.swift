@@ -76,7 +76,8 @@ final class AutoCorrectionService {
     private var snoozeFieldIdentifier: String?
     private let completionRefresh: AutocompletionRefresh
     private let aiDebounceTimer = AIDebounceTimer()
-    private var fieldAnchorTimer: Timer?
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
     private var physicalInputRevision = 0
     private var consumedAcceptanceKeys: Set<UInt16> = []
     private var replacementSession = ReplacementSession()
@@ -143,10 +144,17 @@ final class AutoCorrectionService {
     }
 
     deinit {
-        fieldAnchorTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseMonitor = nil
+        }
+        if let monitor = localMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMouseMonitor = nil
+        }
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
@@ -180,10 +188,10 @@ final class AutoCorrectionService {
 
         // Observe releases too: a consumed acceptance key owns its repeat cycle.
         // Using .defaultTap so it works under Accessibility permissions (listenOnly requires Input Monitoring).
+        // CRITICAL: Mouse events are monitored PASSIVELY via NSEvent monitors below.
+        // Never put mouse events in CGEventTap to prevent WindowServer input deadlocks!
         let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue) |
-                                     (1 << CGEventType.keyUp.rawValue) |
-                                     (1 << CGEventType.leftMouseDown.rawValue) |
-                                     (1 << CGEventType.rightMouseDown.rawValue)
+                                     (1 << CGEventType.keyUp.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -204,6 +212,22 @@ final class AutoCorrectionService {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+
+        if globalMouseMonitor == nil {
+            globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown]
+            ) { [weak self] _ in
+                self?.handleMouseDown()
+            }
+        }
+        if localMouseMonitor == nil {
+            localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown]
+            ) { [weak self] event in
+                self?.handleMouseDown()
+                return event
+            }
+        }
 
         ServiceStatus.shared.state = isRunning ? .running : .failed
         NSLog("[LangSwitcher] AutoCorrectionService: started keystroke monitoring")
@@ -263,6 +287,14 @@ final class AutoCorrectionService {
         typeAheadHandledCount = 0
         fieldAnchorController.hide()
         stopFieldAnchorPoll()
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseMonitor = nil
+        }
+        if let monitor = localMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMouseMonitor = nil
+        }
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
@@ -1091,18 +1123,12 @@ final class AutoCorrectionService {
     }
 
     private func startFieldAnchorPoll() {
-        guard fieldAnchorTimer == nil else { return }
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.updateFieldAnchor()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        fieldAnchorTimer = timer
+        // Continuous polling via Timer causes Mach IPC stalls and deadlocks in WindowServer.
+        // Anchor positions are refreshed reactively on typing and app focus events instead.
     }
 
     private func stopFieldAnchorPoll() {
-        fieldAnchorTimer?.invalidate()
-        fieldAnchorTimer = nil
+        // No-op
     }
 
     private func scheduleAutocompletion() {
@@ -2115,27 +2141,20 @@ private func autoCorrectionEventCallback(
 
     let service = Unmanaged<AutoCorrectionService>.fromOpaque(userInfo).takeUnretainedValue()
 
-    if type == .leftMouseDown || type == .rightMouseDown {
-        DispatchQueue.main.async {
-            service.handleMouseDown()
-        }
-        return Unmanaged.passUnretained(event)
-    }
-
     guard type == .keyDown || type == .keyUp else {
         return Unmanaged.passUnretained(event)
     }
 
-    // Check if the key should be consumed by active autocompletion overlay
+    // Check if the key should be consumed by active autocompletion overlay.
+    // CRITICAL: NEVER call DispatchQueue.main.sync inside a CGEventTap callback!
+    // Any synchronous dispatch to main queue will deadlock WindowServer whenever the main thread is busy.
     let intercepted: Bool
     if Thread.isMainThread {
         intercepted = MainActor.assumeIsolated {
             service.interceptCompletionKeyEvent(event)
         }
     } else {
-        intercepted = DispatchQueue.main.sync {
-            service.interceptCompletionKeyEvent(event)
-        }
+        intercepted = false
     }
 
     if intercepted {

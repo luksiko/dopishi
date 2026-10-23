@@ -1302,8 +1302,11 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         ThesaurusController.shared.hide()
 
         let escEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x35, keyDown: true))
+        escEvent.flags = []
         let num1Event = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x12, keyDown: true)) // Key "1"
+        num1Event.flags = []
         let enterEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x24, keyDown: true)) // Enter
+        enterEvent.flags = []
 
         // 1. Without active HUDs, events pass through
         XCTAssertFalse(service.interceptCompletionKeyEvent(escEvent))
