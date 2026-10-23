@@ -31,6 +31,40 @@ if CommandLine.arguments.count == 6 {
     outputPath = CommandLine.arguments[6]
 }
 
+func resolvePrivateEdKey() -> Curve25519.Signing.PrivateKey? {
+    var rawKey: String? = ProcessInfo.processInfo.environment["SPARKLE_PRIVATE_ED_KEY"]
+    if rawKey == nil || rawKey?.isEmpty == true {
+        let scriptDir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().path
+        let projectRoot = URL(fileURLWithPath: scriptDir).deletingLastPathComponent().path
+        let candidatePaths = [
+            FileManager.default.currentDirectoryPath + "/.sparkle_ed_key",
+            projectRoot + "/.sparkle_ed_key",
+            NSHomeDirectory() + "/.config/dopishi/sparkle_ed_key"
+        ]
+        for path in candidatePaths {
+            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    rawKey = trimmed
+                    break
+                }
+            }
+        }
+    }
+
+    guard let keyStr = rawKey, let keyData = Data(base64Encoded: keyStr) else {
+        return nil
+    }
+
+    return try? Curve25519.Signing.PrivateKey(rawRepresentation: keyData)
+}
+
+guard let signingKey = resolvePrivateEdKey() else {
+    print("Error: SPARKLE_PRIVATE_ED_KEY not found in environment, .sparkle_ed_key, or ~/.config/dopishi/sparkle_ed_key!")
+    print("Sparkle updates MUST be signed with Ed25519 or the updater will reject them as improperly signed.")
+    exit(1)
+}
+
 func generateItem(
     title: String,
     version: String,
@@ -53,18 +87,15 @@ func generateItem(
     let fileSize = zipData.count
     let zipFilename = zipURL.lastPathComponent
 
-    var signatureBase64 = ""
-    if let privKeyB64 = ProcessInfo.processInfo.environment["SPARKLE_PRIVATE_ED_KEY"],
-       let privKeyData = Data(base64Encoded: privKeyB64) {
-        do {
-            let privKey = try Curve25519.Signing.PrivateKey(rawRepresentation: privKeyData)
-            let sig = try privKey.signature(for: zipData)
-            signatureBase64 = sig.base64EncodedString()
-            print("Successfully signed \(zipFilename) with Ed25519 (size: \(fileSize) bytes)")
-        } catch {
-            print("Warning: Failed to sign with SPARKLE_PRIVATE_ED_KEY: \(error)")
-        }
+    let sig: Data
+    do {
+        sig = try signingKey.signature(for: zipData)
+    } catch {
+        print("Error: Failed to sign \(zipFilename) with Ed25519: \(error)")
+        exit(1)
     }
+    let signatureBase64 = sig.base64EncodedString()
+    print("Successfully signed \(zipFilename) with Ed25519 (size: \(fileSize) bytes)")
 
     let enclosureAttrs = [
         "url=\"https://github.com/luksiko/dopishi/releases/download/\(tag)/\(zipFilename)\"",
@@ -72,8 +103,8 @@ func generateItem(
         "sparkle:shortVersionString=\"\(version)\"",
         "length=\"\(fileSize)\"",
         "type=\"application/octet-stream\"",
-        signatureBase64.isEmpty ? "" : "sparkle:edSignature=\"\(signatureBase64)\""
-    ].filter { !$0.isEmpty }.joined(separator: "\n        ")
+        "sparkle:edSignature=\"\(signatureBase64)\""
+    ].joined(separator: "\n        ")
 
     var hwLine = ""
     if let hw = hardwareRequirement {

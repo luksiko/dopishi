@@ -21,6 +21,13 @@ if [[ -z "$identity" ]]; then
     exit 1
 fi
 
+# Ensure Sparkle Ed25519 private key is available
+if [[ -z "${SPARKLE_PRIVATE_ED_KEY:-}" ]] && [[ ! -f "$project_root/.sparkle_ed_key" ]] && [[ ! -f "$HOME/.config/dopishi/sparkle_ed_key" ]]; then
+    echo "Error: SPARKLE_PRIVATE_ED_KEY is not set and no .sparkle_ed_key file found in project or ~/.config/dopishi/!" >&2
+    echo "Sparkle updates require Ed25519 signatures. Without it, the in-app updater will fail validation." >&2
+    exit 1
+fi
+
 echo "==> Packaging Dopishi v${VERSION} using identity: $identity"
 
 build_dir="$project_root/build/release-dist"
@@ -133,6 +140,11 @@ swift "$script_dir/generate-appcast.swift" "$VERSION" "$build_number" "v${VERSIO
     "$project_root/Dopishi-${VERSION}-universal.zip" \
     "$project_root/Dopishi-${VERSION}-arm64.zip" \
     "$project_root/appcast.xml"
+
+if ! grep -q 'sparkle:edSignature=' "$project_root/appcast.xml"; then
+    echo "Error: appcast.xml was generated without Ed25519 signatures!" >&2
+    exit 1
+fi
 
 echo "==> Cleaning temporary build folder..."
 rm -rf "$build_dir"

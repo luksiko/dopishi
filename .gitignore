@@ -58,6 +58,10 @@ fastlane/test_output
 .idea/
 *.profraw
 
+# Release & Signing Keys
+.sparkle_ed_key
+*.sparkle_ed_key
+
 # AI Agent metadata
 .agents/
 skills-lock.json

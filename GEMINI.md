@@ -157,3 +157,9 @@ langSwitcher/
    - The auto-updater feed `appcast.xml` always points to `Dopishi-<ver>-universal.zip`, ensuring zero risk of architectural mismatch or update failure.
    - Always package releases using `bash scripts/package-release.sh <version>`.
    - Always verify feed availability post-publish: `curl -ILs "https://github.com/luksiko/dopishi/releases/latest/download/appcast.xml"`.
+
+7. **Ed25519 Sparkle Feed Signing (`sparkle:edSignature`)**:
+   - `Info.plist` defines `SUPublicEDKey = MsZRN8OExsTi4d5F3XoGpwo9cxsrFiAMaHDMSzUVI9I=`.
+   - Sparkle strictly rejects any update if `<enclosure>` is missing `sparkle:edSignature="..."`.
+   - The private Ed25519 key is stored in `.sparkle_ed_key` (local, gitignored) and GitHub Secret `SPARKLE_ED_KEY`.
+   - `scripts/generate-appcast.swift` and `scripts/package-release.sh` enforce cryptographic EdDSA signing and halt if keys are missing.
