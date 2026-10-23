@@ -24,7 +24,7 @@ public struct SmartPunctuationEngine {
         "iphone", "ipad", "ipod", "imac", "ebay", "emacs"
     ]
 
-    /// Checks if a word typed after a sentence terminator ('.', '!', '?', or start of paragraph/text)
+    /// Checks if a word typed after a sentence terminator ('.', '!', '?', or newline)
     /// should be capitalized.
     /// - Parameters:
     ///   - word: The word currently being completed (e.g. "привет", "hello").
@@ -34,16 +34,22 @@ public struct SmartPunctuationEngine {
         guard !word.isEmpty else { return nil }
         guard let firstChar = word.first, firstChar.isLetter, firstChar.isLowercase else { return nil }
 
-        let trimmedPreceding = precedingText.trimmingCharacters(in: .whitespaces)
+        // Require at least one trailing whitespace or newline after the terminator.
+        // This prevents capitalizing when precedingText is empty (e.g. buffer reset / layout switch)
+        // and prevents capitalizing domain suffixes like "google.com" where there is no space after '.'.
+        guard let lastRaw = precedingText.last, lastRaw.isWhitespace || lastRaw.isNewline else {
+            return nil
+        }
 
-        // If preceding is empty, it's the start of the field/buffer
-        if trimmedPreceding.isEmpty {
+        // Check if preceding ended with an explicit newline (paragraph break)
+        let withoutSpaces = precedingText.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "\t", with: "")
+        if withoutSpaces.hasSuffix("\n") || withoutSpaces.hasSuffix("\r") {
             return word.prefix(1).uppercased() + word.dropFirst()
         }
 
-        // Check if preceding ended with newline (paragraph start)
-        if trimmedPreceding.hasSuffix("\n") || trimmedPreceding.hasSuffix("\r") {
-            return word.prefix(1).uppercased() + word.dropFirst()
+        let trimmedPreceding = precedingText.trimmingCharacters(in: .whitespaces)
+        guard !trimmedPreceding.isEmpty else {
+            return nil
         }
 
         // Check for sentence terminator

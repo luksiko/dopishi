@@ -171,4 +171,20 @@ final class SpellCheckService {
         }
         return completions ?? []
     }
+
+    /// Get spelling correction guesses for a misspelled word.
+    func guesses(forWord word: String, language: String) -> [String] {
+        let lang = normalizeLanguage(language)
+        let nsRange = NSRange(location: 0, length: (word as NSString).length)
+        if let result = checker.guesses(forWordRange: nsRange, in: word, language: lang, inSpellDocumentWithTag: 0), !result.isEmpty {
+            return result
+        }
+        let prefix = lang + "_"
+        for available in checker.availableLanguages where available.hasPrefix(prefix) {
+            if let fallback = checker.guesses(forWordRange: nsRange, in: word, language: available, inSpellDocumentWithTag: 0), !fallback.isEmpty {
+                return fallback
+            }
+        }
+        return []
+    }
 }

@@ -308,6 +308,8 @@ Dopishi нуждается в разрешении универсального 
         "general.autoCorrectionCapitalizeSentencesDesc": "Автоматически начинает слово с прописной буквы после знаков конца предложения («.», «!», «?») и с новой строки.",
         "general.autoCorrectionFixCapsLock":         "Исправлять случайный cAPS lOCK (например, «пРИВЕТ» → «Привет»)",
         "general.autoCorrectionFixCapsLockDesc":     "Исправляет слова, набранные со случайно включенным Caps Lock при первой строчной букве.",
+        "general.autoCorrectionFixTypos":            "Исправлять опечатки и перепутанные буквы в словах на лету",
+        "general.autoCorrectionFixTyposDesc":        "Автоматически исправляет переставленные соседние буквы, случайно задетые лишние клавиши и пропущенные буквы (например, «большоей» → «большой», «поставитьл» → «поставить», «привте» → «привет»).",
         "general.autoCorrectionCommaBeforeConjunctions": "Ставить запятую перед «а» и «но»",
         "general.autoCorrectionCommaBeforeConjunctionsDesc": "Автоматически добавляет запятую перед союзами «а» и «но» в середине предложения (например, «хотел а не смог » → «хотел, а не смог »).",
         "general.autoCorrectionRemoveSpaceBeforePunctuation": "Удалять пробел перед знаками препинания",

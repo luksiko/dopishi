@@ -20,9 +20,15 @@ final class SmartPunctuationEngineTests: XCTestCase {
         XCTAssertEqual(result, "Hello")
     }
 
-    func testCapitalizeAtStartOfText() {
-        let result = SmartPunctuationEngine.capitalizeAfterSentence(word: "первое", precedingText: "")
-        XCTAssertEqual(result, "Первое")
+    func testDoNotCapitalizeOnEmptyPrecedingContext() {
+        // Empty preceding context (e.g. after layout switch or buffer reset) must NOT falsely capitalize
+        let result = SmartPunctuationEngine.capitalizeAfterSentence(word: "перевод", precedingText: "")
+        XCTAssertNil(result)
+    }
+
+    func testDoNotCapitalizeDomainSuffixWithoutSpace() {
+        let result = SmartPunctuationEngine.capitalizeAfterSentence(word: "com", precedingText: "google.")
+        XCTAssertNil(result)
     }
 
     func testCapitalizeAtStartOfParagraph() {

@@ -42,6 +42,32 @@ enum LanguageWordlists {
         Set(WordlistData.russian.split(separator: "\n").map(String.init))
     }()
 
+    private static let russianRanks: [String: Int] = {
+        var dict: [String: Int] = [:]
+        for (idx, word) in WordlistData.russian.split(separator: "\n").enumerated() {
+            let s = String(word)
+            if dict[s] == nil { dict[s] = idx }
+        }
+        return dict
+    }()
+
+    private static let englishRanks: [String: Int] = {
+        var dict: [String: Int] = [:]
+        for (idx, word) in WordlistData.english.split(separator: "\n").enumerated() {
+            let s = String(word)
+            if dict[s] == nil { dict[s] = idx }
+        }
+        return dict
+    }()
+
+    /// Returns the 0-based frequency rank of `word` in Russian or English wordlists (lower is more frequent).
+    static func frequencyRank(of word: String) -> Int? {
+        let lower = word.lowercased()
+        if let r = russianRanks[lower] { return r }
+        if let e = englishRanks[lower] { return e }
+        return nil
+    }
+
     // MARK: - Public API
 
     /// Coverage = share of the text's alphabetic tokens found in `list`.

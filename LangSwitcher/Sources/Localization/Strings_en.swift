@@ -309,6 +309,8 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "general.autoCorrectionCapitalizeSentencesDesc": "Automatically capitalizes words after '.', '!', '?' or at the beginning of paragraphs.",
         "general.autoCorrectionFixCapsLock":         "Fix accidental cAPS lOCK (e.g. 'hELLO' → 'Hello')",
         "general.autoCorrectionFixCapsLockDesc":     "Corrects words accidentally typed when Caps Lock is active and the first letter is lowercase.",
+        "general.autoCorrectionFixTypos":            "Fix word typos and transposed letters on the fly",
+        "general.autoCorrectionFixTyposDesc":        "Automatically fixes swapped adjacent letters, accidental extra keys, and single missing letters in words (e.g. 'большоей' → 'большой', 'поставитьл' → 'поставить', 'привте' → 'привет').",
         "general.autoCorrectionCommaBeforeConjunctions": "Insert comma before conjunctions 'а' and 'но'",
         "general.autoCorrectionCommaBeforeConjunctionsDesc": "Automatically places a comma before Russian coordinating conjunctions 'а' and 'но' when typed in the middle of a sentence.",
         "general.autoCorrectionRemoveSpaceBeforePunctuation": "Remove space before punctuation marks",

@@ -366,6 +366,11 @@ struct LayoutSettingsTab: View {
                         Text(l10n.t("general.autoCorrectionSwitchLayoutDesc"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        Toggle(l10n.t("general.autoCorrectionFixTypos"), isOn: $settingsManager.autoCorrectionFixTypos)
+                        Text(l10n.t("general.autoCorrectionFixTyposDesc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.top, 4)
 

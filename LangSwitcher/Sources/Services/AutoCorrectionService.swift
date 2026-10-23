@@ -315,8 +315,6 @@ final class AutoCorrectionService {
 
     @objc private func handleLayoutChanged() {
         wordBuffer = ""
-        recentTextBuffer = ""
-        previousWord = nil
         dismissSuggestionsOnly()
     }
 
@@ -1856,10 +1854,18 @@ final class AutoCorrectionService {
         if !word.isEmpty { previousWord = word.lowercased() }
 
         let axBefore = accessibilityService.captureCaretContext()?.textBeforeCaret
-        let fullContext = axBefore ?? recentTextBuffer
+        let withTrigger = bufferedWord + String(triggerChar)
         let textBeforeWord: String
-        if fullContext.hasSuffix(bufferedWord) {
-            textBeforeWord = String(fullContext.dropLast(bufferedWord.count))
+        if let ax = axBefore, !ax.isEmpty {
+            if ax.hasSuffix(withTrigger) {
+                textBeforeWord = String(ax.dropLast(withTrigger.count))
+            } else if ax.hasSuffix(bufferedWord) {
+                textBeforeWord = String(ax.dropLast(bufferedWord.count))
+            } else if recentTextBuffer.hasSuffix(bufferedWord) {
+                textBeforeWord = String(recentTextBuffer.dropLast(bufferedWord.count))
+            } else {
+                textBeforeWord = recentTextBuffer
+            }
         } else if recentTextBuffer.hasSuffix(bufferedWord) {
             textBeforeWord = String(recentTextBuffer.dropLast(bufferedWord.count))
         } else {
@@ -1982,6 +1988,27 @@ final class AutoCorrectionService {
                                           replacement: token.prefix + fixedCaps + token.punctuation + String(triggerChar)) { [weak self] _ in
                     guard let self else { return }
                     self.previousWord = fixedCaps.lowercased()
+                    self.playCorrectionFeedback()
+                    self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
+                }
+                return
+            }
+        }
+
+        // Step 3b: Check for mechanical word typos (e.g. "большоей" -> "большой", "поставитьл" -> "поставить", "привте" -> "привет")
+        if settingsManager.autoCorrectionFixTypos {
+            let layouts = settingsManager.enabledLayouts
+            let langs = layouts.map(\.languageCode)
+            if var fixedTypo = TypoCorrectionEngine.correctTypo(word, languages: langs, spellCheckService: spellCheckService) {
+                if settingsManager.autoCorrectionCapitalizeSentences,
+                   let capTypo = SmartPunctuationEngine.capitalizeAfterSentence(word: fixedTypo, precedingText: textBeforeWord) {
+                    fixedTypo = capTypo
+                }
+                NSLog("[LangSwitcher] AutoCorrection: typo corrected: '\(word)' → '\(fixedTypo)'")
+                performCheckedReplacement(expected: bufferedWord + String(triggerChar),
+                                          replacement: token.prefix + fixedTypo + token.punctuation + String(triggerChar)) { [weak self] _ in
+                    guard let self else { return }
+                    self.previousWord = fixedTypo.lowercased()
                     self.playCorrectionFeedback()
                     self.settingsManager.recordAutoCorrection(charCount: bufferedWord.count)
                 }

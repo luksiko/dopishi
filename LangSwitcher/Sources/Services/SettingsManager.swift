@@ -206,6 +206,11 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCorrectionFixCapsLockErrors, forKey: Keys.autoCorrectionFixCapsLockErrors) }
     }
 
+    /// Whether to fix single-edit mechanical typos in words on the fly (e.g. "большоей" -> "большой", "поставитьл" -> "поставить"). Default: true.
+    @Published var autoCorrectionFixTypos: Bool {
+        didSet { defaults.set(autoCorrectionFixTypos, forKey: Keys.autoCorrectionFixTypos) }
+    }
+
     /// Whether to replace emoji shortcodes like :fire: or :огонь: or :jujym: with Unicode emojis. Default: true.
     @Published var autoCorrectionEmojiShortcodes: Bool {
         didSet { defaults.set(autoCorrectionEmojiShortcodes, forKey: Keys.autoCorrectionEmojiShortcodes) }
@@ -746,6 +751,7 @@ final class SettingsManager: ObservableObject {
         static let autoCorrectionRemoveSpaceBeforePunctuation = "autoCorrectionRemoveSpaceBeforePunctuation"
         static let autoCorrectionSmartDashesAndEllipsis = "autoCorrectionSmartDashesAndEllipsis"
         static let autoCorrectionFixCapsLockErrors = "autoCorrectionFixCapsLockErrors"
+        static let autoCorrectionFixTypos = "autoCorrectionFixTypos"
         static let autoCorrectionEmojiShortcodes = "autoCorrectionEmojiShortcodes"
         static let autoCompletionEnabled = "autoCompletionEnabled"
         static let autoCompletionAcceptKey = "autoCompletionAcceptKey"
@@ -839,6 +845,7 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionRemoveSpaceBeforePunctuation = defaults.object(forKey: Keys.autoCorrectionRemoveSpaceBeforePunctuation) as? Bool ?? true // Default: ON
         self.autoCorrectionSmartDashesAndEllipsis = defaults.object(forKey: Keys.autoCorrectionSmartDashesAndEllipsis) as? Bool ?? true // Default: ON
         self.autoCorrectionFixCapsLockErrors = defaults.object(forKey: Keys.autoCorrectionFixCapsLockErrors) as? Bool ?? true // Default: ON
+        self.autoCorrectionFixTypos = defaults.object(forKey: Keys.autoCorrectionFixTypos) as? Bool ?? true // Default: ON
         self.autoCorrectionEmojiShortcodes = defaults.object(forKey: Keys.autoCorrectionEmojiShortcodes) as? Bool ?? true // Default: ON
         
         self.autoCompletionEnabled = defaults.object(forKey: Keys.autoCompletionEnabled) as? Bool ?? true      // Default: ON
