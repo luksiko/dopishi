@@ -118,18 +118,21 @@ thin_bundle() {
 # 1. Package Universal Assets
 package_artifacts "$built_app" "-universal"
 
-# 2. Generate Sparkle appcast pointing to Universal zip
-build_number=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$built_app/Contents/Info.plist" 2>/dev/null || echo "$VERSION")
-echo "==> Generating Sparkle appcast: appcast.xml (version: $VERSION, build: $build_number)..."
-swift "$script_dir/generate-appcast.swift" "$VERSION" "$build_number" "v${VERSION}" "$project_root/Dopishi-${VERSION}-universal.zip" "$project_root/appcast.xml"
-
-# 3. Thin & Package Apple Silicon (arm64) Assets
+# 2. Thin & Package Apple Silicon (arm64) Assets
 thin_bundle "$built_app" "$build_dir/Dopishi_arm64.app" "arm64"
 package_artifacts "$build_dir/Dopishi_arm64.app" "-arm64"
 
-# 4. Thin & Package Intel (x86_64) Assets
+# 3. Thin & Package Intel (x86_64) Assets
 thin_bundle "$built_app" "$build_dir/Dopishi_x86_64.app" "x86_64"
 package_artifacts "$build_dir/Dopishi_x86_64.app" "-x86_64"
+
+# 4. Generate Sparkle appcast with ARM64 priority and Universal fallback
+build_number=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$built_app/Contents/Info.plist" 2>/dev/null || echo "$VERSION")
+echo "==> Generating Sparkle appcast: appcast.xml (version: $VERSION, build: $build_number)..."
+swift "$script_dir/generate-appcast.swift" "$VERSION" "$build_number" "v${VERSION}" \
+    "$project_root/Dopishi-${VERSION}-universal.zip" \
+    "$project_root/Dopishi-${VERSION}-arm64.zip" \
+    "$project_root/appcast.xml"
 
 echo "==> Cleaning temporary build folder..."
 rm -rf "$build_dir"
