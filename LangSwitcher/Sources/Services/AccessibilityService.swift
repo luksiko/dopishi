@@ -449,12 +449,12 @@ final class AccessibilityService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in
             guard let self else { completion?(false); return }
             self.simulatePaste()
+            completion?(true)
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 if pasteboard.changeCount == revision {
                     TransientPasteboard.restore(savedContents, pasteboard: pasteboard)
                 }
-                completion?(true)
             }
         }
     }
@@ -898,9 +898,11 @@ final class AccessibilityService {
         focusedChild: (Node) -> Node?, children: (Node) -> [Node],
         limit: Int = 128, shouldContinue: () -> Bool = { true }
     ) -> Node? {
+        let leafTextRoles: Set<String> = ["AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"]
         var pending: [(Node, Bool)] = [(root, true)]
         var visited: Set<Node> = []
         var result: Node?
+        var webAreaFallback: Node?
         while !pending.isEmpty {
             guard visited.count < limit, shouldContinue() else { break }
             let (node, linkedFocus) = pending.removeLast()
@@ -911,22 +913,25 @@ final class AccessibilityService {
                 if confirmed { return nil }
                 continue
             }
-            if AutoCorrectionGate.textInputRoles.contains(info.role ?? "") {
+            if leafTextRoles.contains(info.role ?? "") {
                 if confirmed {
                     guard result == nil || result == node else { return nil }
                     result = node
                 }
                 continue
             }
+            if info.role == "AXWebArea" && confirmed && webAreaFallback == nil {
+                webAreaFallback = node
+            }
             if let child = focusedChild(node), child != node {
                 pending.append((child, true))
                 continue
             }
-            if ["AXGroup", "AXWebArea", "AXScrollArea", "AXSplitGroup"].contains(info.role ?? "") {
+            if ["AXWindow", "AXGroup", "AXWebArea", "AXScrollArea", "AXSplitGroup"].contains(info.role ?? "") {
                 pending.append(contentsOf: children(node).reversed().map { ($0, false) })
             }
         }
-        return result
+        return result ?? webAreaFallback
     }
 
     /// Electron and Chromium document these attributes for third-party assistive applications.

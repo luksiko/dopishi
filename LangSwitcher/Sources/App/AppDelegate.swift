@@ -189,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     func registerLayoutSwitchKey() {
         layoutSwitcher.register(key: settingsManager.layoutSwitchKey) { [weak self] in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 self?.performDirectLayoutSwitch()
             }
         }

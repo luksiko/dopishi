@@ -47,7 +47,7 @@ final class PowerService: ObservableObject {
         self.isOnBattery = battery
         self.powerSourceDescription = battery ? "Battery" : "AC Power"
         
-        if battery && SettingsManager.shared.aiBatteryModeEnabled {
+        if battery && SettingsManager.shared.aiBatteryModeEnabled && SettingsManager.shared.aiBatteryPolicy == .pauseInference {
             AIInferenceEngine.shared.stop()
         }
     }

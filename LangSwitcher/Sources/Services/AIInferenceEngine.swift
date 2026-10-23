@@ -16,6 +16,7 @@ final class AIInferenceEngine: ObservableObject {
     private var process: Process?
     @Published private(set) var isStarting: Bool = false
     private let session: URLSession
+    private var engineGeneration: Int = 0
     
     init() {
         let config = URLSessionConfiguration.ephemeral
@@ -85,7 +86,8 @@ final class AIInferenceEngine: ObservableObject {
             return true
         }
         // Process died, was never started, or model path changed -> restart
-        stop()
+        isRunning = false
+        terminateExternalProcess()
         return await start(modelPath: activePath)
     }
     
@@ -97,11 +99,11 @@ final class AIInferenceEngine: ObservableObject {
             return false
         }
         
+        engineGeneration &+= 1
         isStarting = true
         defer { isStarting = false }
         
-        stop() // Ensure previous instance is terminated
-        await AILocalEngine.shared.unload()
+        terminateExternalProcess()
         
         // 1. First attempt native in-process Metal inference via AILocalEngine
         do {
@@ -201,11 +203,7 @@ final class AIInferenceEngine: ObservableObject {
         }
     }
     
-    /// Stop the inference engine
-    func stop() {
-        Task {
-            await AILocalEngine.shared.unload()
-        }
+    private func terminateExternalProcess() {
         if let p = process {
             p.terminationHandler = nil
             if p.isRunning {
@@ -213,6 +211,13 @@ final class AIInferenceEngine: ObservableObject {
             }
             process = nil
         }
+    }
+
+    /// Stop the inference engine
+    func stop() {
+        engineGeneration &+= 1
+        let stopGen = engineGeneration
+        terminateExternalProcess()
         isRunning = false
         currentLoadedModelPath = nil
         inFlightTemplateTask?.task.cancel()
@@ -220,6 +225,10 @@ final class AIInferenceEngine: ObservableObject {
         metadataCacheRevision &+= 1
         cachedTemplateModel = nil
         cachedUsesChatTemplate = true
+        Task { @MainActor [weak self] in
+            guard let self, self.engineGeneration == stopGen, !self.isStarting, !self.isRunning else { return }
+            await AILocalEngine.shared.unload()
+        }
     }
 
     private func checkAndRecoverProcess(error: Error) {
@@ -261,7 +270,14 @@ final class AIInferenceEngine: ObservableObject {
             if cleaned == result { break }
             result = cleaned
         }
-        return result.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: .regularExpression)
+        result = result.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: .regularExpression)
+        // Strip standalone void/form HTML tags (e.g. <input>, <button>, <kbd>) that models emit inside code snippets
+        result = result.replacingOccurrences(
+            of: "</?(?:input|button|select|textarea|form|label|option|img|hr|wbr|kbd)(?:\\s+[^<>]*?)?/?>",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        return result
     }
 
     nonisolated static func completionMessages(
@@ -374,45 +390,90 @@ final class AIInferenceEngine: ObservableObject {
     /// must receive a raw prefix, not llama-server's fallback ChatML template.
     nonisolated static func embeddedChatTemplate(at path: String) -> Bool? {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped),
-              data.count >= 24, data.prefix(4) == Data("GGUF".utf8) else { return nil }
-        var offset = 4
-        func integer(_ bytes: Int) -> UInt64? {
-            guard bytes >= 0, offset <= data.count - bytes else { return nil }
-            var result: UInt64 = 0
-            for i in 0..<bytes { result |= UInt64(data[offset + i]) << (i * 8) }
-            offset += bytes
-            return result
-        }
-        func string(read: Bool) -> String? {
-            guard let size = integer(8), size <= UInt64(data.count - offset) else { return nil }
-            let count = Int(size)
-            defer { offset += count }
-            return read ? String(data: data[offset..<(offset + count)], encoding: .utf8) : ""
-        }
-        func skip(_ type: UInt64, depth: Int = 0) -> Bool {
-            let sizes: [UInt64: Int] = [0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8]
-            if let size = sizes[type] { return integer(size) != nil }
-            if type == 8 { return string(read: false) != nil }
-            guard type == 9, depth < 4, let subtype = integer(4), let count = integer(8) else { return false }
-            if let size = sizes[subtype] {
-                guard count <= UInt64((data.count - offset) / size) else { return false }
-                offset += Int(count) * size
+              data.count >= 24 else { return nil }
+        return data.withUnsafeBytes { raw -> Bool? in
+            guard raw.count >= 24,
+                  let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                  base[0] == 0x47, base[1] == 0x47, base[2] == 0x55, base[3] == 0x46 else { return nil }
+            var offset = 4
+            let total = raw.count
+            @inline(__always)
+            func readUInt32() -> UInt32? {
+                guard offset <= total - 4 else { return nil }
+                let val = raw.loadUnaligned(fromByteOffset: offset, as: UInt32.self).littleEndian
+                offset += 4
+                return val
+            }
+            @inline(__always)
+            func readUInt64() -> UInt64? {
+                guard offset <= total - 8 else { return nil }
+                let val = raw.loadUnaligned(fromByteOffset: offset, as: UInt64.self).littleEndian
+                offset += 8
+                return val
+            }
+            @inline(__always)
+            func skipBytes(_ count: Int) -> Bool {
+                guard count >= 0, offset <= total - count else { return false }
+                offset += count
                 return true
             }
-            guard count <= UInt64(data.count - offset) else { return false }
-            for _ in 0..<count { if !skip(subtype, depth: depth + 1) { return false } }
-            return true
+            @inline(__always)
+            func readString(decode: Bool) -> String? {
+                guard let size = readUInt64(), size <= UInt64(total - offset) else { return nil }
+                let count = Int(size)
+                let start = offset
+                offset += count
+                guard decode else { return "" }
+                let buf = UnsafeBufferPointer(start: base.advanced(by: start), count: count)
+                return String(bytes: buf, encoding: .utf8)
+            }
+            func skip(_ type: UInt32, depth: Int = 0) -> Bool {
+                switch type {
+                case 0, 1, 7: return skipBytes(1)
+                case 2, 3:    return skipBytes(2)
+                case 4, 5, 6: return skipBytes(4)
+                case 10, 11, 12: return skipBytes(8)
+                case 8:
+                    guard let size = readUInt64(), size <= UInt64(total - offset) else { return false }
+                    offset += Int(size)
+                    return true
+                case 9:
+                    guard depth < 4, let subtype = readUInt32(), let count = readUInt64() else { return false }
+                    let fixedSize: Int? = switch subtype {
+                    case 0, 1, 7: 1
+                    case 2, 3: 2
+                    case 4, 5, 6: 4
+                    case 10, 11, 12: 8
+                    default: nil
+                    }
+                    if let size = fixedSize {
+                        guard count <= UInt64((total - offset) / size) else { return false }
+                        offset += Int(count) * size
+                        return true
+                    }
+                    guard count <= UInt64(total - offset) else { return false }
+                    for _ in 0..<count {
+                        if !skip(subtype, depth: depth + 1) { return false }
+                    }
+                    return true
+                default:
+                    return false
+                }
+            }
+            guard let version = readUInt32(), (version == 2 || version == 3),
+                  readUInt64() != nil,
+                  let count = readUInt64(), count <= 100_000 else { return nil }
+            for _ in 0..<count {
+                guard let key = readString(decode: true), let type = readUInt32() else { return nil }
+                if key == "tokenizer.chat_template", type == 8 {
+                    guard let template = readString(decode: true) else { return nil }
+                    return !template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                } else if !skip(type) {
+                    return nil
+                }
+            }
+            return false
         }
-        guard let version = integer(4), [2, 3].contains(version), integer(8) != nil,
-              let count = integer(8), count <= 100_000 else { return nil }
-        for _ in 0..<count {
-            guard let key = string(read: true), let type = integer(4) else { return nil }
-            if key == "tokenizer.chat_template", type == 8 {
-                guard let template = string(read: true) else { return nil }
-                return !template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            } else if !skip(type) { return nil }
-        }
-        return false
     }
 
     private var cachedTemplateModel: String?
@@ -422,6 +483,12 @@ final class AIInferenceEngine: ObservableObject {
 
     func modelUsesChatTemplate(at path: String) async -> Bool? {
         if cachedTemplateModel == path { return cachedUsesChatTemplate }
+        if await AILocalEngine.shared.isLoaded, await AILocalEngine.shared.currentModelPath == path {
+            let detected = await AILocalEngine.shared.hasChatTemplate()
+            cachedTemplateModel = path
+            cachedUsesChatTemplate = detected
+            return detected
+        }
         if let current = inFlightTemplateTask, current.path == path {
             return await current.task.value
         }

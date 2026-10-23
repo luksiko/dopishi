@@ -119,4 +119,35 @@ final class AILocalEngineTests: XCTestCase {
         let hitsAfterUnload = await engine.prefixCacheHitCount
         XCTAssertEqual(hitsAfterUnload, 0)
     }
+
+    func testHasChatTemplateWhenUnloaded() async {
+        let engine = AILocalEngine()
+        let hasTemplate = await engine.hasChatTemplate()
+        XCTAssertFalse(hasTemplate)
+    }
+
+    func testStrippingGeneratedMarkupRemovesStandaloneVoidAndFormTags() {
+        let raw = "<code><input></code> будет выбран."
+        let stripped = AIInferenceEngine.strippingGeneratedMarkup(raw)
+        XCTAssertEqual(stripped, " будет выбран.")
+    }
+
+    func testResolveFocusedTextNodeTraversesInsideUnconfirmedWebArea() {
+        // Root (AXGroup, confirmed) -> child AXWebArea (unconfirmed) -> grandchild AXTextArea (focused)
+        let nodes: [Int: (role: String?, subrole: String?, focused: Bool, focusedChild: Int?, children: [Int])] = [
+            1: ("AXGroup", "AXLandmarkRegion", false, nil, [2]),
+            2: ("AXWebArea", nil, false, 3, [3]),
+            3: ("AXTextArea", nil, true, nil, [])
+        ]
+        let resolved = AccessibilityService.resolveFocusedTextNode(
+            root: 1,
+            attributes: { id in
+                let n = nodes[id]!
+                return (n.role, n.subrole, n.focused)
+            },
+            focusedChild: { id in nodes[id]?.focusedChild },
+            children: { id in nodes[id]?.children ?? [] }
+        )
+        XCTAssertEqual(resolved, 3)
+    }
 }

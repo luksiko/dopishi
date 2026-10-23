@@ -439,6 +439,12 @@ public actor AILocalEngine {
 
     // MARK: - Token Stitching
 
+    /// Returns whether the currently loaded model embeds a chat template in its metadata.
+    public func hasChatTemplate() -> Bool {
+        guard isLoaded, let m = model else { return false }
+        return llama_model_chat_template(m, nil) != nil
+    }
+
     /// Formats an array of chat messages using the model's embedded Jinja chat template.
     /// Returns the formatted prompt string, or nil if no template is present or formatting fails.
     public func applyChatTemplate(messages: [(role: String, content: String)], addAssistant: Bool = true) -> String? {
