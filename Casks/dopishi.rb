@@ -1,6 +1,6 @@
 cask "dopishi" do
   version "1.4.0"
-  sha256 "9f19e9b1a41f84c8601fbd5ec58e25381b61dbe4aa862768d43806b3bf8e95f2"
+  sha256 "2a959aa7c63dbbf8be2b714dcaa9cf2cf9a13a5222e99ec6978d00891d2593f0"
 
   url "https://github.com/luksiko/dopishi/releases/download/v#{version}/Dopishi-#{version}-universal.dmg"
   name "Dopishi"

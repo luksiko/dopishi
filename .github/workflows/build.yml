@@ -140,19 +140,17 @@ jobs:
             build
         fi
 
-    - name: Sign app bundle
+    - name: Embed AI inference engine & sign app bundle
       run: |
         APP_PATH="build/Build/Products/Release/Dopishi.app"
+        bash scripts/embed-inference.sh "$APP_PATH" || true
         if [ "$CODESIGN_ENABLED" = "true" ]; then
           echo "=== Signing with Developer ID ==="
-          codesign --force --options runtime --deep \
-            -s "$CODESIGN_IDENTITY" "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="$CODESIGN_IDENTITY" bash scripts/sign-app.sh "$APP_PATH"
         else
           echo "=== Ad-hoc signing ==="
-          codesign --force --deep -s - "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="-" bash scripts/sign-app.sh "$APP_PATH"
         fi
-        echo "=== Codesign verify ==="
-        codesign -dvvv "$APP_PATH" 2>&1
         echo "=== spctl assess ==="
         spctl --assess --type exec "$APP_PATH" 2>&1 || true
 
@@ -307,15 +305,15 @@ jobs:
             build
         fi
 
-    - name: Sign app bundle
+    - name: Embed AI inference engine & sign app bundle
       run: |
         APP_PATH="build/Build/Products/Release/Dopishi.app"
+        bash scripts/embed-inference.sh "$APP_PATH" || true
         if [ "$CODESIGN_ENABLED" = "true" ]; then
-          codesign --force --options runtime --deep -s "$CODESIGN_IDENTITY" "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="$CODESIGN_IDENTITY" bash scripts/sign-app.sh "$APP_PATH"
         else
-          codesign --force --deep -s - "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="-" bash scripts/sign-app.sh "$APP_PATH"
         fi
-        codesign -dvvv "$APP_PATH" 2>&1
         spctl --assess --type exec "$APP_PATH" 2>&1 || true
 
     - name: Create DMG (x86_64)
@@ -451,15 +449,15 @@ jobs:
             build
         fi
 
-    - name: Sign app bundle
+    - name: Embed AI inference engine & sign app bundle
       run: |
         APP_PATH="build/Build/Products/Release/Dopishi.app"
+        bash scripts/embed-inference.sh "$APP_PATH" || true
         if [ "$CODESIGN_ENABLED" = "true" ]; then
-          codesign --force --options runtime --deep -s "$CODESIGN_IDENTITY" "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="$CODESIGN_IDENTITY" bash scripts/sign-app.sh "$APP_PATH"
         else
-          codesign --force --deep -s - "$APP_PATH"
+          LANGSWITCHER_SIGNING_IDENTITY="-" bash scripts/sign-app.sh "$APP_PATH"
         fi
-        codesign -dvvv "$APP_PATH" 2>&1
         spctl --assess --type exec "$APP_PATH" 2>&1 || true
 
     - name: Create DMG (universal)

@@ -248,6 +248,11 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         self.lastSpeedCheckTime = Date()
         self.lastBytesWritten = 0
         
+        downloadTask?.cancel()
+        downloadTask = nil
+        urlSession?.invalidateAndCancel()
+        urlSession = nil
+        
         let config = URLSessionConfiguration.default
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         self.urlSession = session
@@ -347,8 +352,13 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
             moveError = error
         }
         
+        session.finishTasksAndInvalidate()
         Task { @MainActor in
             self.activeDownloadingModel = nil
+            self.downloadTask = nil
+            if self.urlSession === session {
+                self.urlSession = nil
+            }
             if let error = moveError {
                 self.state = .error(message: error.localizedDescription)
             } else {
@@ -365,7 +375,13 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         didCompleteWithError error: Error?
     ) {
         if let error = error {
+            session.finishTasksAndInvalidate()
             Task { @MainActor in
+                self.activeDownloadingModel = nil
+                self.downloadTask = nil
+                if self.urlSession === session {
+                    self.urlSession = nil
+                }
                 let nsError = error as NSError
                 if nsError.code != NSURLErrorCancelled {
                     self.state = .error(message: error.localizedDescription)

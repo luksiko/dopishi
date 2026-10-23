@@ -680,7 +680,8 @@ final class ScreenContextService: ObservableObject {
             appName: appName,
             focusedElement: focusedElement,
             maxCharacters: maxCharacters,
-            maxMessages: maxMessages
+            maxMessages: maxMessages,
+            allowVisionOCR: !Thread.isMainThread
         )
         self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
         return result
@@ -729,7 +730,8 @@ final class ScreenContextService: ObservableObject {
                     appName: appName,
                     focusedElement: focusedElement,
                     maxCharacters: maxCharacters,
-                    maxMessages: maxMessages
+                    maxMessages: maxMessages,
+                    allowVisionOCR: false
                 )
                 return .completed(res)
             }
@@ -743,11 +745,27 @@ final class ScreenContextService: ObservableObject {
         }
 
         switch outcome {
-        case .completed(let result):
+        case .completed(let axResult):
             consecutiveFailures = 0
             circuitBreakerUntil = nil
-            self.cache = CacheEntry(key: cacheKey, result: result, timestamp: Date())
-            return result
+            if let res = axResult, !res.messages.isEmpty {
+                self.cache = CacheEntry(key: cacheKey, result: res, timestamp: Date())
+                return res
+            }
+            // Fallback to Apple Vision OCR off the main thread without tripping the AX circuit breaker
+            let ocrResult = await Task.detached(priority: .utility) {
+                Self.performVisionFallbackForApp(
+                    pid: pid,
+                    bundleID: bundleID,
+                    appName: appName,
+                    focusedElement: focusedElement,
+                    fallbackWindowTitle: axResult?.windowTitle,
+                    fallbackWebDomain: axResult?.webDomain,
+                    maxMessages: maxMessages
+                )
+            }.value ?? axResult
+            self.cache = CacheEntry(key: cacheKey, result: ocrResult, timestamp: Date())
+            return ocrResult
         case .timedOut:
             consecutiveFailures += 1
             if consecutiveFailures >= 3 {
@@ -771,7 +789,8 @@ final class ScreenContextService: ObservableObject {
         appName: String,
         focusedElement: AXUIElement?,
         maxCharacters: Int = defaultMaxCharacters,
-        maxMessages: Int = defaultMaxMessages
+        maxMessages: Int = defaultMaxMessages,
+        allowVisionOCR: Bool = true
     ) -> ScreenContextResult? {
         let appElement = AXUIElementCreateApplication(pid)
         // Bound individual IPC messages to 50ms so an unresponsive app never hangs LangSwitcher
@@ -1036,6 +1055,10 @@ final class ScreenContextService: ObservableObject {
             return res
         }
 
+        guard allowVisionOCR else {
+            return axResult
+        }
+
         // Fallback to high-speed Apple Vision OCR on window screenshot when AX tree has no text
         // (common in Electron/Qt apps like Telegram, Slack, VSCode, Chrome canvas)
         let winFrame = elementFrame(window)
@@ -1048,6 +1071,47 @@ final class ScreenContextService: ObservableObject {
             webDomain: webDomain,
             maxMessages: maxMessages
         ) ?? axResult
+    }
+
+    nonisolated private static func performVisionFallbackForApp(
+        pid: pid_t,
+        bundleID: String,
+        appName: String,
+        focusedElement: AXUIElement?,
+        fallbackWindowTitle: String?,
+        fallbackWebDomain: String?,
+        maxMessages: Int
+    ) -> ScreenContextResult? {
+        let appElement = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(appElement, 0.05)
+
+        var windowRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef) != .success {
+            _ = AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &windowRef)
+        }
+        var winFrame: CGRect?
+        var windowTitle = fallbackWindowTitle
+        if let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() {
+            let win = windowRef as! AXUIElement
+            AXUIElementSetMessagingTimeout(win, 0.05)
+            winFrame = elementFrame(win)
+            if windowTitle == nil {
+                var titleRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(win, kAXTitleAttribute as CFString, &titleRef) == .success {
+                    windowTitle = titleRef as? String
+                }
+            }
+        }
+        let focusedRect = focusedElement.flatMap { elementFrame($0) }
+        return performVisionOCR(
+            windowFrame: winFrame,
+            focusedRect: focusedRect,
+            bundleID: bundleID,
+            appName: appName,
+            windowTitle: windowTitle,
+            webDomain: fallbackWebDomain,
+            maxMessages: maxMessages
+        )
     }
 
     // MARK: - Apple Vision OCR Engine

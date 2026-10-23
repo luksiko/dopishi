@@ -46,4 +46,21 @@ final class ThesaurusEngineTests: XCTestCase {
         let results = ThesaurusEngine.suggest(word: "qwerty_unknown_word_xyz")
         XCTAssertTrue(results.isEmpty)
     }
+
+    func testExtractTrailingWordPreservesPunctuationAndNewlines() {
+        let newlinePrefixed = ThesaurusController.extractTrailingWord(from: "Первая строка\nбыстрый")
+        XCTAssertEqual(newlinePrefixed?.word, "быстрый")
+        XCTAssertEqual(newlinePrefixed?.trailingSuffix, "")
+
+        let parenPrefixed = ThesaurusController.extractTrailingWord(from: "Текст (важный")
+        XCTAssertEqual(parenPrefixed?.word, "важный")
+        XCTAssertEqual(parenPrefixed?.trailingSuffix, "")
+
+        let trailingComma = ThesaurusController.extractTrailingWord(from: "Это важный, ")
+        XCTAssertEqual(trailingComma?.word, "важный")
+        XCTAssertEqual(trailingComma?.trailingSuffix, ", ")
+
+        let trailingNewline = ThesaurusController.extractTrailingWord(from: "быстрый\n")
+        XCTAssertNil(trailingNewline)
+    }
 }

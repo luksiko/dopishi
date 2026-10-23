@@ -422,4 +422,20 @@ extension AIInferenceTests {
         XCTAssertTrue(prefix.contains("Стиль и правила:"))
         XCTAssertTrue(prefix.contains("Write in a friendly voice."))
     }
+
+    func testHealedContinuationDoesNotDoubleStripRepeatedPrefix() {
+        let context = "Свежий ко"
+        let wordBuffer = "ко"
+        let raw = "кокосовый сок"
+        let healed = AIInferenceEngine.healedContinuation(raw, wordBuffer: wordBuffer)
+        XCTAssertEqual(healed, "косовый сок")
+
+        let cleaned = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: healed ?? raw,
+            context: context,
+            wordBuffer: healed != nil ? "" : wordBuffer,
+            maxWords: 4
+        )
+        XCTAssertEqual(cleaned, "косовый сок")
+    }
 }

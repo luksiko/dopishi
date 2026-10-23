@@ -16,6 +16,7 @@ final class ThesaurusController: NSObject {
     private(set) var activeCandidates: [ThesaurusEngine.Candidate] = []
     private(set) var activeWord: String?
     private(set) var isActualSelection: Bool = false
+    private(set) var trailingSuffixToPreserve: String = ""
 
     var isVisible: Bool {
         panel?.isVisible == true
@@ -26,12 +27,19 @@ final class ThesaurusController: NSObject {
         super.init()
     }
 
-    func show(word: String, candidates: [ThesaurusEngine.Candidate], anchor: CGRect, isActualSelection: Bool = true) {
+    func show(
+        word: String,
+        candidates: [ThesaurusEngine.Candidate],
+        anchor: CGRect,
+        isActualSelection: Bool = true,
+        trailingSuffix: String = ""
+    ) {
         guard !candidates.isEmpty else { return }
 
         self.activeWord = word
         self.activeCandidates = candidates
         self.isActualSelection = isActualSelection
+        self.trailingSuffixToPreserve = isActualSelection ? "" : trailingSuffix
 
         let hudView = ThesaurusHUDView(
             word: word,
@@ -98,6 +106,7 @@ final class ThesaurusController: NSObject {
         panel?.orderOut(nil)
         activeCandidates = []
         activeWord = nil
+        trailingSuffixToPreserve = ""
     }
 
     func handleNumericInput(_ digit: Int) -> Bool {
@@ -123,16 +132,47 @@ final class ThesaurusController: NSObject {
             // If text was highlighted, paste over selection
             accessibilityService.pasteReplacingSelection(replacement)
         } else {
-            // If no text was highlighted, delete the preceding word and insert synonym
-            accessibilityService.replaceWithBackspaces(count: word.count, replacement: replacement)
+            // If no text was highlighted, delete the preceding word (plus any trailing punctuation/space) and re-insert
+            let deleteCount = word.count + trailingSuffixToPreserve.count
+            accessibilityService.replaceWithBackspaces(
+                count: deleteCount,
+                replacement: replacement + trailingSuffixToPreserve
+            )
         }
         hide()
+    }
+
+    nonisolated static func extractTrailingWord(from textBeforeCaret: String) -> (word: String, trailingSuffix: String)? {
+        guard !textBeforeCaret.isEmpty else { return nil }
+        let chars = Array(textBeforeCaret)
+        var idx = chars.count - 1
+        var trailingCount = 0
+
+        while idx >= 0 && !chars[idx].isLetter {
+            if chars[idx].isNewline || trailingCount >= 4 {
+                return nil
+            }
+            trailingCount += 1
+            idx -= 1
+        }
+        guard idx >= 0 else { return nil }
+
+        let wordEnd = idx
+        while idx >= 0 && (chars[idx].isLetter || (chars[idx] == "-" && idx > 0 && chars[idx - 1].isLetter)) {
+            idx -= 1
+        }
+        let wordStart = idx + 1
+        let word = String(chars[wordStart...wordEnd])
+        guard !word.isEmpty else { return nil }
+        let trailingSuffix = (wordEnd + 1 < chars.count) ? String(chars[(wordEnd + 1)...]) : ""
+        return (word: word, trailingSuffix: trailingSuffix)
     }
 
     func triggerForCurrentSelection() {
         // Try getting selection from AX
         var selectedText: String?
         var isActualSelection = false
+        var trailingSuffix = ""
         if let focused = accessibilityService.focusedTextElement() {
             var value: AnyObject?
             if AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &value) == .success,
@@ -145,8 +185,9 @@ final class ThesaurusController: NSObject {
         // If no AX selection, check caret context
         if selectedText == nil {
             if let context = accessibilityService.captureCaretContext(),
-               let lastWord = context.textBeforeCaret.split(separator: " ").last {
-                selectedText = String(lastWord)
+               let extracted = Self.extractTrailingWord(from: context.textBeforeCaret) {
+                selectedText = extracted.word
+                trailingSuffix = extracted.trailingSuffix
                 isActualSelection = false
             }
         }
@@ -157,6 +198,12 @@ final class ThesaurusController: NSObject {
         guard !candidates.isEmpty else { return }
 
         let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
-        show(word: word, candidates: candidates, anchor: caret, isActualSelection: isActualSelection)
+        show(
+            word: word,
+            candidates: candidates,
+            anchor: caret,
+            isActualSelection: isActualSelection,
+            trailingSuffix: trailingSuffix
+        )
     }
 }

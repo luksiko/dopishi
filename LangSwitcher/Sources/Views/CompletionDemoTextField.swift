@@ -220,8 +220,9 @@ struct CompletionDemoTextField: View {
             : Self.splitFirstWord(from: ghostSuffix)
 
         guard !acceptedChunk.isEmpty else { return }
+        let previousInput = inputText
         lastAcceptedGhost = acceptedChunk
-        let full = inputText + acceptedChunk
+        let full = previousInput + acceptedChunk
         inputText = full
         ghostSuffix = remainingChunk
         savedCharNotice = acceptedChunk.count
@@ -229,7 +230,7 @@ struct CompletionDemoTextField: View {
             showSuccessBanner = true
         }
 
-        statsTracker.recordAcceptedCompletion(insertedText: full, typedPrefix: inputText)
+        statsTracker.recordAcceptedCompletion(insertedText: full, typedPrefix: previousInput)
     }
 }
 

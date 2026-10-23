@@ -125,18 +125,27 @@ final class SmartRepliesController: NSObject {
         hide()
     }
 
+    private var generationTask: Task<Void, Never>?
+
     func hide() {
+        generationTask?.cancel()
+        generationTask = nil
         panel?.orderOut(nil)
         activeReplies = []
         selectedIndex = 0
     }
 
     func triggerSmartReplies() {
-        let screenResult = ScreenContextService.shared.extractScreenContext()
-        let promptContext = screenResult?.messages.last ?? screenResult?.formattedContext ?? ""
-        let replies = SmartRepliesEngine.generateReplies(for: promptContext)
-
+        generationTask?.cancel()
         let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
-        show(replies: replies, anchor: caret)
+        generationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let screenResult = await ScreenContextService.shared.extractScreenContextAsync()
+            guard !Task.isCancelled else { return }
+            let promptContext = screenResult?.messages.last ?? screenResult?.formattedContext ?? ""
+            let replies = SmartRepliesEngine.generateReplies(for: promptContext)
+            guard !Task.isCancelled else { return }
+            self.show(replies: replies, anchor: caret)
+        }
     }
 }

@@ -84,6 +84,7 @@ public actor AILocalEngine {
     private var context: OpaquePointer?                        // llama_context*
     private var vocab: OpaquePointer?                          // const llama_vocab*
     private var sampler: UnsafeMutablePointer<llama_sampler>?  // llama_sampler*
+    private var currentSamplerTemperature: Float = 0.2
     private var batch: llama_batch?
 
     public private(set) var currentModelPath: String?
@@ -101,7 +102,18 @@ public actor AILocalEngine {
     }
 
     deinit {
-        unload()
+        if let b = batch {
+            llama_batch_free(b)
+        }
+        if let s = sampler {
+            llama_sampler_free(s)
+        }
+        if let c = context {
+            llama_free(c)
+        }
+        if let m = model {
+            llama_model_free(m)
+        }
     }
 
     /// Load a GGUF model file into Metal GPU memory.
@@ -149,20 +161,28 @@ public actor AILocalEngine {
         self.batch = llama_batch_init(512, 0, 1)
 
         // 5. Sampler chain
-        let sparams = llama_sampler_chain_default_params()
-        guard let chain = llama_sampler_chain_init(sparams) else {
+        guard let chain = Self.makeSamplerChain(vocab: modelVocab, temperature: 0.2) else {
             unload()
             throw AILocalEngineError.contextInitFailed
         }
-        llama_sampler_chain_add(chain, llama_sampler_init_top_k(40))
-        llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9, 1))
-        llama_sampler_chain_add(chain, llama_sampler_init_penalties(llama_vocab_n_tokens(modelVocab), 64, 1.15, 0.0, 0.2))
-        llama_sampler_chain_add(chain, llama_sampler_init_temp(0.2))
-        llama_sampler_chain_add(chain, llama_sampler_init_dist(42))
         self.sampler = chain
+        self.currentSamplerTemperature = 0.2
 
         self.currentModelPath = path
         self.isLoaded = true
+    }
+
+    private static func makeSamplerChain(vocab: OpaquePointer, temperature: Float) -> UnsafeMutablePointer<llama_sampler>? {
+        let sparams = llama_sampler_chain_default_params()
+        guard let chain = llama_sampler_chain_init(sparams) else {
+            return nil
+        }
+        llama_sampler_chain_add(chain, llama_sampler_init_top_k(40))
+        llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9, 1))
+        llama_sampler_chain_add(chain, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.15, 0.0, 0.2))
+        llama_sampler_chain_add(chain, llama_sampler_init_temp(temperature))
+        llama_sampler_chain_add(chain, llama_sampler_init_dist(42))
+        return chain
     }
 
     /// Unload model and free all C/Metal memory buffers.
@@ -254,10 +274,23 @@ public actor AILocalEngine {
     public func generateContinuation(
         prompt: String,
         maxTokens: Int = 16,
+        temperature: Float = 0.2,
         stopSequences: [String] = ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "<eos>", "\n"],
         onToken: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
-        guard isLoaded, let ctx = context, let v = vocab, let smpl = sampler, var b = batch else {
+        guard isLoaded, let ctx = context, let v = vocab, var b = batch else {
+            throw AILocalEngineError.notLoaded
+        }
+        defer { self.batch = b }
+
+        if sampler == nil || abs(temperature - currentSamplerTemperature) > 0.001 {
+            if let old = sampler {
+                llama_sampler_free(old)
+            }
+            sampler = Self.makeSamplerChain(vocab: v, temperature: temperature)
+            currentSamplerTemperature = temperature
+        }
+        guard let smpl = sampler else {
             throw AILocalEngineError.notLoaded
         }
 

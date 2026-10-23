@@ -13,6 +13,7 @@ final class ConversionLogStore: ObservableObject {
     @Published private(set) var logs: [ConversionLog] = []
     
     private var db: OpaquePointer?
+    private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
     // MARK: - Init
     
@@ -113,11 +114,11 @@ final class ConversionLogStore: ObservableObject {
         
         let timestamp = Date().timeIntervalSince1970
         sqlite3_bind_double(stmt, 1, timestamp)
-        sqlite3_bind_text(stmt, 2, (inputText as NSString).utf8String, -1, nil)
-        sqlite3_bind_text(stmt, 3, (outputText as NSString).utf8String, -1, nil)
-        sqlite3_bind_text(stmt, 4, (sourceLayout as NSString).utf8String, -1, nil)
-        sqlite3_bind_text(stmt, 5, (targetLayout as NSString).utf8String, -1, nil)
-        sqlite3_bind_text(stmt, 6, (conversionMode as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (inputText as NSString).utf8String, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 3, (outputText as NSString).utf8String, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 4, (sourceLayout as NSString).utf8String, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 5, (targetLayout as NSString).utf8String, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 6, (conversionMode as NSString).utf8String, -1, sqliteTransient)
         
         if sqlite3_step(stmt) == SQLITE_DONE {
             NSLog("[LangSwitcher] ConversionLogStore: logged conversion '\(inputText)' -> '\(outputText)'")

@@ -237,9 +237,9 @@ final class AIInferenceEngine: ObservableObject {
         }
     }
     
-    static let defaultSystemPromptEn = "Continue the immediate thought naturally with a few words (up to 4 words). Maintain the existing context, language and style. Do not invent new unrelated topics, quotes, proper nouns or random questions. Do not explain."
-    static let defaultSystemPromptRu = "Продолжи начатую мысль естественно несколькими словами (до 4 слов). Сохраняй контекст, язык и стиль. Не придумывай новые несвязанные темы, имена, названия в кавычках или вопросы. Не добавляй пояснений."
-    static var defaultSystemPrompt: String { defaultSystemPromptEn }
+    nonisolated static let defaultSystemPromptEn = "Continue the immediate thought naturally with a few words (up to 4 words). Maintain the existing context, language and style. Do not invent new unrelated topics, quotes, proper nouns or random questions. Do not explain."
+    nonisolated static let defaultSystemPromptRu = "Продолжи начатую мысль естественно несколькими словами (до 4 слов). Сохраняй контекст, язык и стиль. Не придумывай новые несвязанные темы, имена, названия в кавычках или вопросы. Не добавляй пояснений."
+    nonisolated static var defaultSystemPrompt: String { defaultSystemPromptEn }
 
     nonisolated static func containsCyrillic(_ text: String) -> Bool {
         text.contains { ("\u{0400}"..."\u{04FF}").contains($0) }
@@ -322,8 +322,8 @@ final class AIInferenceEngine: ObservableObject {
                 : "The partner asked a question. Answer it concisely and naturally in first person in 2-4 words."
             system += "\n" + qaPrompt
         }
-        if !afterCaret.isEmpty {
-            let data = try! JSONSerialization.data(withJSONObject: ["after": afterCaret], options: [.sortedKeys])
+        if !afterCaret.isEmpty,
+           let data = try? JSONSerialization.data(withJSONObject: ["after": afterCaret], options: [.sortedKeys]) {
             system += "\nInsert before the following existing suffix, without repeating it: " + String(decoding: data, as: UTF8.self)
         }
         return [["role": "system", "content": system], ["role": "user", "content": context]]
@@ -405,7 +405,6 @@ final class AIInferenceEngine: ObservableObject {
         }
         guard let version = integer(4), [2, 3].contains(version), integer(8) != nil,
               let count = integer(8), count <= 100_000 else { return nil }
-        var found = false
         for _ in 0..<count {
             guard let key = string(read: true), let type = integer(4) else { return nil }
             if key == "tokenizer.chat_template", type == 8 {
@@ -544,10 +543,12 @@ final class AIInferenceEngine: ObservableObject {
             }
 
             let started = Date()
+            let effectiveTemp = LoRAAdapterManager.shared.effectiveTemperature(base: 0.2)
             do {
                 let generated = try await AILocalEngine.shared.generateContinuation(
                     prompt: nativePrompt,
-                    maxTokens: Self.predictionTokenBudget(context: context, maxWords: maxWords)
+                    maxTokens: Self.predictionTokenBudget(context: context, maxWords: maxWords),
+                    temperature: effectiveTemp
                 ) { partial in
                     var currentRaw = partial
                     if healsWord, let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
@@ -751,7 +752,7 @@ final class AIInferenceEngine: ObservableObject {
                     raw = healed
                 }
                 guard let cleaned = Self.cleanAndTrimContinuation(raw: raw, context: context,
-                    wordBuffer: wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
+                    wordBuffer: healsWord ? "" : wordBuffer, maxWords: maxWords, afterCaret: afterCaret,
                     screenContext: screenContext) else { return nil }
                 return context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
             } catch {
