@@ -982,6 +982,9 @@ final class AutoCorrectionService {
         lastCaretContext = nil
         overlayController.hide()
         ghostTextController.hide()
+        WordAlternativesController.shared.hide()
+        ThesaurusController.shared.hide()
+        SmartRepliesController.shared.hide()
         fieldAnchorController.updateContextState(hasScreenContext: false, hasPendingQuestion: false)
         Task { await AILocalEngine.shared.resetStitch() }
     }

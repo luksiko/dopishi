@@ -15,6 +15,7 @@ final class ThesaurusController: NSObject {
 
     private(set) var activeCandidates: [ThesaurusEngine.Candidate] = []
     private(set) var activeWord: String?
+    private(set) var isActualSelection: Bool = false
 
     var isVisible: Bool {
         panel?.isVisible == true
@@ -25,11 +26,12 @@ final class ThesaurusController: NSObject {
         super.init()
     }
 
-    func show(word: String, candidates: [ThesaurusEngine.Candidate], anchor: CGRect) {
+    func show(word: String, candidates: [ThesaurusEngine.Candidate], anchor: CGRect, isActualSelection: Bool = true) {
         guard !candidates.isEmpty else { return }
 
         self.activeWord = word
         self.activeCandidates = candidates
+        self.isActualSelection = isActualSelection
 
         let hudView = ThesaurusHUDView(
             word: word,
@@ -106,24 +108,31 @@ final class ThesaurusController: NSObject {
     }
 
     func applyReplacement(_ replacement: String) {
-        guard activeWord != nil else {
+        guard let word = activeWord else {
             hide()
             return
         }
 
-        // If text is currently selected, paste directly over selection
-        accessibilityService.pasteReplacingSelection(replacement)
+        if isActualSelection {
+            // If text was highlighted, paste over selection
+            accessibilityService.pasteReplacingSelection(replacement)
+        } else {
+            // If no text was highlighted, delete the preceding word and insert synonym
+            accessibilityService.replaceWithBackspaces(count: word.count, replacement: replacement)
+        }
         hide()
     }
 
     func triggerForCurrentSelection() {
         // Try getting selection from AX
         var selectedText: String?
+        var isActualSelection = false
         if let focused = accessibilityService.focusedTextElement() {
             var value: AnyObject?
             if AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &value) == .success,
                let text = value as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 selectedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                isActualSelection = true
             }
         }
 
@@ -132,6 +141,7 @@ final class ThesaurusController: NSObject {
             if let context = accessibilityService.captureCaretContext(),
                let lastWord = context.textBeforeCaret.split(separator: " ").last {
                 selectedText = String(lastWord)
+                isActualSelection = false
             }
         }
 
@@ -141,6 +151,6 @@ final class ThesaurusController: NSObject {
         guard !candidates.isEmpty else { return }
 
         let caret = accessibilityService.caretScreenRect() ?? CGRect(x: 200, y: 500, width: 2, height: 16)
-        show(word: word, candidates: candidates, anchor: caret)
+        show(word: word, candidates: candidates, anchor: caret, isActualSelection: isActualSelection)
     }
 }
