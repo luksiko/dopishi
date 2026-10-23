@@ -127,3 +127,5 @@ The update feed URL configured in `Info.plist` is:
    ```bash
    bash scripts/bump-cask.sh "${VERSION}" "Dopishi-${VERSION}-universal.dmg"
    ```
+6. **Sparkle Version Comparison (`sparkle:version` vs `CFBundleVersion`)**:
+   `sparkle:version` MUST always match the integer build number `CFBundleVersion` (`CURRENT_PROJECT_VERSION`), while `sparkle:shortVersionString` contains the marketing version (`1.5.1`). If `sparkle:version` is set to "1.5.1", Sparkle compares `"7"` (current build) against `"1.5.1"`, considers build 7 newer than 1.5.1, and reports *"You're up to date! Dopishi 1.5.1 is currently the newest version available (You are currently running version 1.5.0.)"*. `scripts/package-release.sh` extracts `CFBundleVersion` automatically.

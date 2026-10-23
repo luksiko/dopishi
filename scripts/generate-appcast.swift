@@ -2,18 +2,31 @@
 import Foundation
 import CryptoKit
 
-// Usage: swift scripts/generate-appcast.swift <version> <tag> <path-to-universal-zip> [output-path]
+// Usage: swift scripts/generate-appcast.swift <version> [build-number] <tag> <path-to-universal-zip> [output-path]
 // Environment: SPARKLE_PRIVATE_ED_KEY (base64 encoded 32-byte private key)
 
 guard CommandLine.arguments.count >= 4 else {
-    print("Usage: swift scripts/generate-appcast.swift <version> <tag> <path-to-universal-zip> [output-path]")
+    print("Usage: swift scripts/generate-appcast.swift <version> [build-number] <tag> <path-to-universal-zip> [output-path]")
     exit(1)
 }
 
 let version = CommandLine.arguments[1].replacingOccurrences(of: "^v", with: "", options: .regularExpression)
-let tag = CommandLine.arguments[2]
-let zipPath = CommandLine.arguments[3]
-let outputPath = CommandLine.arguments.count > 4 ? CommandLine.arguments[4] : "appcast.xml"
+let buildNumber: String
+let tag: String
+let zipPath: String
+let outputPath: String
+
+if CommandLine.arguments.count >= 5 && !CommandLine.arguments[2].hasPrefix("v") && Int(CommandLine.arguments[2]) != nil {
+    buildNumber = CommandLine.arguments[2]
+    tag = CommandLine.arguments[3]
+    zipPath = CommandLine.arguments[4]
+    outputPath = CommandLine.arguments.count > 5 ? CommandLine.arguments[5] : "appcast.xml"
+} else {
+    tag = CommandLine.arguments[2]
+    zipPath = CommandLine.arguments[3]
+    outputPath = CommandLine.arguments.count > 4 ? CommandLine.arguments[4] : "appcast.xml"
+    buildNumber = version
+}
 
 let zipURL = URL(fileURLWithPath: zipPath)
 guard FileManager.default.fileExists(atPath: zipPath) else {
@@ -51,7 +64,7 @@ let pubDate = rfc822Formatter.string(from: Date())
 
 let enclosureAttrs = [
     "url=\"https://github.com/luksiko/dopishi/releases/download/\(tag)/\(zipFilename)\"",
-    "sparkle:version=\"\(version)\"",
+    "sparkle:version=\"\(buildNumber)\"",
     "sparkle:shortVersionString=\"\(version)\"",
     "length=\"\(fileSize)\"",
     "type=\"application/octet-stream\"",

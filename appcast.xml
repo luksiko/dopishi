@@ -11,7 +11,7 @@
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <enclosure
         url="https://github.com/luksiko/dopishi/releases/download/v1.5.1/Dopishi-1.5.1-universal.zip"
-        sparkle:version="1.5.1"
+        sparkle:version="8"
         sparkle:shortVersionString="1.5.1"
         length="33649598"
         type="application/octet-stream" />

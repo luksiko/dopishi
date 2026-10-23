@@ -119,8 +119,9 @@ thin_bundle() {
 package_artifacts "$built_app" "-universal"
 
 # 2. Generate Sparkle appcast pointing to Universal zip
-echo "==> Generating Sparkle appcast: appcast.xml (points to universal zip)..."
-swift "$script_dir/generate-appcast.swift" "$VERSION" "v${VERSION}" "$project_root/Dopishi-${VERSION}-universal.zip" "$project_root/appcast.xml"
+build_number=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$built_app/Contents/Info.plist" 2>/dev/null || echo "$VERSION")
+echo "==> Generating Sparkle appcast: appcast.xml (version: $VERSION, build: $build_number)..."
+swift "$script_dir/generate-appcast.swift" "$VERSION" "$build_number" "v${VERSION}" "$project_root/Dopishi-${VERSION}-universal.zip" "$project_root/appcast.xml"
 
 # 3. Thin & Package Apple Silicon (arm64) Assets
 thin_bundle "$built_app" "$build_dir/Dopishi_arm64.app" "arm64"
