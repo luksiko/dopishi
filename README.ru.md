@@ -1,24 +1,25 @@
-<p align="center">
-  <img src="screenshots/icon.png" width="96" height="96" alt="Иконка приложения Dopishi">
+<img src="screenshots/icon.png" align="left" width="144" height="144" alt="Dopishi">
+
+<h1>Dopishi (Допиши)</h1>
+
+<p>Пишите свободно — Dopishi исправит опечатки и неверную раскладку, расставит знаки и предложит продолжение с помощью локального AI. Живёт в строке меню macOS. Бесплатно и с открытым исходным кодом.</p>
+
+<p>
+  <a href="https://github.com/luksiko/dopishi/releases/latest"><img src="assets/download-macos.svg" width="190" height="48" alt="Скачать для macOS"></a>
 </p>
 
-<h1 align="center">Dopishi (Допиши)</h1>
+<br clear="all">
 
 <p align="center">
-  <strong>Локальный AI-ассистент набора текста, автокорректор опечаток и раскладки, умная типографика и мгновенный переключатель языка для macOS.</strong>
+  <a href="https://github.com/luksiko/dopishi/releases/latest"><img src="https://img.shields.io/github/v/release/luksiko/dopishi?style=for-the-badge&amp;logo=github&amp;label=Release&amp;color=1683FF" alt="Latest release"></a>
+  <a href="https://github.com/luksiko/dopishi/releases"><img src="https://img.shields.io/github/downloads/luksiko/dopishi/total?style=for-the-badge&amp;label=Downloads&amp;color=555555" alt="Total downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-555555?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://ko-fi.com/luksiko"><img src="https://img.shields.io/badge/Tip_on_Ko--fi-FF5E5B?style=for-the-badge&amp;logo=kofi&amp;logoColor=white" alt="Поддержать на Ko-fi"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-13%2B-555555?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="macOS 13+"></a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <strong>Русский</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/luksiko/dopishi/actions/workflows/build.yml"><img src="https://github.com/luksiko/dopishi/actions/workflows/build.yml/badge.svg" alt="Статус сборки"></a>
-  <a href="https://github.com/luksiko/dopishi/releases/latest"><img src="https://img.shields.io/github/v/release/luksiko/dopishi?color=blue&label=%D0%A0%D0%B5%D0%BB%D0%B8%D0%B7" alt="Последний релиз"></a>
-  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-13%2B%20Ventura-brightgreen.svg" alt="macOS 13+"></a>
-  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5%20%7C%20Metal-orange.svg" alt="Swift 5 & Metal"></a>
-  <img src="https://img.shields.io/badge/AI-100%25%20%D0%9B%D0%BE%D0%BA%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE%20(GGUF)-success.svg" alt="100% Локальный AI">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/%D0%9B%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-purple.svg" alt="Лицензия: MIT"></a>
+  <a href="README.md">English</a> · <strong>Русский</strong>
 </p>
 
 ---
@@ -114,7 +115,11 @@ bash scripts/package-release.sh 1.5.1
 
 ## Поддержать проект
 
-Dopishi — бесплатный проект с открытым исходным кодом. Если приложение экономит вам время каждый день, вы можете поддержать его развитие:
+Dopishi — бесплатный проект с открытым исходным кодом. Если он помогает вам каждый день, угостите автора кофе — это простой способ сказать спасибо и поддержать дальнейшую разработку.
+
+<p>
+  <a href="https://ko-fi.com/luksiko"><img src="https://img.shields.io/badge/Support_on_Ko--fi-FF5E5B?style=for-the-badge&amp;logo=kofi&amp;logoColor=white" alt="Поддержать на Ko-fi"></a>
+</p>
 
 ### Перевод картой РФ
 👉 **[Перевод через Т-Банк](https://www.tbank.ru/cf/66tz0unG7b7)**
