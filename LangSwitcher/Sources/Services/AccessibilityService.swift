@@ -837,13 +837,8 @@ final class AccessibilityService {
 
     /// App-specific coordinate corrections for applications with uncompensated container insets.
     static func adjustCaretForApp(caret: CGRect, bundleID: String?) -> CGRect {
-        if bundleID == "ru.keepcoder.Telegram" {
-            // Telegram macOS reports text range AX bounds shifted upwards by 18 points
-            // due to uncompensated chat input container padding and baseline offset. Adjust Y downwards in Cocoa coordinates.
-            let lineOffset: CGFloat = 18.0
-            return CGRect(x: caret.origin.x, y: caret.origin.y - lineOffset,
-                          width: caret.width, height: caret.height)
-        }
+        // Universal TextKit caret baseline resolution in `resolveCaretBounds` dynamically
+        // aligns coordinates across all editors (Apple Notes, Telegram, TextEdit, Pages).
         return caret
     }
 
@@ -1009,19 +1004,59 @@ final class AccessibilityService {
         return parameterizedRect(element, attribute: "AXBoundsForTextMarkerRange", parameter: markerRange)
     }
 
+    /// Minimum vertical offset (in Cocoa points) between zero-length layout fragment top
+    /// and actual character baseline to detect TextKit 2 insertion-point rendering anomaly.
+    static let textKitBaselineAnomalyThreshold: CGFloat = 4.0
+
     static func resolveCaretBounds(selectedRange: CFRange?, primaryScreenMaxY: CGFloat,
                                    rangeBounds: (CFRange) -> CGRect?, markerBounds: () -> CGRect?) -> CGRect? {
         if let range = selectedRange {
             guard range.location >= 0, range.length == 0 else { return nil }
-            if let bounds = rangeBounds(range),
-               let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
-                                                 precedingCharacter: false) { return caret }
-            // A preceding character is only a fallback: at a line wrap its
-            // position legitimately differs from the current insertion point.
-            if range.location > 0,
-               let bounds = rangeBounds(CFRange(location: range.location - 1, length: 1)),
-               let caret = normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY,
-                                                 precedingCharacter: true) { return caret }
+            let zeroBounds = rangeBounds(range)
+            let prevBounds = range.location > 0 ? rangeBounds(CFRange(location: range.location - 1, length: 1)) : nil
+
+            // 1. If preceding character is available, verify and compensate for TextKit 2 layout offset anomaly:
+            // in Apple Notes and TextKit 2 apps, zero-length ranges return paragraph/layout fragment tops
+            // (shifted up ~1 line height in screen space), while the preceding character's maxX strictly matches X.
+            if let prev = prevBounds,
+               let prevCaret = normalizedCaretBounds(prev, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: true) {
+                if let zero = zeroBounds,
+                   let zeroCaret = normalizedCaretBounds(zero, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false) {
+                    // Check if X coordinates align horizontally (same line, not a soft wrap)
+                    if abs(zeroCaret.minX - prevCaret.minX) <= 1.5 {
+                        // Same line: if zero-length Y is substantially higher than preceding char Y (TextKit 2 bug),
+                        // use the true line baseline from preceding character.
+                        if zeroCaret.origin.y > prevCaret.origin.y + textKitBaselineAnomalyThreshold {
+                            return prevCaret
+                        }
+                        return zeroCaret
+                    } else {
+                        // Soft wrap or start of newline: check if succeeding character provides the true line baseline
+                        if let next = rangeBounds(CFRange(location: range.location, length: 1)),
+                           let nextCaret = normalizedCaretBounds(next, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false),
+                           abs(zeroCaret.minX - nextCaret.minX) <= 1.5,
+                           zeroCaret.origin.y > nextCaret.origin.y + textKitBaselineAnomalyThreshold {
+                            return nextCaret
+                        }
+                        return zeroCaret
+                    }
+                }
+                return prevCaret
+            }
+
+            // 2. If at start of line (or document), check succeeding character (length: 1 at location)
+            // for the same TextKit 2 top-offset anomaly.
+            if let zero = zeroBounds,
+               let zeroCaret = normalizedCaretBounds(zero, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false) {
+                if let next = rangeBounds(CFRange(location: range.location, length: 1)),
+                   let nextCaret = normalizedCaretBounds(next, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false) {
+                    if abs(zeroCaret.minX - nextCaret.minX) <= 1.5,
+                       zeroCaret.origin.y > nextCaret.origin.y + textKitBaselineAnomalyThreshold {
+                        return nextCaret
+                    }
+                }
+                return zeroCaret
+            }
         }
         guard let bounds = markerBounds(), bounds.width <= 2 else { return nil }
         return normalizedCaretBounds(bounds, primaryScreenMaxY: primaryScreenMaxY, precedingCharacter: false)

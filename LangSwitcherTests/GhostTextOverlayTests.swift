@@ -214,6 +214,79 @@ extension GhostTextOverlayTests {
         XCTAssertEqual(rect, CGRect(x: 10, y: 105, width: 1, height: 15))
     }
 
+    func testTextKit2LayoutOffsetAnomalyCompensatedFromPrecedingCharacter() {
+        // Apple Notes / TextKit 2 bug: zero-length query reports Carbon Y=572 (Cocoa Y=706),
+        // while preceding character query reports the true Carbon Y=590 (Cocoa Y=688) with identical X.
+        let rect = AccessibilityService.resolveCaretBounds(
+            selectedRange: CFRange(location: 272, length: 0),
+            primaryScreenMaxY: 1296,
+            rangeBounds: { range in
+                if range.length == 0 {
+                    return CGRect(x: 3619.4, y: 572.0, width: 0.0, height: 18.0)
+                } else if range.location == 271 && range.length == 1 {
+                    return CGRect(x: 3615.4, y: 590.0, width: 4.0, height: 18.0)
+                }
+                return nil
+            },
+            markerBounds: { nil }
+        )
+        XCTAssertNotNil(rect)
+        // Cocoa Y for true line: 1296 - (590 + 18) = 688
+        XCTAssertEqual(rect?.origin.y, 688)
+        XCTAssertEqual(rect?.origin.x, 3619.4)
+        XCTAssertEqual(rect?.size.height, 18.0)
+    }
+
+    func testTextKit2LayoutOffsetAnomalyCompensatedFromSucceedingCharacterAtLineStart() {
+        // At start of line / document: preceding char not on same line, but succeeding char has true line Y.
+        let rect = AccessibilityService.resolveCaretBounds(
+            selectedRange: CFRange(location: 0, length: 0),
+            primaryScreenMaxY: 1296,
+            rangeBounds: { range in
+                if range.length == 0 {
+                    return CGRect(x: 2899.0, y: 419.0, width: 0.0, height: 28.0)
+                } else if range.location == 0 && range.length == 1 {
+                    return CGRect(x: 2899.0, y: 447.0, width: 15.0, height: 28.0)
+                }
+                return nil
+            },
+            markerBounds: { nil }
+        )
+        XCTAssertNotNil(rect)
+        // Cocoa Y for true line: 1296 - (447 + 28) = 821
+        XCTAssertEqual(rect?.origin.y, 821)
+        XCTAssertEqual(rect?.origin.x, 2899.0)
+        XCTAssertEqual(rect?.size.height, 28.0)
+    }
+
+    func testTextKit2LayoutOffsetAnomalyCompensatedFromSucceedingCharacterAtStartOfMiddleLine() {
+        // At start of line 2 (location: 50): preceding character was at line 1 (x: 500, y: 100).
+        // Zero-length query at line 2 reports x: 100, y: 120 (TextKit 2 top-offset anomaly).
+        // Succeeding character at line 2 (loc: 50, len: 1) reports x: 100, y: 140 (true line baseline).
+        let rect = AccessibilityService.resolveCaretBounds(
+            selectedRange: CFRange(location: 50, length: 0),
+            primaryScreenMaxY: 900,
+            rangeBounds: { range in
+                if range.length == 0 {
+                    return CGRect(x: 100, y: 120, width: 0, height: 18)
+                } else if range.location == 49 && range.length == 1 {
+                    // Preceding character on line 1
+                    return CGRect(x: 490, y: 100, width: 10, height: 18)
+                } else if range.location == 50 && range.length == 1 {
+                    // Succeeding character on line 2
+                    return CGRect(x: 100, y: 140, width: 10, height: 18)
+                }
+                return nil
+            },
+            markerBounds: { nil }
+        )
+        XCTAssertNotNil(rect)
+        // Cocoa Y for true line 2: 900 - (140 + 18) = 742
+        XCTAssertEqual(rect?.origin.y, 742)
+        XCTAssertEqual(rect?.origin.x, 100)
+        XCTAssertEqual(rect?.size.height, 18.0)
+    }
+
     func testFieldAnchorRemainsOnLeftMonitor() {
         let screen = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
         let frame = FieldAnchorOverlayController.badgeFrame(
@@ -243,14 +316,11 @@ extension GhostTextOverlayTests {
         XCTAssertTrue(anchor.isVisible)
     }
 
-    func testTelegramCaretAdjustedDownwardsForContainerPadding() {
+    func testTelegramCaretRemainsUnchangedWithUniversalResolution() {
         let rawCaret = CGRect(x: 500, y: 400, width: 1, height: 16)
         let adjusted = AccessibilityService.adjustCaretForApp(caret: rawCaret, bundleID: "ru.keepcoder.Telegram")
-        // In Telegram, input container padding and baseline offset is 18 points downwards (smaller Y in Cocoa)
-        XCTAssertEqual(adjusted.origin.x, 500)
-        XCTAssertEqual(adjusted.origin.y, 400 - 18)
-        XCTAssertEqual(adjusted.width, 1)
-        XCTAssertEqual(adjusted.height, 16)
+        // Universal baseline resolution in resolveCaretBounds dynamically handles TextKit baseline offsets
+        XCTAssertEqual(adjusted, rawCaret)
     }
 
     func testNonTelegramCaretRemainsUnchanged() {
