@@ -88,6 +88,11 @@
 		E10000010000000000000140 /* DictionaryDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000140 /* DictionaryDownloadManager.swift */; };
 		E10000010000000000000141 /* DictionaryDownloadManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */; };
 		E10000010000000000000142 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000142 /* OnboardingView.swift */; };
+		E10000010000000000000143 /* Strings_uk.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000143 /* Strings_uk.swift */; };
+		E10000010000000000000144 /* Strings_de.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000144 /* Strings_de.swift */; };
+		E10000010000000000000145 /* Strings_fr.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000145 /* Strings_fr.swift */; };
+		E10000010000000000000146 /* Strings_es.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000146 /* Strings_es.swift */; };
+		E10000010000000000000147 /* LocalizationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000147 /* LocalizationManagerTests.swift */; };
 		E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000059 /* CompletionStatsTracker.swift */; };
 		E1000001000000000000005A /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005A /* KeyboardView.swift */; };
 		E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005B /* CompletionDemoTextField.swift */; };
@@ -262,6 +267,11 @@
 		E10000020000000000000140 /* DictionaryDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryDownloadManager.swift; sourceTree = "<group>"; };
 		E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryDownloadManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000142 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		E10000020000000000000143 /* Strings_uk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_uk.swift; sourceTree = "<group>"; };
+		E10000020000000000000144 /* Strings_de.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_de.swift; sourceTree = "<group>"; };
+		E10000020000000000000145 /* Strings_fr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_fr.swift; sourceTree = "<group>"; };
+		E10000020000000000000146 /* Strings_es.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings_es.swift; sourceTree = "<group>"; };
+		E10000020000000000000147 /* LocalizationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000131 /* CompletionStatsTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTrackerTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -436,6 +446,10 @@
 				E10000020000000000000019 /* LocalizationManager.swift */,
 				E10000020000000000000020 /* Strings_en.swift */,
 				E10000020000000000000021 /* Strings_ru.swift */,
+				E10000020000000000000143 /* Strings_uk.swift */,
+				E10000020000000000000144 /* Strings_de.swift */,
+				E10000020000000000000145 /* Strings_fr.swift */,
+				E10000020000000000000146 /* Strings_es.swift */,
 			);
 			path = Localization;
 			sourceTree = "<group>";
@@ -498,6 +512,7 @@
 				E10000020000000000000130 /* BatteryPowerManagerTests.swift */,
 				E10000020000000000000131 /* CompletionStatsTrackerTests.swift */,
 				E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */,
+				E10000020000000000000147 /* LocalizationManagerTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -694,6 +709,10 @@
 				E1000001000000000000005C /* TimeSavedBanner.swift in Sources */,
 				E10000010000000000000140 /* DictionaryDownloadManager.swift in Sources */,
 				E10000010000000000000142 /* OnboardingView.swift in Sources */,
+				E10000010000000000000143 /* Strings_uk.swift in Sources */,
+				E10000010000000000000144 /* Strings_de.swift in Sources */,
+				E10000010000000000000145 /* Strings_fr.swift in Sources */,
+				E10000010000000000000146 /* Strings_es.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -739,6 +758,7 @@
 				E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */,
 				E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */,
 				E10000010000000000000141 /* DictionaryDownloadManagerTests.swift in Sources */,
+				E10000010000000000000147 /* LocalizationManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

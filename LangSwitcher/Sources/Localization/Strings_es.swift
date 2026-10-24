@@ -1,0 +1,722 @@
+import Foundation
+
+// MARK: - Spanish Strings (Español)
+
+enum Strings_es {
+
+    static let strings: [String: String] = [
+
+        // ── Menu (StatusBarController) ──────────────────────────────
+        "menu.header":                    "⌨ Dopishi",
+        "menu.appActive":                 "✓ Activado en “%@”",
+        "menu.appDisabled":               "○ Desactivado en “%@”",
+        "menu.pause30Min":                "⏸ Pausar durante 30 minutos",
+        "menu.resumeNow":                 "▶ Reanudar (quedan %d min)",
+        "menu.aiAssistant":               "Asistente IA (neuronal)",
+        "menu.aiStatusBattery":           "Ahorro de batería — IA pausada",
+        "menu.aiStatusDownloading":       "Descargando modelo (%d%%)",
+        "menu.aiStatusFastDictionary":    "Diccionario rápido",
+        "menu.aiStatusDisabled":          "Desactivado",
+        "menu.batteryEcoMode":            "Modo de ahorro de batería",
+        "menu.conversionHistory":         "Historial de conversiones…",
+        "menu.layoutsSubmenu":            "Disposiciones",
+        "menu.convertText":               "Convertir texto",
+        "menu.switchLayout":              "Cambiar disposición del teclado",
+        "menu.activeLayouts":             "Disposiciones activas:",
+        "menu.conversions":               "Conversiones:",
+        "menu.settings":                  "Ajustes…",
+        "menu.checkForUpdates":           "Buscar actualizaciones…",
+        "menu.setupWizard":               "Asistente de configuración…",
+        "menu.about":                     "Acerca de Dopishi",
+        "menu.quit":                      "Salir de Dopishi",
+        "menu.tooltip":                   "Dopishi — %@ para convertir",
+
+
+        // ── Attention Center ─────────────────────────────────────────
+        "attention.header":               "Atención requerida",
+        "attention.inlinePredictionConflict.title": "Conflicto con las predicciones de macOS",
+        "attention.inlinePredictionConflict.desc": "Las predicciones integradas de macOS se superponen a las sugerencias de Dopishi e interceptan las teclas Espacio/Tabulador.",
+        "attention.inlinePredictionConflict.action": "Desactivar predicciones de macOS",
+        "attention.accessibility.title":  "Permiso de accesibilidad requerido",
+        "attention.accessibility.desc":   "Dopishi necesita permiso de accesibilidad para detectar la entrada y sustituir el texto.",
+        "attention.accessibility.action": "Abrir Ajustes del Sistema",
+        "attention.noModel.title":        "Modelo de IA local no descargado",
+        "attention.noModel.desc":         "El autocompletado con IA está activado, pero no hay ningún archivo de modelo instalado.",
+        "attention.noModel.action":       "Abrir ajustes de IA",
+        "attention.screenRecording.title": "Permiso de grabación de pantalla necesario",
+        "attention.screenRecording.desc": "Se requiere permiso de grabación de pantalla para la comprensión del contexto.",
+        "attention.screenRecording.action": "Abrir Ajustes del Sistema",
+        "attention.clipboard.title":      "Activar contexto del portapapeles",
+        "attention.clipboard.desc":       "El contexto del portapapeles ayuda a mejorar la precisión del autocompletado.",
+        "attention.clipboard.action":     "Activar en Ajustes",
+
+
+        // ── Settings Window ─────────────────────────────────────────
+        "settings.windowTitle":           "Ajustes de Dopishi",
+        "settings.tab.setup":             "Asistente de configuración",
+        "settings.tab.general":           "General",
+        "settings.tab.shortcuts":         "Atajos",
+        "settings.tab.layouts":           "Disposiciones y diccionarios",
+        "settings.tab.autoCorrection":    "Autocorrección",
+        "settings.tab.layout":            "Disposición",
+        "settings.tab.hotkey":            "Atajo de teclado",
+        "settings.tab.ai":                "Autocompletado e IA",
+        "settings.tab.apps":              "Aplicaciones",
+        "settings.tab.history":           "Historial y estadísticas",
+        "settings.tab.about":             "Acerca de",
+        "settings.tab.permissions":       "Permisos",
+        "settings.tab.log":               "Registro",
+        "settings.iconStyle.languageBadge": "Código de idioma en marco",
+        "settings.iconStyle.keyboardIcon": "Icono de teclado",
+
+
+        // ── Apps Tab ────────────────────────────────────────────────
+        "apps.title":                     "Reglas para aplicaciones",
+        "apps.description":               "Configura reglas personalizadas de conversión de disposición, autocorrección y autocompletado con IA para aplicaciones específicas.",
+        "apps.empty":                     "No hay reglas de aplicaciones personalizadas. La configuración por omisión se aplica en todas partes.",
+        "apps.addRunning":                "Añadir aplicación en ejecución",
+        "apps.chooseFromDisk":            "Seleccionar de Aplicaciones…",
+        "apps.disableLayout":             "Desactivar conversión de disposición y autocorrección",
+        "apps.enableAI":                  "Activar sugerencias de IA",
+        "apps.customInstructions":        "Instrucciones de IA personalizadas para esta aplicación:",
+        "apps.customVocabulary":          "Palabras de vocabulario personalizado (separadas por comas):",
+        "apps.remove":                    "Eliminar reglas",
+        "apps.badge.layoutOff":           "Disposición desc.",
+        "apps.badge.aiOff":               "IA desc.",
+        "apps.badge.customPrompt":        "Aviso personalizado",
+
+
+        // ── Permissions Integration ────────────────────────────────
+        "permissions.active":             "Accesibilidad activa",
+        "permissions.activeDesc":         "La monitorización del teclado y la conversión de texto funcionan correctamente.",
+        "permissions.openSystemSettings": "Abrir Ajustes del Sistema…",
+        "permissions.guide":              "Guía de configuración",
+
+
+        // ── Statistics Summary ──────────────────────────────────────
+        "stats.summary":                  "Resumen de actividad",
+        "stats.conversions":              "Conversiones de disposición",
+        "stats.recoveries":               "Recuperaciones de texto",
+        "stats.aiGenerated":              "Autocompletados con IA",
+
+
+        // ── General Tab ─────────────────────────────────────────────
+        "general.language":               "Idioma",
+        "general.statusBarIcon":          "Icono de la barra de menús",
+        "general.launchAtLogin":          "Abrir al iniciar sesión",
+        "general.playSound":              "Reproducir sonido al convertir",
+        "general.showNotifications":      "Mostrar notificaciones",
+        "general.updates":                "Actualizaciones",
+        "general.autoUpdateCheck":        "Buscar actualizaciones automáticamente",
+        "general.checkNow":               "Buscar actualizaciones…",
+        "general.updatesDesc":            "Mantén Dopishi actualizado con mejoras y correcciones de errores a través de Sparkle.",
+        "general.iCloudSync":             "Sincronización con iCloud (E2EE)",
+        "general.iCloudSyncDesc":         "Sincroniza de forma segura el vocabulario personal y las preferencias entre tus Mac mediante cifrado de extremo a extremo.",
+        "general.smartConversion":        "Conversión inteligente (sin selección)",
+        "general.mode":                   "Modo:",
+        "general.layoutSwitch":           "Cambio de disposición al convertir con atajo",
+        "general.howItWorks":             "Cómo funciona",
+        "general.howItWorksText":         "Cuando hay texto seleccionado, el atajo convierte la selección.\nCuando no hay texto seleccionado, el comportamiento depende del modo de conversión inteligente superior.",
+        "general.statistics":             "Estadísticas",
+        "general.totalConversions":       "Total de conversiones:",
+
+
+        // ── Smart Conversion Modes ──────────────────────────────────
+        "smartMode.lastWord.name":        "Solo la última palabra",
+        "smartMode.greedyLine.name":      "Avaro (frase completa)",
+        "smartMode.disabled.name":        "Desactivado",
+        "smartMode.lastWord.desc":        "Convierte solo la última palabra escrita antes del cursor.",
+        "smartMode.greedyLine.desc":      "Selecciona el texto hasta el inicio de la línea, detecta dónde empieza la disposición incorrecta y convierte toda la frase errónea.",
+        "smartMode.disabled.desc":        "La conversión inteligente está desactivada. Debes seleccionar el texto manualmente antes de pulsar el atajo.",
+
+
+        // ── Layout Switch Modes ─────────────────────────────────────
+        "layoutSwitchMode.always.name":   "Cambiar siempre la disposición",
+        "layoutSwitchMode.ifLastWord.name": "Cambiar si se convirtió la última palabra",
+        "layoutSwitchMode.ifAnyWord.name": "Cambiar si alguna palabra requirió conversión",
+        "layoutSwitchMode.never.name":    "No cambiar la disposición",
+        "layoutSwitchMode.always.desc":   "Cambia siempre la disposición del teclado al pulsar el atajo, incluso si no hubo texto que convertir.",
+        "layoutSwitchMode.ifLastWord.desc": "Cambia la disposición del teclado al pulsar el atajo solo si se reconvirtió la última palabra antes del cursor.",
+        "layoutSwitchMode.ifAnyWord.desc": "Cambia la disposición del teclado al pulsar el atajo si alguna palabra del texto requirió reconversión.",
+        "layoutSwitchMode.never.desc":    "Convierte el texto mediante atajo sin cambiar la disposición del teclado.",
+
+
+        // ── Layouts Tab ─────────────────────────────────────────────
+        "layouts.title":                  "Disposiciones de teclado activas",
+        "layouts.description":            "Estas disposiciones se detectan a partir de los ajustes de teclado de tu sistema. El conversor mapea los caracteres entre ellas según la posición física de las teclas.",
+        "layouts.refresh":                "Actualizar desde el sistema",
+        "layouts.count":                  "%d disposiciones detectadas",
+        "layouts.dict.system":            "Diccionario del sistema",
+        "layouts.dict.installed":         "Diccionario instalado",
+        "layouts.dict.missing":           "Sin diccionario ortográfico",
+        "layouts.dict.download":          "Descargar diccionario",
+        "layouts.dict.downloading":       "Descargando…",
+        "layouts.dict.retry":             "Reintentar",
+        "layouts.dict.openFolder":        "Abrir carpeta Spelling en el Finder",
+        "layouts.dict.notAvailable":      "No hay diccionario disponible",
+
+
+        // ── Single Key Layout Switching ──────────────────────────────
+        "layoutSwitchKey.title":          "Tecla para cambiar el idioma del teclado",
+        "layoutSwitchKey.description":    "Cambia rápidamente la disposición del teclado del sistema con una sola tecla, sin convertir texto.",
+        "layoutSwitchKey.current":        "Tecla de cambio:",
+        "layoutSwitchKey.disabled":       "Desactivada",
+        "layoutSwitchKey.capsLock":       "Bloq Mayús",
+        "layoutSwitchKey.rightOption":    "Opción derecha (⌥)",
+        "layoutSwitchKey.rightCommand":   "Comando derecho (⌘)",
+        "layoutSwitchKey.rightShift":     "Shift derecho (⇧)",
+        "layout.multiLanguageAutoDetect": "Cambio automático multilingüe (más de 2 idiomas)",
+        "layout.multiLanguageAutoDetectDesc": "Detecta y convierte fluidamente entre más de 2 disposiciones de teclado sin necesidad de cambiar manualmente.",
+        "layoutSwitchKey.rightControl":   "Control derecho (⌃)",
+        "layoutSwitchKey.leftOption":     "Opción izquierda (⌥)",
+        "layoutSwitchKey.leftControl":    "Control izquierdo (⌃)",
+        "layoutSwitchKey.leftCommand":    "Comando izquierdo (⌘)",
+        "layoutSwitchKey.leftShift":      "Shift izquierdo (⇧)",
+        "layoutSwitchKey.fn":             "Fn / Globo (fn)",
+        "layoutSwitchKey.hint":           "Pulsa esta tecla para alternar entre las disposiciones de teclado activadas. Rápido y fluido, independiente de la conversión de texto.",
+
+
+        // ── Hotkey Tab ──────────────────────────────────────────────
+        "hotkey.title":                   "Atajo de teclado",
+        "hotkey.description":             "Pulsa este atajo para convertir texto. Si hay texto seleccionado, convierte la selección; de lo contrario, selecciona automáticamente la última palabra.",
+        "hotkey.current":                 "Atajo actual:",
+        "hotkey.useDoubleShift":          "Usar doble Shift (⇧⇧) como atajo",
+        "hotkey.doubleShiftHint":         "Pulsa Shift dos veces rápidamente para convertir. Es el atajo recomendado: rápido y sin conflictos con otras aplicaciones.",
+        "hotkey.customTitle":             "Atajo personalizado",
+
+
+        // ── Hotkey Recorder ─────────────────────────────────────────
+        "hotkeyRecorder.prompt":          "Haz clic en «Grabar» y pulsa el atajo deseado:",
+        "hotkeyRecorder.pressKey":        "Pulsa una combinación de teclas…",
+        "hotkeyRecorder.cancel":          "Cancelar",
+        "hotkeyRecorder.record":          "Grabar",
+
+
+        // ── Permissions Tab ─────────────────────────────────────────
+        "permissions.title":              "Permisos",
+        "permissions.description":        "Dopishi necesita acceso de accesibilidad para leer y sustituir el texto seleccionado en otras aplicaciones.",
+        "permissions.accessibilityTitle": "Acceso de accesibilidad",
+        "permissions.granted":            "Concedido — Dopishi puede convertir texto",
+        "permissions.notGranted":         "No concedido — Actívalo en Ajustes del Sistema",
+        "permissions.grantAccess":        "Conceder acceso",
+        "permissions.howToEnable":        "Cómo activarlo:",
+        "permissions.step1":              "1. Abre Ajustes del Sistema > Privacidad y seguridad > Accesibilidad",
+        "permissions.step2":              "2. Haz clic en el icono de candado para realizar cambios",
+        "permissions.step3":              "3. Activa Dopishi en la lista",
+        "permissions.step4":              "4. Reinicia Dopishi si es necesario",
+        "permissions.openSettings":       "Abrir Ajustes del Sistema",
+        "permissions.refreshStatus":      "Actualizar estado",
+
+
+        // ── Conversion Log Tab ──────────────────────────────────────
+        "log.title":                      "Registro de conversiones",
+        "log.entries":                    "%d entradas",
+        "log.exportJSON":                 "Exportar JSON",
+        "log.clearAll":                   "Borrar todo",
+        "log.ratingHint":                 "Valora cada conversión como correcta o incorrecta para crear datos de entrenamiento. Haz clic para alternar: sin valorar -> correcta -> incorrecta -> sin valorar.",
+        "log.emptyTitle":                 "Aún no hay conversiones registradas.",
+        "log.emptyHint":                  "Usa el atajo para convertir texto y las entradas aparecerán aquí.",
+        "log.clearConfirmTitle":          "¿Borrar todo el registro?",
+        "log.clearConfirmMessage":        "Esto eliminará permanentemente todas las entradas del registro de conversiones. Esta acción no se puede deshacer.",
+        "log.cancel":                     "Cancelar",
+        "log.deleteEntry":                "Eliminar esta entrada",
+        "log.exportPanelTitle":           "Exportar registro de conversiones",
+        "log.ratingUnrated":              "Sin valorar — haz clic para marcar como correcta",
+        "log.ratingCorrect":              "Correcta — haz clic para marcar como incorrecta",
+        "log.ratingIncorrect":            "Incorrecta — haz clic para borrar la valoración",
+
+
+        // ── Logging Settings (General Tab) ─────────────────────────
+        "general.logging":                "Registro de conversiones",
+        "general.loggingEnabled":         "Activar registro de conversiones",
+        "general.loggingDisabledNote":    "El registro está desactivado por omisión para proteger tu privacidad. Cuando se activa, las conversiones se almacenan localmente en tu Mac.",
+        "general.logMaxEntries":          "Número máximo de entradas en el registro",
+        "general.logUnlimited":           "0 = ilimitado",
+
+
+        // ── Logging Disabled (Log Tab) ─────────────────────────────
+        "log.unlimited":                  "Ilimitado",
+        "log.disabledTitle":              "El registro está desactivado",
+        "log.disabledHint":               "Activa el registro arriba para empezar a guardar conversiones.",
+
+
+        // ── About Window ────────────────────────────────────────────
+        "about.windowTitle":              "Acerca de Dopishi",
+        "about.appName":                  "Dopishi",
+        "about.version":                  "Versión 1.5.2",
+        "about.tagline":                  "Asistente de escritura con IA en el dispositivo, autocorrector de erratas y disposición en tiempo real, y cambiador instantáneo de teclado para macOS",
+        "about.howToUse":                 "Funcionalidades clave:",
+        "about.step1":                    "Sugerencias con IA en el dispositivo mediante Metal y respuestas inteligentes (Tab para aceptar)",
+        "about.step2":                    "Autocorrección en tiempo real de erratas, disposición y puntuación mientras escribes",
+        "about.step3":                    "Conversión instantánea de disposición (⇧⇧) y cambio de idioma con una sola tecla",
+        "about.github":                   "GitHub",
+        "about.license":                  "Licencia MIT",
+        "about.forkNotice":               "",
+
+
+        // ── Alerts (AppDelegate) ────────────────────────────────────
+        "alert.accessibilityTitle":       "Acceso de accesibilidad requerido",
+        "alert.accessibilityMessage":    """
+Dopishi necesita permiso de accesibilidad para leer y sustituir texto.
+
+Ve a Ajustes del Sistema → Privacidad y seguridad → Accesibilidad y activa Dopishi.
+
+Si ejecutas desde Xcode: añade la app compilada desde DerivedData o añade el propio Xcode.
+
+Si ya has concedido el permiso pero sigue sin funcionar:
+1. Elimina Dopishi de la lista de Accesibilidad
+2. Vuelve a añadirlo
+3. Reinicia la aplicación
+
+Comprueba también: Privacidad y seguridad → Monitorización de entrada: Dopishi podría necesitar figurar allí también.
+""",
+        "alert.openSystemSettings":       "Abrir Ajustes del Sistema",
+        "alert.continueAnyway":           "Continuar de todos modos",
+
+
+        // ── Common ──────────────────────────────────────────────────
+        "common.cancel":                  "Cancelar",
+        "common.delete":                  "Eliminar",
+        "common.search":                  "Buscar",
+        "common.ms":                      "ms",
+
+        "menu.previewRecovery":           "Previsualizar recuperación…",
+        "menu.thesaurus":                 "Diccionario de sinónimos contextual…",
+        "menu.smartReplies":              "Respuestas inteligentes (rápidas)…",
+        "general.autoCorrectOnSpace":     "Autocorregir con Espacio",
+        "general.autoCorrectOnSpaceHint": "Convierte automáticamente la última palabra al pulsar Espacio si parece estar en una disposición errónea.",
+        "general.thoughtRecovery":        "Recuperación de texto",
+        "general.thoughtRecoveryEnabled": "Recuperar líneas con disposiciones mezcladas",
+        "general.thoughtRecoveryPreview": "Mostrar vista previa antes de aplicar",
+        "general.thoughtRecoveryHint":    "Reescribe solo las palabras con disposición errónea en líneas mixtas, conservando código, enlaces y palabras intencionadas en inglés. Descartar en la vista previa enseña a tu diccionario personal.",
+        "general.recoveryStats":          "Recuperaciones:",
+        "general.recoveryRevertRate":     "revertidas",
+        "hotkey.doubleShiftMode":         "Doble Shift (⇧⇧)",
+        "hotkey.doubleOptionMode":        "Doble Opción (⌥⌥)",
+        "hotkey.customMode":              "Atajo personalizado",
+        "hotkey.doubleOptionHint":        "Pulsa Opción dos veces rápidamente para convertir. Los atajos de Opción+tecla (⌥+tecla) se ignoran y no activarán la conversión.",
+        "permissions.inputMonitoringTitle": "Monitorización de entrada",
+        "permissions.inputMonitoringGranted": "Concedido: los atajos de conversión funcionan en todo el sistema",
+        "permissions.inputMonitoringNotGranted": "No concedido: los atajos podrían no funcionar en otras aplicaciones",
+        "permissions.crossAppTitle":      "Aplicación actual",
+        "permissions.crossAppFrontmost":  "Aplicación en primer plano:",
+        "permissions.crossAppFull":       "Se espera que la conversión funcione en esta aplicación",
+        "permissions.crossAppLimited":    "Se sabe que la conversión es limitada en esta aplicación (p. ej., terminal); comprueba el resultado",
+        "recovery.title":                 "Recuperación de texto",
+        "recovery.subtitle":              "Solo cambiarán las palabras resaltadas.",
+        "recovery.nothingToChange":       "No hay nada que recuperar en esta línea: ya se lee como texto natural.",
+        "recovery.original":              "Original",
+        "recovery.reconstructed":         "Recuperado",
+        "recovery.alternatives":          "Otras alternativas",
+        "recovery.changedSpans":          "Palabras modificadas",
+        "recovery.confidence":            "Confianza: %@",
+        "recovery.apply":                 "Aplicar",
+        "recovery.copy":                  "Copiar",
+        "recovery.revert":                "Mantener original",
+        "recovery.revertHint":            "Mantener el original también añade estas palabras a tu diccionario personal: no se volverán a reescribir.",
+        "recovery.kind.wrongLayout":      "disposición incorrecta",
+        "recovery.kind.intentionalForeign": "palabra extranjera",
+        "recovery.kind.code":             "código",
+        "recovery.kind.url":              "enlace",
+        "recovery.kind.properName":       "nombre propio",
+        "recovery.kind.ambiguous":        "ambiguo",
+        "recovery.kind.correct":          "correcto",
+        "recovery.kind.separator":        "separador",
+
+        "notification.layoutSwitched":    "Disposición: %@",
+
+
+        // ── Auto-Correction ────────────────────────────────────────
+        "general.autoCorrection":         "Autocorrección",
+        "general.autoCorrectionEnabled":  "Autocorregir disposición errónea con Espacio/Entrar",
+        "general.autoCorrectionDesc":     "Detecta y corrige automáticamente palabras escritas en la disposición incorrecta al pulsar Espacio, Entrar o signos de puntuación. Utiliza el corrector ortográfico del sistema para reducir falsos positivos.",
+        "general.autoCorrectionSpellCheck": "Validar con el corrector del sistema",
+        "general.autoCorrectionSpellCheckDesc": "Solo autocorrige cuando la palabra convertida es reconocida por el corrector ortográfico de macOS. Reduce falsos positivos pero puede omitir algunas palabras válidas.",
+        "general.autoCorrectionSwitchLayout": "Cambiar la disposición del sistema tras autocorregir",
+        "general.autoCorrectionSwitchLayoutDesc": "Cambia automáticamente el idioma de entrada del sistema para que coincida con la palabra corregida (p. ej., a ruso tras 'ghbdtn ' → 'привет ').",
+        "general.autoCorrectionFixTwoCapitals": "Corregir dos mayúsculas iniciales (p. ej. 'ESte' → 'Este')",
+        "general.autoCorrectionFixTwoCapitalsDesc": "Corrige automáticamente palabras escritas con dos letras mayúsculas al inicio seguidas de minúsculas.",
+        "general.autoCorrectionGroup.layout": "Disposición y diccionario",
+        "general.autoCorrectionGroup.casing": "Mayúsculas y minúsculas",
+        "general.autoCorrectionGroup.punctuation": "Puntuación inteligente y tipografía",
+        "general.autoCorrectionCapitalizeSentences": "Poner mayúscula tras punto y al inicio de frase",
+        "general.autoCorrectionCapitalizeSentencesDesc": "Escribe automáticamente en mayúscula las palabras tras '.', '!', '?' o al principio de un párrafo.",
+        "general.autoCorrectionFixCapsLock": "Corregir bLOQ mAYÚS accidental (p. ej. 'hOLA' → 'Hola')",
+        "general.autoCorrectionFixCapsLockDesc": "Corrige palabras escritas accidentalmente con Bloq Mayús activo cuando la primera letra es minúscula.",
+        "general.autoCorrectionFixTypos": "Corregir erratas y letras transpuestas sobre la marcha",
+        "general.autoCorrectionFixTyposDesc": "Corrige automáticamente letras contiguas invertidas, teclas adicionales accidentales y letras omitidas en palabras (p. ej. 'большоей' → 'большой', 'поставитьл' → 'поставить', 'привте' → 'привет').",
+        "general.autoCorrectionRevertOnBackspace": "Deshacer corrección con Retroceso o ⌥Z",
+        "general.autoCorrectionRevertOnBackspaceDesc": "Pulsar Retroceso inmediatamente después de una autocorrección restablece la palabra original y la añade al diccionario del usuario. ⌥Z también deshace la última corrección.",
+        "general.userDictionary":         "Diccionario de usuario y excepciones",
+        "general.userDictionaryDesc":     "Las palabras guardadas aquí nunca se corrigen automáticamente ni se convierten a otras disposiciones.",
+        "general.userDictionaryAddPlaceholder": "Añadir palabra a excepciones…",
+        "general.userDictionaryAdd":      "Añadir",
+        "general.userDictionaryEmpty":    "El diccionario está vacío. Las palabras se aprenden automáticamente al deshacer una autocorrección o al reescribir una palabra eliminada.",
+        "general.userDictionaryClearAll": "Borrar todo",
+        "general.userDictionaryClearConfirmTitle": "¿Borrar el diccionario de usuario?",
+        "general.userDictionaryClearConfirmMessage": "Esto eliminará permanentemente todas las palabras aprendidas. Dejarán de estar protegidas contra la autocorrección.",
+        "general.userDictionaryCount":    "%d palabras",
+        "general.autoCorrectionCommaBeforeConjunctions": "Insertar coma antes de las conjunciones 'а' y 'но'",
+        "general.autoCorrectionCommaBeforeConjunctionsDesc": "Coloca automáticamente una coma antes de las conjunciones coordinantes rusas 'а' y 'но' al escribirlas en mitad de una frase.",
+        "general.autoCorrectionRemoveSpaceBeforePunctuation": "Eliminar espacio antes de signos de puntuación",
+        "general.autoCorrectionRemoveSpaceBeforePunctuationDesc": "Corrige el espacio accidental escrito antes de comas, puntos, dos puntos, signos de interrogación y signos de exclamación (p. ej. 'palabra ,' → 'palabra,').",
+        "general.autoCorrectionSmartDashesAndEllipsis": "Rayas y puntos suspensivos tipográficos",
+        "general.autoCorrectionSmartDashesAndEllipsisDesc": "Convierte automáticamente el guion doble '--' en una raya tipográfica '—' y los tres puntos '...' en puntos suspensivos '…'.",
+        "general.autoCorrectionEmojiShortcodes": "Códigos cortos de emojis (:fire: o :огонь: → 🔥)",
+        "general.autoCorrectionEmojiShortcodesDesc": "Convierte automáticamente códigos cortos de emojis en inglés, ruso y con cambio de disposición (p. ej. :fire:, :огонь: o :jujym: → 🔥) al cerrar los dos puntos o pulsar espacio.",
+
+
+        // ── Autocompletion ──────────────────────────────────────────
+        "general.autocompletion":         "Autocompletado de palabras",
+        "autocompletion.enabled":         "Mostrar sugerencias de palabras al escribir",
+        "autocompletion.desc":            "Muestra sugerencias flotantes cerca del cursor mientras escribes. Sugiere palabras en los idiomas activos y entre disposiciones.",
+        "autocompletion.fim":             "Completado en medio del texto (FIM)",
+        "autocompletion.fimDesc":         "Genera sugerencias directamente en medio de frases o párrafos, no solo al final.",
+        "autocompletion.acceptKey":       "Tecla para aceptar siguiente palabra",
+        "autocompletion.acceptKey.tab":   "Tab (⇥)",
+        "autocompletion.acceptKey.space": "Espacio (␣)",
+        "autocompletion.acceptKey.enter": "Entrar (↩)",
+        "autocompletion.acceptKey.rightArrow": "Flecha derecha (→)",
+        "autocompletion.acceptKey.custom": "Tecla personalizada",
+        "autocompletion.acceptAllKey":    "Tecla para aceptar frase completa",
+        "autocompletion.acceptAllKey.cmdSection": "Cmd + § / ` (⌘§)",
+        "autocompletion.acceptAllKey.shiftTab": "Shift + Tab (⇧⇥)",
+        "autocompletion.acceptAllKey.cmdReturn": "Cmd + Entrar (⌘↩)",
+        "autocompletion.acceptAllKey.optionTab": "Opción + Tab (⌥⇥)",
+        "autocompletion.acceptAllKey.custom": "Tecla personalizada",
+        "autocompletion.customKey":       "Tecla personalizada:",
+        "autocompletion.recordKey":       "Pulsa una tecla…",
+        "autocompletion.changeKey":       "Cambiar",
+        "autocompletion.noneKey":         "Ninguno",
+        "autocompletion.shortcutsSection": "Atajos de autocompletado",
+        "autocompletion.completeNextWord": "Completar solo la siguiente palabra",
+        "autocompletion.completeNextWordDesc": "A menudo, solo las primeras palabras de una sugerencia coinciden con lo que quieres escribir. En ese caso, pulsa esta tecla repetidamente para insertar solo esas palabras y continúa escribiendo hasta la siguiente sugerencia. ¡Es sorprendentemente eficaz en la práctica!",
+        "autocompletion.includeTrailingSpace": "Incluir espacio posterior",
+        "autocompletion.includeTrailingSpaceDesc": "Al activarlo, aceptar una sola palabra también incluye el espacio posterior, permitiéndote seguir escribiendo la siguiente palabra de inmediato.",
+        "autocompletion.acceptEntirePhrase": "Aceptar frase completa con la tecla de aceptación",
+        "autocompletion.acceptEntirePhraseDesc": "Al activarlo, pulsar la tecla de aceptación (p. ej. Tab) inserta la frase sugerida completa. Al desactivarlo, se acepta palabra por palabra.",
+        "autocompletion.includeTrailingPunctuation": "Incluir puntuación adjunta",
+        "autocompletion.includeTrailingPunctuationDesc": "Al activarlo, los signos de puntuación adheridos a la palabra (como un punto o signo de interrogación) se aceptan con ella en lugar de requerir una pulsación separada.",
+        "autocompletion.triggerFullCompletion": "Activar completado completo",
+        "autocompletion.triggerFullCompletionDesc": "Esto aceptará toda la sugerencia a la vez. Recomendamos usar la tecla sobre Tab (habitualmente ` o §, según tu disposición de teclado).",
+        "autocompletion.whenEscapePressed": "Al pulsar Escape",
+        "autocompletion.whenEscapePressedDesc": "Esto solo cambia lo que hace la tecla Escape mientras se muestra una sugerencia. El resto del tiempo, Escape funciona como siempre. Una vez que descarta una sugerencia, una segunda pulsación va directamente a la app; para desactivar las sugerencias por más tiempo, usa el interruptor global o por app.",
+        "autocompletion.escapeAction.pauseFewSeconds": "Pausar sugerencias durante unos segundos",
+        "autocompletion.escapeAction.dismissOnly": "Descartar solo la sugerencia actual",
+        "autocompletion.forceActivate":   "Forzar activación de sugerencias",
+        "autocompletion.forceActivateDesc": "En algunos casos, Dopishi no detecta automáticamente que has empezado a escribir. ¡Usa este atajo para activar sugerencias al instante en la posición actual!",
+        "autocompletion.toggleCurrentApp": "Alternar sugerencias temporalmente en la aplicación actual",
+        "autocompletion.toggleCurrentAppDesc": "Desactiva rápidamente las sugerencias durante unos minutos en la aplicación activa, o las vuelve a activar si estaban desactivadas.",
+        "autocompletion.toggleGlobally":  "Alternar sugerencias globalmente",
+        "autocompletion.toggleGloballyDesc": "Desactiva las sugerencias en todo el sistema hasta que vuelvas a pulsar el atajo. Útil cuando prefieres que Dopishi no intervenga durante un tiempo.",
+        "autocompletion.configureShortcuts": "Configurar atajos…",
+        "autocompletion.shortcutsLinkTitle": "Atajos de autocompletado",
+        "autocompletion.shortcutsLinkDesc": "Los atajos para aceptar palabras, completar frases y controles rápidos se encuentran ahora en la pestaña Atajos.",
+        "hotkey.conversionSection":       "Conversión de texto y disposición",
+        "hotkey.layoutSwitchSection":     "Cambio de disposición del sistema",
+        "autocompletion.useNumberShortcuts": "Seleccionar con teclas numéricas (1–5)",
+        "autocompletion.includeCrossLayout": "Incluir sugerencias de otra disposición",
+        "autocompletion.crossLayoutDesc": "P. ej., escribir 'ghbd' sugiere 'привет' y cambia automáticamente la disposición.",
+        "autocompletion.suggestProfanity": "Sugerir palabras malsonantes",
+        "autocompletion.suggestProfanityDesc": "Permite palabras ofensivas y malsonantes en las sugerencias de autocompletado. Desactivado por omisión.",
+        "autocompletion.maxSuggestions":  "Máximo de sugerencias:",
+        "autocompletion.minPrefixLength": "Longitud mínima de prefijo:",
+        "autocompletion.delay":           "Retardo de ventana emergente:",
+        "autocompletion.delayDesc":       "Pausa antes de mostrar la ventana de sugerencias.",
+        "autocompletion.badge.context":   "Contexto",
+        "autocompletion.hint.toAccept":   "para insertar",
+        "autocompletion.displayMode":     "Estilo de visualización",
+        "autocompletion.displayMode.popup": "Menú emergente",
+        "autocompletion.displayMode.ghostText": "Texto fantasma integrado",
+        "autocompletion.displayMode.both": "Ambos (Menú + Texto fantasma)",
+        "autocompletion.displayModeDesc.popup": "Muestra una lista flotante de sugerencias bajo el cursor de texto.",
+        "autocompletion.displayModeDesc.ghostText": "Muestra una continuación discreta directamente junto al cursor en la línea.",
+        "autocompletion.displayModeDesc.both": "Muestra el texto fantasma en la línea junto a un menú flotante de alternativas.",
+        "autocompletion.resetAdaptive":   "Restablecer vocabulario aprendido",
+        "autocompletion.adaptiveResetDone": "Vocabulario restablecido correctamente.",
+
+
+        // ── Excluded Apps ────────────────────────────────────────────
+        "excludedApps.title":             "Aplicaciones excluidas",
+        "excludedApps.desc":              "La autocorrección y el autocompletado se desactivarán en estas aplicaciones.",
+        "excludedApps.empty":             "No hay aplicaciones excluidas. Añade aplicaciones en las que no desees asistentes de escritura.",
+        "excludedApps.addRunning":        "Añadir aplicación en ejecución…",
+        "excludedApps.chooseFromDisk":    "Seleccionar del disco…",
+        "permissions.serviceTitle":       "Servicio de autocorrección",
+        "permissions.service.disabled":   "Desactivado en ajustes",
+        "permissions.service.permissionRequired": "Permiso de accesibilidad requerido",
+        "permissions.service.running":    "La monitorización de teclado está activa",
+        "permissions.service.failed":     "No se pudo iniciar la monitorización; reintentando automáticamente",
+        "permissions.serviceDetail":      "Comprueba el permiso y la monitorización cada 5 segundos y tras reanudar el sistema. La monitorización activa no significa que cada palabra sea corregida.",
+        "permissions.restartService":     "Reiniciar servicio",
+        "permissions.copiesTitle":        "Copias de la aplicación",
+        "permissions.copiesDetail":       "Las copias reconocidas por macOS se enumeran a continuación. Solo puede ejecutarse una copia por usuario. El acceso de accesibilidad se aplica a la copia actual; macOS no muestra aquí el estado de permisos de otras copias. Mantén la aplicación instalada en /Applications; elimina copias no deseadas usando el Finder.",
+        "permissions.currentCopy":        "Copia actual",
+        "permissions.otherCopy":          "Otra copia",
+        "permissions.revealCopy":         "Mostrar en el Finder",
+        "permissions.instanceError":      "No se pudo proteger contra inicios duplicados",
+        "permissions.instanceErrorDetail": "Dopishi se cerrará para evitar ejecutar múltiples monitores de teclado. Comprueba el acceso a su carpeta en Application Support.",
+
+
+        // ── AI Assistant ─────────────────────────────────────────────
+        "ai.title":                       "Asistente de IA local",
+        "ai.subtitle":                    "Motor neuronal sin conexión para predicción predictiva (100% privado, no requiere internet).",
+        "ai.masterSwitch.title":          "Asistente de IA local",
+        "ai.masterSwitch.activeDesc":     "Continuación predictiva de frases mediante modelo neuronal local.",
+        "ai.masterSwitch.disabledDesc":   "Desactivado. El modelo neuronal se descarga completamente de la memoria RAM (0 MB).",
+        "ai.status.offMemoryFreed":       "Desactivado (0 MB RAM, modelo descargado)",
+        "ai.predictive.parameters":       "Parámetros de generación",
+        "ai.model.invalidGGUF":           "Este archivo no es un modelo GGUF estándar. Elige un archivo GGUF compatible.",
+        "ai.model.name":                  "Modelo",
+        "ai.model.status":                "Estado",
+        "ai.model.status.ready":          "Listo",
+        "ai.model.status.downloading":    "Descargando (%@)",
+        "ai.model.status.notDownloaded":  "No descargado",
+        "ai.model.status.error":          "Error",
+        "ai.model.downloadButton":        "Descargar modelo (%@)",
+        "ai.model.cancelDownload":        "Cancelar",
+        "ai.model.deleteButton":          "Eliminar modelo",
+        "ai.model.deleteConfirm":         "¿Seguro que quieres eliminar los pesos del modelo?",
+        "ai.predictive.enable":           "Continuación predictiva de texto",
+        "ai.predictive.desc":             "Sugiere de 2 a 4 palabras tras una pausa al escribir (350 ms).",
+        "ai.predictive.wordCount":        "Longitud de continuación",
+        "ai.predictive.words":            "%d palabras",
+        "ai.predictive.debounceDelay":    "Retardo de sugerencia:",
+        "ai.predictive.debounceDesc":     "Pausa al escribir antes de que la IA genere la continuación.",
+        "ai.predictive.fast":             "150 ms (Rápido)",
+        "ai.predictive.slow":             "1000 ms (Relajado)",
+        "ai.predictive.proLengthDesc":    "La generación de frases largas (8–15 palabras) requiere Dopishi Pro.",
+        "ai.deepContext":                 "Contexto profundo del portapapeles",
+        "ai.deepContextDesc":             "Utiliza el contexto reciente del portapapeles (últimos 5 minutos) para formular sugerencias altamente relevantes.",
+        "ai.fieldAnchor.title":           "Indicador de anclaje de campo",
+        "ai.fieldAnchor.desc":            "Muestra un distintivo sutil de estado en la esquina superior izquierda del campo de texto activo.",
+        "ai.battery.title":               "Gestión de batería y energía",
+        "ai.battery.desc":                "Adapta el rendimiento de la generación neuronal y la carga de la GPU Metal al funcionar con la batería del MacBook.",
+        "ai.battery.adaptiveManagement":  "Gestión adaptativa de energía de la batería",
+        "ai.battery.policy.label":        "Política de batería",
+        "ai.battery.policy.adaptiveEco":  "Modo ecológico adaptativo (Recomendado)",
+        "ai.battery.policy.adaptiveEco.desc": "Aumenta el retardo a 350 ms y cambia a un modelo ultracompacto con batería para mantener fría la GPU Metal.",
+        "ai.battery.policy.throttleOnly": "Limitar solo GPU (retardo de 350 ms)",
+        "ai.battery.policy.throttleOnly.desc": "Mantiene el modelo actual pero incrementa la pausa tras pulsar teclas de 150 ms a 350 ms, reduciendo el consumo de GPU en un ~60%.",
+        "ai.battery.policy.pauseInference": "Pausar IA con batería",
+        "ai.battery.policy.pauseInference.desc": "Suspende completamente la generación neuronal con batería (las sugerencias instantáneas del diccionario siguen activas).",
+        "ai.battery.policy.unrestricted": "Máximo rendimiento (sin restricciones)",
+        "ai.battery.policy.unrestricted.desc": "Ejecuta la inferencia neuronal a máxima velocidad con batería sin limitaciones.",
+        "ai.battery.status.ac":           "⚡ Corriente alterna — IA activa",
+        "ai.battery.status.battery":      "🔋 Batería — IA en pausa para ahorrar energía",
+        "ai.battery.status.acPower":      "⚡ Corriente alterna — Máximo rendimiento activo",
+        "ai.battery.status.batteryEco":   "🔋 Batería — Modo eco activo (350 ms de retardo, GPU moderada)",
+        "ai.battery.status.batteryThrottled": "🔋 Batería — GPU moderada (350 ms de retardo)",
+        "ai.battery.status.batteryPaused": "🔋 Batería — Inferencia de IA pausada para conservar energía",
+        "ai.battery.status.batteryUnrestricted": "🔋 Batería — Funcionando a máximo rendimiento",
+        "ai.battery.status.lowPowerMode": "🟡 Modo de bajo consumo de macOS activo — Ahorro de energía forzado",
+        "ai.battery.status.unknown":      "Fuente de alimentación: %@",
+
+
+        // ── Recommended Models ─────────────────────────────────────────
+        "ai.model.recommended":           "Modelos de IA locales",
+        "ai.model.recommended.desc":      "Elige un modelo neuronal local o vincula tu propio archivo .gguf para sugerencias de baja latencia.",
+        "ai.model.picker.label":          "Modelo activo",
+        "ai.model.section.custom":        "Modelo personalizado",
+        "ai.model.active":                "Activo",
+        "ai.model.select":                "Seleccionar",
+        "ai.model.badge.recommended":     "Recomendado",
+        "ai.model.tier.8gb":              "8 GB RAM",
+        "ai.model.tier.8_16gb":           "8–16 GB RAM",
+        "ai.model.tier.16gb":             "16 GB RAM",
+        "ai.model.tier.16_24gb":          "16–24 GB RAM",
+        "ai.model.tier.24gb":             "24+ GB RAM",
+        "ai.model.tier.custom":           "GGUF personalizado",
+        "ai.model.desc.qwen05b":          "Qwen 0.5B ultrarrápido, ideal para autocompletado de baja latencia en cualquier Mac.",
+        "ai.model.desc.smollm360m":       "Modelo 360M sumamente ligero con un consumo de memoria mínimo (~229 MB).",
+        "ai.model.desc.qwencoder15b":     "Modelo especializado en código y texto, excepcional para terminología técnica, código y lenguajes naturales.",
+        "ai.model.desc.smollm17b":        "Modelo 1.7B de alto rendimiento con amplio vocabulario y excelente fluidez bilingüe.",
+        "ai.model.desc.qwen15b":          "Alta calidad de razonamiento y vocabulario, ideal para Apple Silicon con 16 GB+ de RAM.",
+        "ai.model.desc.llama1b":          "Modelo compacto Meta Llama 3.2 optimizado para texto natural en inglés.",
+        "ai.model.desc.gemma2b":          "Google Gemma 2 2B compacto y potente, con gran capacidad de razonamiento y comprensión del lenguaje.",
+        "ai.model.desc.gemma4e2b":        "Modelo base de completado Gemma 4 E2B. Continuaciones naturales de alta calidad sin etiquetas de chat.",
+        "ai.model.desc.qwen3b":           "Qwen 2.5 3B de gran capacidad con profunda comprensión contextual, ideal para Mac con 24 GB+ de RAM.",
+        "ai.model.desc.custom":           "Archivo de modelo GGUF local suministrado por el usuario.",
+        "ai.model.custom.option":         "Modelo GGUF personalizado…",
+        "ai.model.custom.chooseFile":     "Seleccionar archivo .gguf…",
+        "ai.model.custom.changeFile":     "Cambiar archivo…",
+        "ai.model.custom.noFileSelected": "Ningún archivo de modelo seleccionado. Elige un archivo .gguf de tu disco.",
+        "ai.model.custom.path":           "Ruta: %@",
+        "ai.model.custom.disconnect":     "Desconectar modelo",
+        "ai.model.custom.disconnectConfirm": "¿Desconectar este modelo personalizado y volver al modelo predeterminado?",
+        "ai.customModel.openPanelTitle":  "Seleccionar modelo GGUF local",
+        "ai.customModel.openPanelPrompt": "Seleccionar",
+
+
+        // ── RAM Guide ──────────────────────────────────────────────────
+        "ai.ramGuide.title":              "Recomendaciones de memoria para Mac",
+        "ai.ramGuide.8gb":                "Qwen 0.5B o SmolLM2 — ultraligeros, respuestas instantáneas en cualquier Mac.",
+        "ai.ramGuide.16gb":               "Qwen 1.5B o Llama 1B — equilibrio óptimo entre vocabulario enriquecido y velocidad.",
+        "ai.ramGuide.24gb":               "Qwen 3B, Gemma 2B o GGUF personalizado — máxima profundidad contextual para Apple Silicon.",
+
+
+        // ── AI Custom Instructions ─────────────────────────────────────
+        "ai.persona.title":               "Persona y adaptadores LoRA",
+        "ai.persona.desc":                "Ajusta con precisión el vocabulario, el tono de voz y la temperatura de muestreo para tu área específica.",
+        "ai.instructions.title":          "Instrucciones para IA",
+        "ai.instructions.desc":           "Personaliza el estilo de completado, el rol o la terminología técnica.",
+        "ai.instructions.placeholder":    "P. ej.: Soy programador, escribe de forma concisa y mantén los términos técnicos en inglés.",
+        "ai.instructions.preset.coder":   "Programador",
+        "ai.instructions.preset.coder.text": "Soy programador, escribe de forma concisa y mantén los términos técnicos en inglés.",
+        "ai.instructions.preset.concise": "Conciso",
+        "ai.instructions.preset.concise.text": "Escribe de forma breve y al grano, sin palabras de relleno.",
+        "ai.instructions.preset.business": "Negocios",
+        "ai.instructions.preset.business.text": "Tono formal, educado y profesional de negocios.",
+        "ai.instructions.clear":          "Borrar",
+
+
+        // ── Predictive Options ─────────────────────────────────────────
+        "ai.predictive.streaming":        "Generación en streaming",
+        "ai.predictive.streaming.desc":   "Muestra las palabras progresivamente a medida que se generan los tokens, reduciendo el tiempo hasta el primer token (TTFT).",
+        "ai.predictive.screenContext":    "Contexto de chats y ventanas",
+        "ai.predictive.screenContext.desc": "Analiza los mensajes de chat recientes de la ventana activa para sugerir autocompletados adaptados al contexto.",
+
+
+        // ── Benchmark Profiler ─────────────────────────────────────────
+        "ai.benchmark.title":             "Perfilador de velocidad y calidad",
+        "ai.benchmark.desc":              "Evalúa la latencia de respuesta, la velocidad de generación de tokens y la coherencia de continuación en frases de prueba estándar.",
+        "ai.benchmark.run":               "Ejecutar prueba de rendimiento",
+        "ai.benchmark.running":           "Evaluando modelo…",
+        "ai.benchmark.lastRun":           "Última prueba: %@",
+        "ai.benchmark.ttft":              "Primer token (TTFT)",
+        "ai.benchmark.latency":           "Latencia total",
+        "ai.benchmark.speed":             "Velocidad de generación",
+        "ai.benchmark.samples":           "Frases de prueba y resultados:",
+        "ai.benchmark.error.noResponse":  "El motor de inferencia no respondió. Es posible que sea necesario reiniciar el demonio del modelo.",
+
+
+        // ── Per-Application Settings ───────────────────────────────────
+        "ai.perApp.title":                "Ajustes por aplicación",
+        "ai.perApp.desc":                 "Personaliza las instrucciones, el tono y la terminología de la IA para aplicaciones específicas (p. ej., Xcode, Slack, Notas).",
+        "ai.perApp.empty":                "Aún no hay ajustes configurados por aplicación. Las instrucciones globales se aplican en todas partes.",
+        "ai.perApp.addRunning":           "Añadir aplicación abierta…",
+        "ai.perApp.addOther":             "Añadir otra aplicación…",
+        "ai.perApp.instructions":         "Instrucciones específicas para la aplicación:",
+        "ai.perApp.vocabulary":           "Vocabulario personalizado (separado por comas):",
+        "ai.perApp.enabled":              "Activar autocompletado con IA en esta aplicación",
+        "ai.perApp.remove":               "Eliminar",
+
+
+        // ── Personalization & Writing History ─────────────────────────
+        "ai.personalization.title":       "Estilo de escritura y personalización",
+        "ai.personalization.desc":        "Aprende de forma privada tu estilo de redacción y frases habituales localmente. Los campos sensibles y contraseñas se excluyen automáticamente. Los datos nunca salen de tu Mac.",
+        "ai.personalization.enable":      "Activar personalización según el historial de escritura",
+        "ai.personalization.count":       "%d muestras de texto recopiladas",
+        "ai.personalization.clear":       "Borrar historial",
+        "ai.personalization.clearConfirm": "¿Seguro que quieres eliminar todas las muestras personales de escritura recopiladas?",
+
+
+        // ── Extended Statistics ───────────────────────────────────────
+        "ai.stats.title":                 "Estadísticas de productividad",
+        "ai.stats.savedChars":            "Caracteres ahorrados",
+        "ai.stats.savedClicks":           "Pulsaciones de tecla ahorradas",
+        "ai.stats.conversions":           "Correcciones",
+        "ai.stats.reset":                 "Restablecer estadísticas",
+        "ai.stats.resetConfirm":          "¿Seguro que quieres restablecer todas las estadísticas de productividad?",
+
+
+        // ── Time Saved & Completion Statistics ─────────────────────────
+        "stats.banner.title":             "Productividad y tiempo ahorrado",
+        "stats.scope.today":              "Hoy",
+        "stats.scope.allTime":            "Histórico",
+        "stats.card.timeSaved":           "Tiempo ahorrado",
+        "stats.card.keystrokes":          "Pulsaciones de tecla ahorradas",
+        "stats.card.words":               "Palabras completadas",
+        "stats.time.sec":                 "s",
+        "stats.time.min":                 "min",
+        "stats.time.hr":                  "h",
+
+
+        // ── Interactive Sandbox & Keyboard View ───────────────────────
+        "ai.sandbox.title":               "Área interactiva de pruebas",
+        "ai.sandbox.desc":                "Prueba a escribir unas pocas letras a continuación para experimentar el autocompletado en tiempo real aquí mismo.",
+        "ai.sandbox.placeholder":         "Escribe algo, p. ej. 'Hola' o 'Vamos'…",
+        "ai.sandbox.clear":               "Borrar",
+        "ai.sandbox.typeToSee":           "Escribe texto para ver una sugerencia",
+        "ai.sandbox.pressTab":            "Pulsa Tab para aceptar la sugerencia",
+        "ai.sandbox.examples":            "Probar ejemplo",
+        "ai.sandbox.success":             "¡Completado! +%d caracteres ahorrados",
+
+
+        // ── Onboarding ─────────────────────────────────────────────────
+        "settings.setupWizard.title":     "Asistente de configuración",
+        "settings.setupWizard.desc":      "Ejecuta la configuración inicial para verificar permisos, diccionarios e IA.",
+        "settings.setupWizard.button":    "Iniciar asistente de configuración…",
+
+        "onboarding.windowTitle":         "Te damos la bienvenida a Dopishi",
+        "onboarding.step1.title":         "Acceso de accesibilidad",
+        "onboarding.step1.body":          "Dopishi necesita permiso de accesibilidad para leer y sustituir texto en otras aplicaciones. Sin él, la conversión de disposición no funcionará.",
+        "onboarding.step1.grant":         "Conceder acceso",
+        "onboarding.step1.skip":          "Omitir por ahora",
+        "onboarding.step1.granted":       "Acceso concedido",
+        "onboarding.privacy.offline":     "100% sin conexión: tus pulsaciones nunca salen de tu Mac ni acceden a la red",
+        "onboarding.privacy.passwords":   "Aislamiento de contraseñas: los campos seguros y gestores de contraseñas se ignoran",
+        "onboarding.privacy.openSource":  "Código abierto: código completamente auditable y verificado por la comunidad",
+
+        "onboarding.step2.title":         "Tus idiomas de teclado",
+        "onboarding.step2.body":          "Comprobamos las disposiciones de teclado de tu sistema y la compatibilidad con diccionarios.",
+        "onboarding.step2.builtin":       "Integrado",
+        "onboarding.step2.installed":     "Diccionario instalado",
+        "onboarding.step2.download":      "Descargar",
+        "onboarding.step2.continue":      "Continuar",
+        "onboarding.step2.noLayouts":     "No se detectaron disposiciones",
+
+        "onboarding.ai.title":            "Asistente de IA local (Opcional)",
+        "onboarding.ai.body":             "Además de corregir erratas, Dopishi puede predecir frases y continuar oraciones usando una red neuronal ligera.",
+        "onboarding.ai.feature1":         "Se ejecuta por completo en tu CPU / Apple Silicon (0 internet)",
+        "onboarding.ai.feature2":         "Sin suscripciones ni registros en la nube — privacidad absoluta",
+        "onboarding.ai.feature3":         "Descarga única de un modelo compacto (~800 MB)",
+        "onboarding.ai.downloadButton":   "Descargar modelo neuronal (~800 MB)",
+        "onboarding.ai.ready":            "Modelo listo y activo",
+        "onboarding.ai.later":            "Configurar más tarde en Ajustes",
+        "onboarding.ai.continueInBackground": "Continuar (descargando en segundo plano)",
+
+        "onboarding.step3.title":         "Pruébalo ahora",
+        "onboarding.step3.body":          "Escribe texto como si estuvieras en la disposición equivocada y pulsa tu atajo para convertirlo.",
+        "onboarding.step3.done":          "Listo",
+        "onboarding.step3.hotkey":        "Tu atajo:",
+        "onboarding.step3.convert":       "Convertir",
+        "onboarding.step3.tip":           "¡Prueba a pulsar tu atajo en cualquier aplicación!",
+
+
+        // ── Sidebar & Shortcuts Tab ─────────────────────────────────
+        "shortcuts.title":                "Atajos de teclado",
+        "shortcuts.subtitle":             "Configura el cambio de disposición con una sola tecla, la conversión de texto y los controles de escritura en un solo lugar.",
+        "shortcuts.section.layoutSwitch": "Cambio de disposición del sistema",
+        "shortcuts.section.conversion":   "Conversión de texto",
+        "shortcuts.section.completions":  "Autocompletado y sugerencias",
+        "shortcuts.section.undo":         "Reversión y deshacer rápido",
+        "shortcuts.revertOnBackspace":    "Revertir autocorrección con Retroceso",
+        "shortcuts.revertOnBackspaceDesc": "Pulsar Retroceso inmediatamente después de una autocorrección restablece el texto original y pausa la corrección para esa palabra.",
+
+
+        // ── Setup Wizard Tab ─────────────────────────────────────────
+        "setup.tab.title":                "Configuración rápida y estado",
+        "setup.tab.subtitle":             "Verifica permisos, diccionarios y prueba la conversión instantánea de texto.",
+        "setup.tab.launchWizard":         "Iniciar asistente paso a paso",
+        "setup.tab.launchWizardDesc":     "Abre la guía interactiva inicial con configuración de permisos, estado de los diccionarios sin conexión y tutorial de escritura.",
+        "setup.tab.systemAccess":         "Accesibilidad y monitorización de pulsaciones",
+        "setup.tab.systemAccessOk":       "Permiso concedido. La detección de teclas y la sustitución de texto están activas.",
+        "setup.tab.systemAccessNeeded":   "Permiso necesario. Sin accesibilidad, Dopishi no puede convertir texto ni cambiar disposiciones automáticamente.",
+        "setup.tab.testConversion":       "Prueba interactiva de escritura",
+        "setup.tab.testConversionPlaceholder": "Escribe algo en la disposición errónea (p. ej. 'ghbdtn')…",
+        "setup.tab.testConversionResult": "Texto convertido:",
+        "setup.tab.testConversionTip":    "En cualquier aplicación, pulsa el atajo configurado (p. ej., doble Shift) o deja que la autocorrección corrija palabras con Espacio/Entrar.",
+        "setup.tab.privacyTitle":         "100% sin conexión y privado",
+        "setup.tab.privacyDesc":          "Dopishi funciona estrictamente en tu Mac. Ninguna pulsación, texto del portapapeles o documento se sube a servidores en la nube. Los campos de contraseña y las entradas seguras se ignoran automáticamente.",
+
+
+        // ── About Tab ───────────────────────────────────────────────
+        "about.tab.title":                "Acerca de Dopishi",
+        "about.tab.description":          "Cambiador de disposición del teclado ligero, centrado en la privacidad y asistente de escritura inteligente para macOS.",
+    ]
+
+    @MainActor static func register() {
+        LocalizationManager.shared.register(language: "es", strings: strings)
+    }
+}

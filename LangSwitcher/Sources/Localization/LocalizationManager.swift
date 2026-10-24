@@ -14,6 +14,10 @@ final class LocalizationManager: ObservableObject {
     static let availableLanguages: [(code: String, name: String)] = [
         ("en", "English"),
         ("ru", "Русский"),
+        ("uk", "Українська"),
+        ("de", "Deutsch"),
+        ("fr", "Français"),
+        ("es", "Español"),
     ]
 
     /// Currently active language code
@@ -29,20 +33,25 @@ final class LocalizationManager: ObservableObject {
     // MARK: - Init
 
     private init() {
-        // Read persisted choice, or detect system language
+        // Read persisted choice, or detect system language in order of user preference
         if let saved = UserDefaults.standard.string(forKey: "appLanguage"),
            Self.availableLanguages.contains(where: { $0.code == saved }) {
             self.currentLanguage = saved
         } else {
-            // Auto-detect: check preferred languages for "ru"
-            let preferred = Locale.preferredLanguages // e.g. ["ru-RU", "en-US"]
-            let isRussian = preferred.first(where: {
-                $0.lowercased().hasPrefix("ru")
-            }) != nil
-            self.currentLanguage = isRussian ? "ru" : "en"
-            // Persist the initial choice
+            self.currentLanguage = Self.detectSystemLanguage()
             UserDefaults.standard.set(self.currentLanguage, forKey: "appLanguage")
         }
+    }
+
+    /// Detect the highest priority supported language from system preferred languages
+    static func detectSystemLanguage() -> String {
+        for preferred in Locale.preferredLanguages {
+            let base = preferred.components(separatedBy: CharacterSet(charactersIn: "-_")).first?.lowercased() ?? preferred.lowercased()
+            if availableLanguages.contains(where: { $0.code == base }) {
+                return base
+            }
+        }
+        return "en"
     }
 
     // MARK: - Registration

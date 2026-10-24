@@ -14,7 +14,7 @@ enum Strings_en {
         "menu.appDisabled":              "○ Disabled in “%@”",
         "menu.pause30Min":               "⏸ Pause for 30 minutes",
         "menu.resumeNow":                "▶ Resume (%d min left)",
-        "menu.aiAssistant":              "AI Assistant (Neural)",
+        "menu.aiAssistant":              "AI Suggestions",
         "menu.aiStatusBattery":          "Battery Saver — AI paused",
         "menu.aiStatusDownloading":      "Downloading model (%d%%)",
         "menu.aiStatusFastDictionary":   "Fast Dictionary",
@@ -53,13 +53,17 @@ enum Strings_en {
 
         // ── Settings Window ─────────────────────────────────────────
         "settings.windowTitle":          "Dopishi Settings",
+        "settings.tab.setup":            "Setup Wizard",
         "settings.tab.general":          "General",
+        "settings.tab.shortcuts":        "Shortcuts",
+        "settings.tab.layouts":          "Layouts & Dictionaries",
+        "settings.tab.autoCorrection":   "Auto-Correction",
         "settings.tab.layout":           "Layout & Typing",
-        "settings.tab.layouts":          "Layouts",
         "settings.tab.hotkey":           "Hotkey",
         "settings.tab.ai":               "Completions & AI",
         "settings.tab.apps":             "Apps",
         "settings.tab.history":          "History & Stats",
+        "settings.tab.about":            "About",
         "settings.tab.permissions":      "Permissions",
         "settings.tab.log":              "Log",
         "settings.iconStyle.languageBadge": "Language badge in frame",
@@ -646,6 +650,35 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "onboarding.step3.hotkey":               "Your shortcut:",
         "onboarding.step3.convert":              "Convert",
         "onboarding.step3.tip":                  "Try pressing your shortcut in any app!",
+
+        // ── Sidebar & Shortcuts Tab ─────────────────────────────────
+        "shortcuts.title":                       "Keyboard Shortcuts",
+        "shortcuts.subtitle":                    "Configure single-key layout switching, text conversion, and typing controls in one place.",
+        "shortcuts.section.layoutSwitch":        "System Layout Switching",
+        "shortcuts.section.conversion":          "Text Conversion",
+        "shortcuts.section.completions":         "Autocompletion & Suggestions",
+        "shortcuts.section.undo":                "Quick Revert & Undo",
+        "shortcuts.revertOnBackspace":           "Revert auto-correction on Backspace",
+        "shortcuts.revertOnBackspaceDesc":       "Pressing Backspace immediately after an auto-correction restores the original text and pauses correction for that word.",
+
+        // ── Setup Wizard Tab ─────────────────────────────────────────
+        "setup.tab.title":                       "Quick Setup & Health Check",
+        "setup.tab.subtitle":                    "Verify permissions, dictionaries, and test instant text conversion.",
+        "setup.tab.launchWizard":                "Launch Step-by-Step Wizard",
+        "setup.tab.launchWizardDesc":            "Opens the interactive onboarding walkthrough with permissions setup, offline dictionary status, and typing tutorial.",
+        "setup.tab.systemAccess":                "Accessibility & Keystroke Monitoring",
+        "setup.tab.systemAccessOk":              "Permission granted. Keystroke detection and text replacement are active.",
+        "setup.tab.systemAccessNeeded":          "Permission required. Without Accessibility, Dopishi cannot convert text or switch layouts automatically.",
+        "setup.tab.testConversion":              "Interactive Typing Test",
+        "setup.tab.testConversionPlaceholder":   "Type something in the wrong layout (e.g. 'ghbdtn')...",
+        "setup.tab.testConversionResult":        "Converted text:",
+        "setup.tab.testConversionTip":           "In any app, press your configured shortcut (e.g. Double Shift) or let auto-correction fix words on Space/Enter.",
+        "setup.tab.privacyTitle":                "100% Offline & Private",
+        "setup.tab.privacyDesc":                 "Dopishi operates strictly on your Mac. No keystrokes, clipboard text, or documents are ever uploaded to cloud servers. Password inputs and secure fields are automatically ignored.",
+
+        // ── About Tab ───────────────────────────────────────────────
+        "about.tab.title":                       "About Dopishi",
+        "about.tab.description":                 "Lightweight, privacy-first keyboard layout switcher and intelligent typing assistant for macOS.",
     ]
 
     @MainActor static func register() {

@@ -13,7 +13,7 @@ enum Strings_ru {
         "menu.appDisabled":              "○ Отключено в «%@»",
         "menu.pause30Min":               "⏸ Приостановить на 30 минут",
         "menu.resumeNow":                "▶ Возобновить работу (ещё %d мин)",
-        "menu.aiAssistant":              "AI-ассистент (нейросеть)",
+        "menu.aiAssistant":              "AI-подсказки",
         "menu.aiStatusBattery":          "Экономия батареи — AI на паузе",
         "menu.aiStatusDownloading":      "Загрузка модели (%d%%)",
         "menu.aiStatusFastDictionary":   "Быстрый словарь",
@@ -52,13 +52,17 @@ enum Strings_ru {
 
         // ── Окно настроек ───────────────────────────────────────────
         "settings.windowTitle":          "Настройки Dopishi",
+        "settings.tab.setup":            "Мастер настройки",
         "settings.tab.general":          "Основные",
+        "settings.tab.shortcuts":        "Горячие клавиши",
+        "settings.tab.layouts":          "Раскладки и словари",
+        "settings.tab.autoCorrection":   "Автоисправление",
         "settings.tab.layout":           "Раскладка",
-        "settings.tab.layouts":          "Раскладки",
         "settings.tab.hotkey":           "Горячая клавиша",
         "settings.tab.ai":               "Автодополнение и AI",
         "settings.tab.apps":             "Приложения",
         "settings.tab.history":          "История и статистика",
+        "settings.tab.about":            "О программе",
         "settings.tab.permissions":      "Разрешения",
         "settings.tab.log":              "Журнал",
         "settings.iconStyle.languageBadge": "Код языка в рамке",
@@ -645,6 +649,35 @@ Dopishi нуждается в разрешении универсального 
         "onboarding.step3.hotkey":               "Ваш хоткей:",
         "onboarding.step3.convert":              "Конвертировать",
         "onboarding.step3.tip":                  "Попробуйте нажать ваш хоткей в любой программе!",
+
+        // ── Sidebar & Shortcuts Tab ─────────────────────────────────
+        "shortcuts.title":                       "Горячие клавиши",
+        "shortcuts.subtitle":                    "Настройка переключения языка одиночной клавишей, горячих клавиш конвертации и подсказок в одном месте.",
+        "shortcuts.section.layoutSwitch":        "Переключение языка системы",
+        "shortcuts.section.conversion":          "Конвертация текста",
+        "shortcuts.section.completions":         "Автодополнение и подсказки",
+        "shortcuts.section.undo":                "Быстрый откат",
+        "shortcuts.revertOnBackspace":           "Откат автоисправления по Backspace",
+        "shortcuts.revertOnBackspaceDesc":       "Нажатие Backspace сразу после автоисправления возвращает исходный набранный текст и отменяет замену для этого слова.",
+
+        // ── Setup Wizard Tab ─────────────────────────────────────────
+        "setup.tab.title":                       "Быстрая настройка и проверка",
+        "setup.tab.subtitle":                    "Проверьте разрешения, словари и протестируйте мгновенную конвертацию текста.",
+        "setup.tab.launchWizard":                "Запустить пошаговый мастер",
+        "setup.tab.launchWizardDesc":            "Открывает пошаговый экран знакомства с проверкой разрешений, загрузкой офлайн-словарей и обучающим тренажёром печати.",
+        "setup.tab.systemAccess":                "Управление системой и ввод",
+        "setup.tab.systemAccessOk":              "Доступ предоставлен. Перехват клавиш и замена текста активны.",
+        "setup.tab.systemAccessNeeded":          "Требуется разрешение. Без Универсального доступа Dopishi не сможет заменять текст.",
+        "setup.tab.testConversion":              "Интерактивный тест конвертации",
+        "setup.tab.testConversionPlaceholder":   "Наберите текст в неверной раскладке (например, 'ghbdtn')...",
+        "setup.tab.testConversionResult":        "Результат конвертации:",
+        "setup.tab.testConversionTip":           "В любой программе нажмите настроенную горячую клавишу (например, двойной Shift) или позвольте автоисправлению скорректировать слово при нажатии пробела.",
+        "setup.tab.privacyTitle":                "100% Офлайн и безопасность",
+        "setup.tab.privacyDesc":                 "Dopishi работает исключительно локально на вашем Mac. Нажатия клавиш, буфер обмена и документы никогда не отправляются на внешние серверы. Поля паролей и защищённый ввод автоматически исключаются.",
+
+        // ── About Tab ───────────────────────────────────────────────
+        "about.tab.title":                       "О программе Dopishi",
+        "about.tab.description":                 "Быстрый, приватный переключатель раскладок и умный помощник набора текста для macOS.",
     ]
 
     @MainActor static func register() {

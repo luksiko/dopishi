@@ -628,7 +628,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         if let window = onboardingWindow, window.isVisible {
+            window.level = NSWindow.Level(NSWindow.Level.floating.rawValue + 1)
             window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
             return
         }
 
@@ -646,7 +648,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.contentView = NSHostingView(rootView: onboardingView)
         window.isReleasedWhenClosed = false
+        window.level = NSWindow.Level(NSWindow.Level.floating.rawValue + 1)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
 
         onboardingWindow = window
     }

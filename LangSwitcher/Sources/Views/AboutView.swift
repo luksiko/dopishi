@@ -2,12 +2,23 @@ import SwiftUI
 
 struct AboutView: View {
     @EnvironmentObject var l10n: LocalizationManager
+
+    private var appIcon: NSImage {
+        if let icon = NSApp?.applicationIconImage, icon.isValid {
+            return icon
+        }
+        if let icon = NSImage(named: NSImage.applicationIconName), icon.isValid {
+            return icon
+        }
+        return NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
+    }
     
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "keyboard")
-                .font(.system(size: 48))
-                .foregroundStyle(.blue)
+            Image(nsImage: appIcon)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
             
             Text(l10n.t("about.appName"))
                 .font(.title)

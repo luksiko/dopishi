@@ -5,6 +5,10 @@ import SwiftUI
 @MainActor private func initializeLocalization() {
     Strings_en.register()
     Strings_ru.register()
+    Strings_uk.register()
+    Strings_de.register()
+    Strings_fr.register()
+    Strings_es.register()
 }
 
 @main
