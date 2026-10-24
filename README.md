@@ -124,10 +124,9 @@ Dopishi is free and open source. If it makes your day a little easier, buy me a 
 
 | Network | Address |
 |:---|:---|
-| **Ethereum / Arbitrum / Base** | `0x30c8b011AF68a963694Ce1E5f54A545442acFEfA` |
-| **Bitcoin** | `bc1qtqm7rgma8dcgqc50lmzmyxn729yqrtf9zs7asx` |
-| **Solana** | `A4jzTGxP7tbhyDFrcWJKdsA8v5xUwF6UzvC7RFmDRrfi` |
-| **Tron (USDT)** | `TDAyNkS36eKyqv9s4KQpu4ebWciQ2bqdW3` |
+| **TON** | `UQBVe2-_2IFrOe21Jg3xSOfdx1K7tLLLdx-OiV-sA_XIpTDB` |
+| **Solana** | `BJBiHYX8kydFrBrQbG1W9h6dFyzhC5tBtF3R8b1iCnEB` |
+| **TRON** | `TFXNa1ufxfqCkRj57F5J1o42suEfVhcWJ1` |
 
 ---
 
