@@ -63,6 +63,21 @@ final class SmartPunctuationEngineTests: XCTestCase {
         XCTAssertTrue(shouldInsert)
     }
 
+    func testCommaBeforeMultilingualConjunctions() {
+        // Ukrainian
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "але", precedingText: "хотів "))
+        // English
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "but", precedingText: "tried "))
+        // German
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "aber", precedingText: "wollte "))
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "sondern", precedingText: "nicht so "))
+        // French
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "mais", precedingText: "voulais "))
+        // Spanish
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "pero", precedingText: "quería "))
+        XCTAssertTrue(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "sino", precedingText: "no yo "))
+    }
+
     func testDoNotInsertCommaIfAlreadyHasComma() {
         let shouldInsert = SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "хотел, ")
         XCTAssertFalse(shouldInsert)

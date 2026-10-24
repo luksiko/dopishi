@@ -76,14 +76,25 @@ public struct SmartPunctuationEngine {
         return word.prefix(1).uppercased() + word.dropFirst()
     }
 
-    /// Evaluates whether a comma should be inserted before the Russian coordinating conjunctions «а» or «но».
+    /// Common lowercase coordinating conjunctions across supported languages:
+    /// Russian: "а", "но"
+    /// Ukrainian: "а", "але", "но"
+    /// English: "but"
+    /// German: "aber", "sondern"
+    /// French: "mais"
+    /// Spanish: "pero", "sino"
+    private static let coordinatingConjunctions: Set<String> = [
+        "а", "но", "але", "but", "aber", "sondern", "mais", "pero", "sino"
+    ]
+
+    /// Evaluates whether a comma should be inserted before coordinating conjunctions (e.g. «а», «но», «але», "but", "aber", "mais", "pero").
     /// - Parameters:
-    ///   - word: The completed word (e.g. "а", "но").
-    ///   - precedingText: The text before this word (e.g. "хотел ").
+    ///   - word: The completed word (e.g. "а", "но", "but").
+    ///   - precedingText: The text before this word (e.g. "хотел ", "wanted ").
     /// - Returns: True if a comma should be placed before the word.
     public static func shouldInsertCommaBeforeConjunction(word: String, precedingText: String) -> Bool {
-        // Only target exact lowercase "а" and "но". Uppercase "А" / "Но" indicates sentence start!
-        guard word == "а" || word == "но" else { return false }
+        // Only target exact lowercase conjunctions. Uppercase indicates sentence start!
+        guard coordinatingConjunctions.contains(word) else { return false }
 
         // Preceding text must end with a space (e.g. "хотел ")
         guard precedingText.hasSuffix(" ") else { return false }
