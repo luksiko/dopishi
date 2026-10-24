@@ -769,7 +769,10 @@ extension GhostTextOverlayTests {
         XCTAssertEqual(ghost.currentSuffix, "rld")
 
         // Wait for poll task to resolve fresh anchor
-        try await Task.sleep(nanoseconds: 50_000_000)
+        for _ in 0..<30 {
+            if ghost.lastCaretRect == freshAnchor { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         XCTAssertEqual(ghost.lastCaretRect, freshAnchor)
         let resolvedX = ghost.panelFrame?.origin.x ?? 0
         XCTAssertEqual(resolvedX, 110, accuracy: 0.5)
@@ -790,7 +793,10 @@ extension GhostTextOverlayTests {
 
         XCTAssertFalse(ghost.isVisible)
 
-        try await Task.sleep(nanoseconds: 60_000_000)
+        for _ in 0..<30 {
+            if ghost.lastCaretRect == targetAnchor { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         XCTAssertTrue(ghost.isVisible)
         XCTAssertEqual(ghost.lastCaretRect, targetAnchor)
         XCTAssertEqual(ghost.panelFrame?.origin.x ?? 0, 152, accuracy: 0.5)

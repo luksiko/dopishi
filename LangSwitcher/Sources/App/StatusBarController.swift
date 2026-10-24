@@ -391,6 +391,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let updatesItem = NSMenuItem(
+            title: l10n.t("menu.checkForUpdates"),
+            action: #selector(checkForUpdates),
+            keyEquivalent: ""
+        )
+        updatesItem.target = self
+        menu.addItem(updatesItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let quitItem = NSMenuItem(
             title: l10n.t("menu.quit"),
             action: #selector(NSApplication.terminate(_:)),
