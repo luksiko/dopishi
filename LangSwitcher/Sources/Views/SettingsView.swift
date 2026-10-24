@@ -1089,9 +1089,10 @@ struct AboutSettingsTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                Image(systemName: "keyboard")
-                    .font(.system(size: 52))
-                    .foregroundStyle(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 64, height: 64)
                     .padding(.top, 10)
 
                 VStack(spacing: 4) {
