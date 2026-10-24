@@ -85,6 +85,9 @@
 		E1000001000000000000006A /* TypoCorrectionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000006A /* TypoCorrectionEngine.swift */; };
 		E10000010000000000000137 /* UpdateManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000137 /* UpdateManagerTests.swift */; };
 		E10000010000000000000139 /* TypoCorrectionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000139 /* TypoCorrectionEngineTests.swift */; };
+		E10000010000000000000140 /* DictionaryDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000140 /* DictionaryDownloadManager.swift */; };
+		E10000010000000000000141 /* DictionaryDownloadManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */; };
+		E10000010000000000000142 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000142 /* OnboardingView.swift */; };
 		E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000059 /* CompletionStatsTracker.swift */; };
 		E1000001000000000000005A /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005A /* KeyboardView.swift */; };
 		E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005B /* CompletionDemoTextField.swift */; };
@@ -256,6 +259,9 @@
 		E10000020000000000000136 /* LoRAAdapterManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoRAAdapterManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000137 /* UpdateManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000139 /* TypoCorrectionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypoCorrectionEngineTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000140 /* DictionaryDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryDownloadManager.swift; sourceTree = "<group>"; };
+		E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryDownloadManagerTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000142 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000131 /* CompletionStatsTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTrackerTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -348,6 +354,7 @@
 				E10000020000000000000060 /* ThesaurusHUDView.swift */,
 				E10000020000000000000063 /* WordAlternativesHUDView.swift */,
 				E10000020000000000000066 /* SmartRepliesHUDView.swift */,
+				E10000020000000000000142 /* OnboardingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -403,6 +410,7 @@
 				E10000020000000000000068 /* UpdateManager.swift */,
 				E1000002000000000000006A /* TypoCorrectionEngine.swift */,
 				E10000020000000000000059 /* CompletionStatsTracker.swift */,
+				E10000020000000000000140 /* DictionaryDownloadManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -489,6 +497,7 @@
 				E10000020000000000000139 /* TypoCorrectionEngineTests.swift */,
 				E10000020000000000000130 /* BatteryPowerManagerTests.swift */,
 				E10000020000000000000131 /* CompletionStatsTrackerTests.swift */,
+				E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -683,6 +692,8 @@
 				E1000001000000000000005A /* KeyboardView.swift in Sources */,
 				E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */,
 				E1000001000000000000005C /* TimeSavedBanner.swift in Sources */,
+				E10000010000000000000140 /* DictionaryDownloadManager.swift in Sources */,
+				E10000010000000000000142 /* OnboardingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -727,6 +738,7 @@
 				E10000010000000000000139 /* TypoCorrectionEngineTests.swift in Sources */,
 				E10000010000000000000130 /* BatteryPowerManagerTests.swift in Sources */,
 				E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */,
+				E10000010000000000000141 /* DictionaryDownloadManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

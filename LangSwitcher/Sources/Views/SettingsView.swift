@@ -125,56 +125,14 @@ struct GeneralSettingsTab: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
     @ObservedObject private var updateManager = UpdateManager.shared
+    @ObservedObject private var dictionaryManager = DictionaryDownloadManager.shared
 
     @State private var hasAccessibility = AccessibilityService.hasAccessibilityPermission
     @State private var showPermissionsGuide = false
 
     var body: some View {
         Form {
-            // ── Appearance & Language ───────────────────────────────
-            Section {
-                Picker(l10n.t("general.language"), selection: $l10n.currentLanguage) {
-                    ForEach(LocalizationManager.availableLanguages, id: \.code) { lang in
-                        Text(lang.name).tag(lang.code)
-                    }
-                }
-
-                Picker(l10n.t("general.statusBarIcon"), selection: $settingsManager.statusBarIconStyle) {
-                    ForEach(StatusBarIconStyle.allCases, id: \.self) { style in
-                        Text(iconStyleDisplayName(style)).tag(style)
-                    }
-                }
-            }
-
-            // ── System Integration ──────────────────────────────────
-            Section {
-                Toggle(l10n.t("general.launchAtLogin"), isOn: $settingsManager.launchAtLogin)
-                Toggle(l10n.t("general.playSound"), isOn: $settingsManager.playSounds)
-                Toggle(l10n.t("general.showNotifications"), isOn: $settingsManager.showNotifications)
-
-                HStack {
-                    Toggle(l10n.t("general.iCloudSync"), isOn: $settingsManager.iCloudSyncEnabled)
-                    Spacer()
-                    ProBadge()
-                }
-                Text(l10n.t("general.iCloudSyncDesc"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            // ── Updates ─────────────────────────────────────────────
-            Section(l10n.t("general.updates")) {
-                Toggle(l10n.t("general.autoUpdateCheck"), isOn: $updateManager.automaticallyChecksForUpdates)
-                Text(l10n.t("general.updatesDesc"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button(l10n.t("general.checkNow")) {
-                    updateManager.checkForUpdates()
-                }
-            }
-
-            // ── Accessibility Permissions Status ────────────────────
+            // ── 1. Accessibility Permissions Status (Priority #1) ───
             Section {
                 if hasAccessibility {
                     HStack(spacing: 12) {
@@ -241,6 +199,76 @@ struct GeneralSettingsTab: View {
                     .padding(.vertical, 4)
                 }
             }
+
+            // ── 2. Setup Wizard ─────────────────────────────────────
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.tint)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l10n.t("settings.setupWizard.title"))
+                            .font(.body)
+                            .fontWeight(.medium)
+                        Text(l10n.t("settings.setupWizard.desc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(l10n.t("settings.setupWizard.button")) {
+                        NotificationCenter.default.post(name: NSNotification.Name("OpenOnboardingRequested"), object: nil)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 2)
+            }
+
+            // ── 3. Appearance & Language ────────────────────────────
+            Section {
+                Picker(l10n.t("general.language"), selection: $l10n.currentLanguage) {
+                    ForEach(LocalizationManager.availableLanguages, id: \.code) { lang in
+                        Text(lang.name).tag(lang.code)
+                    }
+                }
+
+                Picker(l10n.t("general.statusBarIcon"), selection: $settingsManager.statusBarIconStyle) {
+                    ForEach(StatusBarIconStyle.allCases, id: \.self) { style in
+                        Text(iconStyleDisplayName(style)).tag(style)
+                    }
+                }
+            }
+
+            // ── 4. System Integration ───────────────────────────────
+            Section {
+                Toggle(l10n.t("general.launchAtLogin"), isOn: $settingsManager.launchAtLogin)
+                Toggle(l10n.t("general.playSound"), isOn: $settingsManager.playSounds)
+                Toggle(l10n.t("general.showNotifications"), isOn: $settingsManager.showNotifications)
+
+                HStack {
+                    Toggle(l10n.t("general.iCloudSync"), isOn: $settingsManager.iCloudSyncEnabled)
+                    Spacer()
+                    ProBadge()
+                }
+                Text(l10n.t("general.iCloudSyncDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // ── 5. Updates ──────────────────────────────────────────
+            Section(l10n.t("general.updates")) {
+                Toggle(l10n.t("general.autoUpdateCheck"), isOn: $updateManager.automaticallyChecksForUpdates)
+                Text(l10n.t("general.updatesDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button(l10n.t("general.checkNow")) {
+                    updateManager.checkForUpdates()
+                }
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -253,8 +281,24 @@ struct GeneralSettingsTab: View {
 
     private func iconStyleDisplayName(_ style: StatusBarIconStyle) -> String {
         switch style {
-        case .languageBadge: return l10n.t("settings.iconStyle.languageBadge")
-        case .keyboardIcon: return l10n.t("settings.iconStyle.keyboardIcon")
+        case .languageBadge:
+            let codes = settingsManager.enabledLayouts
+                .map { $0.languageCode.uppercased() }
+                .filter { !$0.isEmpty }
+            var uniqueCodes: [String] = []
+            for code in codes where !uniqueCodes.contains(code) {
+                uniqueCodes.append(code)
+            }
+            let base = l10n.t("settings.iconStyle.languageBadge")
+            if !uniqueCodes.isEmpty {
+                let maxShown = 3
+                let shown = uniqueCodes.prefix(maxShown).joined(separator: ", ")
+                let suffix = uniqueCodes.count > maxShown ? "…" : ""
+                return "\(base) (\(shown)\(suffix))"
+            }
+            return "\(base) (EN)"
+        case .keyboardIcon:
+            return l10n.t("settings.iconStyle.keyboardIcon")
         }
     }
 }
@@ -264,6 +308,7 @@ struct GeneralSettingsTab: View {
 struct LayoutSettingsTab: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var l10n: LocalizationManager
+    @ObservedObject private var dictionaryManager = DictionaryDownloadManager.shared
 
     @State private var isLayoutsExpanded = false
 
@@ -471,39 +516,147 @@ struct LayoutSettingsTab: View {
             // ── 6. Installed System Layouts ─────────────────────────
             Section {
                 DisclosureGroup(isExpanded: $isLayoutsExpanded) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         ForEach(settingsManager.enabledLayouts) { layout in
-                            HStack {
-                                Image(systemName: "keyboard")
-                                    .foregroundStyle(.tint)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(layout.localizedName)
-                                        .font(.body)
-                                    Text(layout.id)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "keyboard")
+                                        .foregroundStyle(.tint)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(layout.localizedName)
+                                            .font(.body)
+                                        Text(layout.id)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(layout.languageCode.uppercased())
                                         .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .fontWeight(.semibold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor.opacity(0.12))
+                                        .clipShape(Capsule())
                                 }
-                                Spacer()
-                                Text(layout.languageCode.uppercased())
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor.opacity(0.12))
-                                    .clipShape(Capsule())
+
+                                // Dictionary status & action row
+                                let status = dictionaryManager.status(for: layout.languageCode)
+                                let dlState = dictionaryManager.downloadStates[layout.languageCode.lowercased()] ?? .idle
+
+                                HStack(spacing: 6) {
+                                    switch status {
+                                    case .systemProvided:
+                                        Image(systemName: "checkmark.seal")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(l10n.t("layouts.dict.system"))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+
+                                    case .installed:
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.green)
+                                        Text(l10n.t("layouts.dict.installed"))
+                                            .font(.caption2)
+                                            .foregroundStyle(.green)
+                                        Spacer()
+                                        Button {
+                                            dictionaryManager.openSpellingDirectory()
+                                        } label: {
+                                            Image(systemName: "folder")
+                                                .font(.caption2)
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .help(l10n.t("layouts.dict.openFolder"))
+
+                                    case .availableForDownload(let dict):
+                                        switch dlState {
+                                        case .downloading(let progress):
+                                            ProgressView(value: progress)
+                                                .frame(width: 50)
+                                                .scaleEffect(0.7)
+                                            Text(l10n.t("layouts.dict.downloading"))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+
+                                        case .completed:
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.caption2)
+                                                .foregroundStyle(.green)
+                                            Text(l10n.t("layouts.dict.installed"))
+                                                .font(.caption2)
+                                                .foregroundStyle(.green)
+
+                                        case .failed(let err):
+                                            Image(systemName: "exclamationmark.triangle")
+                                                .font(.caption2)
+                                                .foregroundStyle(.red)
+                                            Text(err)
+                                                .font(.caption2)
+                                                .foregroundStyle(.red)
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Button(l10n.t("layouts.dict.retry")) {
+                                                Task { await dictionaryManager.downloadDictionary(for: dict) }
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.mini)
+
+                                        case .idle:
+                                            Image(systemName: "exclamationmark.circle")
+                                                .font(.caption2)
+                                                .foregroundStyle(.orange)
+                                            Text(l10n.t("layouts.dict.missing"))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Spacer()
+                                            Button {
+                                                Task { await dictionaryManager.downloadDictionary(for: dict) }
+                                            } label: {
+                                                HStack(spacing: 3) {
+                                                    Image(systemName: "arrow.down.circle")
+                                                    Text("\(l10n.t("layouts.dict.download")) (~\(String(format: "%.1f", dict.approximateSizeMB)) MB)")
+                                                }
+                                            }
+                                            .buttonStyle(.borderedProminent)
+                                            .controlSize(.mini)
+                                        }
+
+                                    case .unsupported:
+                                        Image(systemName: "questionmark.circle")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(l10n.t("layouts.dict.notAvailable"))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.leading, 24)
+                                .padding(.top, 1)
                             }
                             .padding(.vertical, 2)
                         }
 
+                        Divider()
+                            .padding(.vertical, 2)
+
                         HStack {
+                            Button(l10n.t("layouts.dict.openFolder")) {
+                                dictionaryManager.openSpellingDirectory()
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+
                             Spacer()
+
                             Button(l10n.t("layouts.refresh")) {
                                 settingsManager.refreshSystemLayouts()
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
-                        .padding(.top, 4)
+                        .padding(.top, 2)
                     }
                     .padding(.top, 4)
                 } label: {

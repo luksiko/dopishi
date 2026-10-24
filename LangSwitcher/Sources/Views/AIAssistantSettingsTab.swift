@@ -23,31 +23,52 @@ struct AIAssistantSettingsTab: View {
 
     var body: some View {
         Form {
-            // MARK: - Header
+            // MARK: - Master Switch & Engine Status
             Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 26))
+                            .font(.system(size: 28))
                             .foregroundStyle(.tint)
-                            .padding(.trailing, 4)
+                            .frame(width: 32)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(l10n.t("ai.title"))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.t("ai.masterSwitch.title"))
                                 .font(.headline)
-                            Text(l10n.t("ai.subtitle"))
+                            Text(settingsManager.aiPredictiveEnabled ? l10n.t("ai.masterSwitch.activeDesc") : l10n.t("ai.masterSwitch.disabledDesc"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { settingsManager.aiPredictiveEnabled },
+                            set: { newValue in
+                                settingsManager.aiPredictiveEnabled = newValue
+                                if newValue {
+                                    Task { await inferenceEngine.ensureRunning() }
+                                } else {
+                                    inferenceEngine.stop()
+                                }
+                            }
+                        ))
+                        .toggleStyle(.switch)
                     }
+
+                    Divider()
 
                     // Engine status indicator
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(inferenceEngine.isRunning ? Color.green : Color.secondary.opacity(0.5))
+                            .fill(settingsManager.aiPredictiveEnabled && inferenceEngine.isRunning ? Color.green : Color.secondary.opacity(0.4))
                             .frame(width: 8, height: 8)
 
-                        if inferenceEngine.isStarting {
+                        if !settingsManager.aiPredictiveEnabled {
+                            Text(l10n.t("ai.status.offMemoryFreed"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if inferenceEngine.isStarting {
                             Text(l10n.t("ai.status.starting"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -66,23 +87,25 @@ struct AIAssistantSettingsTab: View {
 
                         Spacer()
 
-                        if !inferenceEngine.isRunning && modelManager.isDownloaded(model: modelManager.currentModel) {
-                            Button(l10n.t("ai.engine.start")) {
-                                Task {
-                                    await inferenceEngine.ensureRunning()
+                        if settingsManager.aiPredictiveEnabled {
+                            if !inferenceEngine.isRunning && modelManager.isDownloaded(model: modelManager.currentModel) {
+                                Button(l10n.t("ai.engine.start")) {
+                                    Task {
+                                        await inferenceEngine.ensureRunning()
+                                    }
                                 }
-                            }
-                            .buttonStyle(.link)
-                            .font(.caption)
-                        } else if inferenceEngine.isRunning {
-                            Button(l10n.t("ai.engine.restart")) {
-                                Task {
-                                    inferenceEngine.stop()
-                                    _ = await inferenceEngine.ensureRunning()
+                                .buttonStyle(.link)
+                                .font(.caption)
+                            } else if inferenceEngine.isRunning {
+                                Button(l10n.t("ai.engine.restart")) {
+                                    Task {
+                                        inferenceEngine.stop()
+                                        _ = await inferenceEngine.ensureRunning()
+                                    }
                                 }
+                                .buttonStyle(.link)
+                                .font(.caption)
                             }
-                            .buttonStyle(.link)
-                            .font(.caption)
                         }
                     }
                     .padding(.top, 2)
@@ -370,15 +393,13 @@ struct AIAssistantSettingsTab: View {
                 .padding(.vertical, 4)
             }
 
-            // MARK: - Section 3: Predictive Text Continuation
-            Section(l10n.t("ai.predictive.enable")) {
-                Toggle(l10n.t("ai.predictive.enable"), isOn: $settingsManager.aiPredictiveEnabled)
-
-                Text(l10n.t("ai.predictive.desc"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if settingsManager.aiPredictiveEnabled {
+            // MARK: - Section 3: Predictive Continuation Parameters
+            Section(l10n.t("ai.predictive.parameters")) {
+                if !settingsManager.aiPredictiveEnabled {
+                    Text(l10n.t("ai.masterSwitch.disabledDesc"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
                     Picker(l10n.t("ai.predictive.wordCount"), selection: $settingsManager.aiMaxContinuationWords) {
                         Text(String(format: l10n.t("ai.predictive.words"), 2)).tag(2)
                         Text(String(format: l10n.t("ai.predictive.words"), 3)).tag(3)

@@ -106,6 +106,13 @@ final class SpellCheckService {
             return true
         }
 
+        // 1. Check custom installed Hunspell dictionaries (e.g. tg, kk, be)
+        if CustomDictionaryStore.shared.hasDictionary(for: lang) {
+            let valid = CustomDictionaryStore.shared.isValidWord(trimmed, language: lang)
+            NSLog("[LangSwitcher] SpellCheckService.isValidWord (custom)('\(trimmed)', lang='\(lang)') = \(valid)")
+            return valid
+        }
+
         // Support compound words with common prefixes (e.g. автосмены -> авто + смены)
         if (lang == "ru" || lang == "uk") {
             for prefix in Self.russianCompoundPrefixes {

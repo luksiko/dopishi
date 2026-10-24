@@ -69,8 +69,24 @@ enum StatusBarIconStyle: Int, CaseIterable, Codable {
     @MainActor var displayName: String {
         let l10n = LocalizationManager.shared
         switch self {
-        case .languageBadge: return l10n.t("settings.iconStyle.languageBadge")
-        case .keyboardIcon: return l10n.t("settings.iconStyle.keyboardIcon")
+        case .languageBadge:
+            let codes = SettingsManager.shared.enabledLayouts
+                .map { $0.languageCode.uppercased() }
+                .filter { !$0.isEmpty }
+            var uniqueCodes: [String] = []
+            for code in codes where !uniqueCodes.contains(code) {
+                uniqueCodes.append(code)
+            }
+            let base = l10n.t("settings.iconStyle.languageBadge")
+            if !uniqueCodes.isEmpty {
+                let maxShown = 3
+                let shown = uniqueCodes.prefix(maxShown).joined(separator: ", ")
+                let suffix = uniqueCodes.count > maxShown ? "…" : ""
+                return "\(base) (\(shown)\(suffix))"
+            }
+            return "\(base) (EN)"
+        case .keyboardIcon:
+            return l10n.t("settings.iconStyle.keyboardIcon")
         }
     }
 }
@@ -518,6 +534,10 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(proDeepContextEnabled, forKey: Keys.proDeepContextEnabled) }
     }
 
+    @Published var hasCompletedOnboarding: Bool {
+        didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
     /// Computed check: whether AI inference is allowed based on preferences and battery state.
     var isAIAllowed: Bool {
         guard aiPredictiveEnabled else { return false }
@@ -818,6 +838,7 @@ final class SettingsManager: ObservableObject {
         static let proMultiLanguageAutoDetect = "proMultiLanguageAutoDetect"
         static let proFimEnabled = "proFimEnabled"
         static let proDeepContextEnabled = "proDeepContextEnabled"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
     }
     
     // MARK: - Init
@@ -934,6 +955,7 @@ final class SettingsManager: ObservableObject {
         self.proMultiLanguageAutoDetect = defaults.bool(forKey: Keys.proMultiLanguageAutoDetect)
         self.proFimEnabled = defaults.bool(forKey: Keys.proFimEnabled)
         self.proDeepContextEnabled = defaults.bool(forKey: Keys.proDeepContextEnabled)
+        self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge

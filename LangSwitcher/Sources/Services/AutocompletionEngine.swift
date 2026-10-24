@@ -151,21 +151,38 @@ final class AutocompletionEngine {
             }
         }
         
-        // 3. System NSSpellChecker completions for active language
-        let systemCompletions = spellCheckService.completions(forPartialWord: lower, language: activeLang)
-        for word in systemCompletions {
-            let wordLower = word.lowercased()
-            if wordLower.hasPrefix(lower) && wordLower != lower {
+        // 3. System NSSpellChecker completions for active language (or custom dictionary candidates)
+        if CustomDictionaryStore.shared.hasDictionary(for: activeLang) {
+            let customCompletions = CustomDictionaryStore.shared.candidateCompletions(prefix: lower, language: activeLang, limit: 6)
+            for word in customCompletions {
                 let formatted = formatCase(word, isCapitalized: isCapitalized)
                 guard isCandidateAllowed(formatted) else { continue }
                 if seenWords.insert(formatted.lowercased()).inserted {
-                    let score = calculateScore(base: 50, word: word)
+                    let score = calculateScore(base: 300, word: word)
                     results.append(AutocompletionCandidate(
                         word: formatted,
                         targetLayoutID: effectiveActiveLayoutID,
                         isCrossLayout: false,
                         score: score
                     ))
+                }
+            }
+        } else {
+            let systemCompletions = spellCheckService.completions(forPartialWord: lower, language: activeLang)
+            for word in systemCompletions {
+                let wordLower = word.lowercased()
+                if wordLower.hasPrefix(lower) && wordLower != lower {
+                    let formatted = formatCase(word, isCapitalized: isCapitalized)
+                    guard isCandidateAllowed(formatted) else { continue }
+                    if seenWords.insert(formatted.lowercased()).inserted {
+                        let score = calculateScore(base: 50, word: word)
+                        results.append(AutocompletionCandidate(
+                            word: formatted,
+                            targetLayoutID: effectiveActiveLayoutID,
+                            isCrossLayout: false,
+                            score: score
+                        ))
+                    }
                 }
             }
         }
@@ -231,11 +248,17 @@ final class AutocompletionEngine {
     }
     
     private func wordsForLanguage(_ lang: String) -> [String] {
-        switch lang.lowercased() {
+        let code = lang.lowercased()
+        switch code {
         case "ru": return Self.russianWords
         case "uk", "ua": return Self.ukrainianWords
         case "pl": return Self.polishWords
-        default: return Self.englishWords
+        case "en": return Self.englishWords
+        default:
+            if CustomDictionaryStore.shared.hasDictionary(for: code) {
+                return Array(CustomDictionaryStore.shared.allWords(for: code))
+            }
+            return Self.englishWords
         }
     }
     

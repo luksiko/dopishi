@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var healthTimer: Timer?
     private var instanceLock: AppInstanceLock?
     private var ownsInstance = false
+    private var onboardingWindow: NSWindow?
 
     private var l10n: LocalizationManager { LocalizationManager.shared }
     
@@ -135,6 +136,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await AIInferenceEngine.shared.ensureRunning()
             }
         }
+
+        // Show onboarding on first launch or when accessibility is not granted
+        if !settingsManager.hasCompletedOnboarding || !AccessibilityService.hasAccessibilityPermission {
+            showOnboarding()
+        }
+
+        // Observe request to open onboarding from menu
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openOnboardingRequested),
+            name: NSNotification.Name("OpenOnboardingRequested"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(closeOnboardingWindow),
+            name: NSNotification.Name("CloseOnboardingWindow"),
+            object: nil
+        )
     }
 
     @objc private func systemDidWake() {
@@ -602,6 +622,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    // MARK: - Onboarding
+
+    func showOnboarding() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let window = onboardingWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let onboardingView = OnboardingView()
+            .environmentObject(settingsManager)
+            .environmentObject(LocalizationManager.shared)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 490),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = l10n.t("onboarding.windowTitle")
+        window.center()
+        window.contentView = NSHostingView(rootView: onboardingView)
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+
+        onboardingWindow = window
+    }
+
+    @objc private func openOnboardingRequested() {
+        showOnboarding()
+    }
+
+    @objc private func closeOnboardingWindow() {
+        onboardingWindow?.close()
+    }
+
     private func showAccessibilityAlert() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()

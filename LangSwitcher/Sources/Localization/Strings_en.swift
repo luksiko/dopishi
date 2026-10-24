@@ -14,6 +14,7 @@ enum Strings_en {
         "menu.appDisabled":              "○ Disabled in “%@”",
         "menu.pause30Min":               "⏸ Pause for 30 minutes",
         "menu.resumeNow":                "▶ Resume (%d min left)",
+        "menu.aiAssistant":              "AI Assistant (Neural)",
         "menu.aiStatusBattery":          "Battery Saver — AI paused",
         "menu.aiStatusDownloading":      "Downloading model (%d%%)",
         "menu.aiStatusFastDictionary":   "Fast Dictionary",
@@ -27,6 +28,7 @@ enum Strings_en {
         "menu.conversions":              "Conversions:",
         "menu.settings":                 "Settings...",
         "menu.checkForUpdates":          "Check for Updates…",
+        "menu.setupWizard":              "Setup Wizard…",
         "menu.about":                    "About Dopishi",
         "menu.quit":                     "Quit Dopishi",
         "menu.tooltip":                  "Dopishi — %@ to convert",
@@ -60,7 +62,7 @@ enum Strings_en {
         "settings.tab.history":          "History & Stats",
         "settings.tab.permissions":      "Permissions",
         "settings.tab.log":              "Log",
-        "settings.iconStyle.languageBadge": "Language badge in frame (RU, EN)",
+        "settings.iconStyle.languageBadge": "Language badge in frame",
         "settings.iconStyle.keyboardIcon":  "Keyboard icon",
 
         // ── Apps Tab ────────────────────────────────────────────────
@@ -133,6 +135,14 @@ enum Strings_en {
         "layouts.description":           "These layouts are detected from your system keyboard settings. The converter maps characters between them based on physical key positions.",
         "layouts.refresh":               "Refresh from System",
         "layouts.count":                 "%d layouts detected",
+        "layouts.dict.system":           "System dictionary",
+        "layouts.dict.installed":        "Dictionary installed",
+        "layouts.dict.missing":          "No spellcheck dictionary",
+        "layouts.dict.download":         "Download Dictionary",
+        "layouts.dict.downloading":      "Downloading…",
+        "layouts.dict.retry":            "Retry",
+        "layouts.dict.openFolder":       "Open Spelling folder in Finder",
+        "layouts.dict.notAvailable":     "No dictionary available",
 
         // ── Single Key Layout Switching ──────────────────────────────
         "layoutSwitchKey.title":         "Keyboard Language Switch Key",
@@ -426,6 +436,11 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         // ── AI Assistant ─────────────────────────────────────────────
         "ai.title":                              "Local AI Assistant",
         "ai.subtitle":                           "Offline neural engine for predictive continuation (100% private, no internet required).",
+        "ai.masterSwitch.title":                 "Local AI Assistant",
+        "ai.masterSwitch.activeDesc":            "Predictive phrase continuation via local neural model.",
+        "ai.masterSwitch.disabledDesc":          "Disabled. Neural model is completely unloaded from RAM (0 MB).",
+        "ai.status.offMemoryFreed":              "Disabled (0 MB RAM, model unloaded)",
+        "ai.predictive.parameters":              "Continuation Parameters",
         "ai.model.invalidGGUF": "This file is not a standard GGUF model. Choose a compatible GGUF file.",
         "ai.model.name":                         "Model",
         "ai.model.status":                       "Status",
@@ -591,6 +606,46 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.sandbox.pressTab":                   "Press Tab to accept suggestion",
         "ai.sandbox.examples":                   "Try Example",
         "ai.sandbox.success":                    "Completed! +%d characters saved",
+
+        // ── Onboarding ─────────────────────────────────────────────────
+        "settings.setupWizard.title":            "Setup Wizard",
+        "settings.setupWizard.desc":             "Run initial setup to verify permissions, dictionaries, and AI.",
+        "settings.setupWizard.button":           "Run Setup Wizard…",
+
+        "onboarding.windowTitle":                "Welcome to Dopishi",
+        "onboarding.step1.title":                "Accessibility Access",
+        "onboarding.step1.body":                 "Dopishi needs Accessibility permission to read and replace text in other apps. Without it, layout conversion won't work.",
+        "onboarding.step1.grant":                "Grant Access",
+        "onboarding.step1.skip":                 "Skip for now",
+        "onboarding.step1.granted":              "Access granted",
+        "onboarding.privacy.offline":            "100% Offline — your keystrokes never leave your Mac or hit the network",
+        "onboarding.privacy.passwords":          "Password Isolation — secure fields and password managers are ignored",
+        "onboarding.privacy.openSource":         "Open Source — fully inspectable code verified by the community",
+
+        "onboarding.step2.title":                "Your Keyboard Languages",
+        "onboarding.step2.body":                 "We checked your system keyboard layouts and their dictionary support.",
+        "onboarding.step2.builtin":              "Built-in",
+        "onboarding.step2.installed":            "Dictionary installed",
+        "onboarding.step2.download":             "Download",
+        "onboarding.step2.continue":             "Continue",
+        "onboarding.step2.noLayouts":            "No layouts detected",
+
+        "onboarding.ai.title":                   "Local AI Assistant (Optional)",
+        "onboarding.ai.body":                    "Beyond fixing typos, Dopishi can predict phrases and continue sentences using a lightweight neural network.",
+        "onboarding.ai.feature1":                "Runs entirely on your Apple Silicon / Intel CPU (0 internet)",
+        "onboarding.ai.feature2":                "Zero subscriptions or cloud logs — absolute privacy",
+        "onboarding.ai.feature3":                "One-time download of a compact model (~800 MB)",
+        "onboarding.ai.downloadButton":          "Download Neural Model (~800 MB)",
+        "onboarding.ai.ready":                   "Model Ready & Active",
+        "onboarding.ai.later":                   "Configure later in Settings",
+        "onboarding.ai.continueInBackground":    "Continue (downloading in background)",
+
+        "onboarding.step3.title":                "Try it now",
+        "onboarding.step3.body":                 "Type text as if you typed in the wrong layout, then press your shortcut to convert it.",
+        "onboarding.step3.done":                 "Done",
+        "onboarding.step3.hotkey":               "Your shortcut:",
+        "onboarding.step3.convert":              "Convert",
+        "onboarding.step3.tip":                  "Try pressing your shortcut in any app!",
     ]
 
     @MainActor static func register() {

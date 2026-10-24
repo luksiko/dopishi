@@ -13,6 +13,7 @@ enum Strings_ru {
         "menu.appDisabled":              "○ Отключено в «%@»",
         "menu.pause30Min":               "⏸ Приостановить на 30 минут",
         "menu.resumeNow":                "▶ Возобновить работу (ещё %d мин)",
+        "menu.aiAssistant":              "AI-ассистент (нейросеть)",
         "menu.aiStatusBattery":          "Экономия батареи — AI на паузе",
         "menu.aiStatusDownloading":      "Загрузка модели (%d%%)",
         "menu.aiStatusFastDictionary":   "Быстрый словарь",
@@ -26,6 +27,7 @@ enum Strings_ru {
         "menu.conversions":              "Конвертаций:",
         "menu.settings":                 "Настройки...",
         "menu.checkForUpdates":          "Проверить обновления…",
+        "menu.setupWizard":              "Мастер настройки…",
         "menu.about":                    "О Dopishi",
         "menu.quit":                     "Завершить Dopishi",
         "menu.tooltip":                  "Dopishi — %@ для конвертации",
@@ -59,7 +61,7 @@ enum Strings_ru {
         "settings.tab.history":          "История и статистика",
         "settings.tab.permissions":      "Разрешения",
         "settings.tab.log":              "Журнал",
-        "settings.iconStyle.languageBadge": "Код языка в рамке (RU, EN)",
+        "settings.iconStyle.languageBadge": "Код языка в рамке",
         "settings.iconStyle.keyboardIcon":  "Значок клавиатуры",
 
         // ── Вкладка «Приложения» ────────────────────────────────────
@@ -132,6 +134,14 @@ enum Strings_ru {
         "layouts.description":           "Эти раскладки определены из настроек системной клавиатуры. Конвертер сопоставляет символы между ними на основе физических позиций клавиш.",
         "layouts.refresh":               "Обновить из системы",
         "layouts.count":                 "Обнаружено раскладок: %d",
+        "layouts.dict.system":           "Системный словарь",
+        "layouts.dict.installed":        "Словарь установлен",
+        "layouts.dict.missing":          "Нет словаря правописания",
+        "layouts.dict.download":         "Скачать словарь",
+        "layouts.dict.downloading":      "Загрузка…",
+        "layouts.dict.retry":            "Повторить",
+        "layouts.dict.openFolder":       "Открыть папку словарей в Finder",
+        "layouts.dict.notAvailable":     "Словарь недоступен",
 
         // ── Переключение раскладки одиночной клавишей ───────────────
         "layoutSwitchKey.title":         "Клавиша переключения языка",
@@ -425,6 +435,11 @@ Dopishi нуждается в разрешении универсального 
         // ── AI Assistant ─────────────────────────────────────────────
         "ai.title":                              "Локальный AI Помощник",
         "ai.subtitle":                           "Локальная нейросеть для предиктивного набора (100% офлайн, без интернета).",
+        "ai.masterSwitch.title":                 "Локальный AI-ассистент",
+        "ai.masterSwitch.activeDesc":            "Предиктивное продолжение фраз локальной нейросетью.",
+        "ai.masterSwitch.disabledDesc":          "Выключен. Модель полностью выгружена из памяти (0 МБ RAM).",
+        "ai.status.offMemoryFreed":              "Выключен (0 МБ RAM, модель выгружена)",
+        "ai.predictive.parameters":              "Параметры генерации",
         "ai.model.invalidGGUF": "Этот файл не является стандартной моделью GGUF. Выберите совместимый файл GGUF.",
         "ai.model.name":                         "Модель",
         "ai.model.status":                       "Статус",
@@ -590,6 +605,46 @@ Dopishi нуждается в разрешении универсального 
         "ai.sandbox.pressTab":                   "Нажмите Tab, чтобы принять",
         "ai.sandbox.examples":                   "Примеры",
         "ai.sandbox.success":                    "Дополнено! +%d символов сэкономлено",
+
+        // ── Onboarding ─────────────────────────────────────────────────
+        "settings.setupWizard.title":            "Мастер первоначальной настройки",
+        "settings.setupWizard.desc":             "Повторить проверку разрешений, системных раскладок, словарей и AI.",
+        "settings.setupWizard.button":           "Запустить мастер…",
+
+        "onboarding.windowTitle":                "Добро пожаловать в Dopishi",
+        "onboarding.step1.title":                "Доступ к Accessibility",
+        "onboarding.step1.body":                 "Dopishi нужен доступ к Accessibility, чтобы читать и заменять текст в других приложениях. Без него конвертация раскладок не работает.",
+        "onboarding.step1.grant":                "Разрешить доступ",
+        "onboarding.step1.skip":                 "Пропустить",
+        "onboarding.step1.granted":              "Доступ разрешён",
+        "onboarding.privacy.offline":            "100% Офлайн — текст не покидает память Mac и не отправляется в сеть",
+        "onboarding.privacy.passwords":          "Защита паролей — поля паролей и защищенный ввод игнорируются автоматически",
+        "onboarding.privacy.openSource":         "Открытый исходный код — безопасность подтверждена открытым репозиторием",
+
+        "onboarding.step2.title":                "Ваши языки клавиатуры",
+        "onboarding.step2.body":                 "Мы проверили ваши системные раскладки клавиатуры и поддержку словарей.",
+        "onboarding.step2.builtin":              "Встроен",
+        "onboarding.step2.installed":            "Словарь установлен",
+        "onboarding.step2.download":             "Скачать",
+        "onboarding.step2.continue":             "Продолжить",
+        "onboarding.step2.noLayouts":            "Раскладки не обнаружены",
+
+        "onboarding.ai.title":                   "Локальный AI-помощник (по желанию)",
+        "onboarding.ai.body":                    "Dopishi умеет не просто исправлять раскладку, но и подсказывать продолжения слов и фраз с помощью нейросети.",
+        "onboarding.ai.feature1":                "Работает прямо на процессоре Mac (Apple Silicon / Intel)",
+        "onboarding.ai.feature2":                "Без облаков и подписок — полная конфиденциальность ваших мыслей",
+        "onboarding.ai.feature3":                "Требует разовой загрузки компактной модели (~800 МБ)",
+        "onboarding.ai.downloadButton":          "Скачать нейросеть (~800 МБ)",
+        "onboarding.ai.ready":                   "Модель установлена и готова к работе",
+        "onboarding.ai.later":                   "Настроить позже в настройках",
+        "onboarding.ai.continueInBackground":    "Продолжить (загрузка в фоне)",
+
+        "onboarding.step3.title":                "Попробуйте прямо сейчас",
+        "onboarding.step3.body":                 "Введите текст так, как будто набирали не в той раскладке, затем нажмите ваш хоткей.",
+        "onboarding.step3.done":                 "Готово",
+        "onboarding.step3.hotkey":               "Ваш хоткей:",
+        "onboarding.step3.convert":              "Конвертировать",
+        "onboarding.step3.tip":                  "Попробуйте нажать ваш хоткей в любой программе!",
     ]
 
     @MainActor static func register() {

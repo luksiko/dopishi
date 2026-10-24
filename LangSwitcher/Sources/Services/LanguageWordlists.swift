@@ -238,7 +238,15 @@ enum LanguageWordlists {
     private static func lists(for script: Script) -> [Set<String>]? {
         switch script {
         case .latin: return [polishWords, englishWords]
-        case .cyrillic: return [ukrainianWords, russianWords]
+        case .cyrillic:
+            var list = [ukrainianWords, russianWords]
+            let tgWords = CustomDictionaryStore.shared.allWords(for: "tg")
+            if !tgWords.isEmpty { list.append(tgWords) }
+            let kkWords = CustomDictionaryStore.shared.allWords(for: "kk")
+            if !kkWords.isEmpty { list.append(kkWords) }
+            let beWords = CustomDictionaryStore.shared.allWords(for: "be")
+            if !beWords.isEmpty { list.append(beWords) }
+            return list
         }
     }
 

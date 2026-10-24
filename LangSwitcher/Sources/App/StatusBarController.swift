@@ -289,25 +289,36 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         headerItem.attributedTitle = NSAttributedString(string: "\(l10n.t("menu.header")) v\(version)", attributes: attrs)
         menu.addItem(headerItem)
 
-        // ── 2. AI Model & Resource Status line ──────────────────────
+        // ── 2. AI Master Toggle & Model Status ──────────────────────
+        let aiToggleItem = NSMenuItem(
+            title: l10n.t("menu.aiAssistant"),
+            action: #selector(toggleAIAssistant),
+            keyEquivalent: ""
+        )
+        aiToggleItem.target = self
+        aiToggleItem.state = settingsManager.aiPredictiveEnabled ? .on : .off
+        menu.addItem(aiToggleItem)
+
         let aiState = AIModelManager.shared.state
         let aiStatusText: String
-        if PowerService.shared.isOnBattery && settingsManager.aiBatteryModeEnabled {
-            aiStatusText = "🔋 " + l10n.t("menu.aiStatusBattery")
+        if !settingsManager.aiPredictiveEnabled {
+            aiStatusText = "    ○ " + l10n.t("menu.aiStatusDisabled")
+        } else if PowerService.shared.isOnBattery && settingsManager.aiBatteryModeEnabled {
+            aiStatusText = "    🔋 " + l10n.t("menu.aiStatusBattery")
         } else {
             switch aiState {
             case .ready(_, let fileSize):
                 let modelName = AIModelManager.shared.currentModel.name
                 let formattedSize = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .memory)
-                aiStatusText = "● AI: \(modelName) (\(formattedSize))"
+                aiStatusText = "    ● \(modelName) (\(formattedSize))"
             case .downloading(let progress, _, _):
                 let pct = Int(progress * 100)
-                aiStatusText = "⟳ AI: " + l10n.t("menu.aiStatusDownloading").replacingOccurrences(of: "%d", with: "\(pct)")
+                aiStatusText = "    ⟳ " + l10n.t("menu.aiStatusDownloading").replacingOccurrences(of: "%d", with: "\(pct)")
             case .notDownloaded, .error:
                 if settingsManager.autoCompletionEnabled {
-                    aiStatusText = "○ AI: " + l10n.t("menu.aiStatusFastDictionary")
+                    aiStatusText = "    ○ " + l10n.t("menu.aiStatusFastDictionary")
                 } else {
-                    aiStatusText = "○ AI: " + l10n.t("menu.aiStatusDisabled")
+                    aiStatusText = "    ○ " + l10n.t("menu.aiStatusDisabled")
                 }
             }
         }
@@ -495,6 +506,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         updateItem.target = self
         menu.addItem(updateItem)
 
+        let setupWizardItem = NSMenuItem(
+            title: l10n.t("menu.setupWizard"),
+            action: #selector(openSetupWizard),
+            keyEquivalent: ""
+        )
+        setupWizardItem.target = self
+        menu.addItem(setupWizardItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
@@ -524,6 +543,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func pause30MinAction() {
         settingsManager.pauseTemporarily(minutes: 30)
+        setupMenu()
+    }
+
+    @objc private func toggleAIAssistant() {
+        settingsManager.aiPredictiveEnabled.toggle()
+        if settingsManager.aiPredictiveEnabled {
+            Task { @MainActor in
+                await AIInferenceEngine.shared.ensureRunning()
+            }
+        } else {
+            AIInferenceEngine.shared.stop()
+        }
         setupMenu()
     }
 
@@ -608,6 +639,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         window.makeKeyAndOrderFront(nil)
 
         settingsWindow = window
+    }
+
+    @objc private func openSetupWizard() {
+        NotificationCenter.default.post(name: NSNotification.Name("OpenOnboardingRequested"), object: nil)
     }
 
     @objc private func openAbout() {
