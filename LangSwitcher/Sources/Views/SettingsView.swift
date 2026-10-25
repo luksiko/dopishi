@@ -1007,15 +1007,19 @@ struct SetupSettingsTab: View {
                     HStack(spacing: 8) {
                         TextField(l10n.t("setup.tab.testConversionPlaceholder"), text: $testInput)
                             .textFieldStyle(.roundedBorder)
+                            .onSubmit {
+                                applyConversion()
+                            }
                             .onChange(of: testInput) { newValue in
                                 updateConversion(for: newValue)
                             }
 
-                        Button(l10n.t("onboarding.step3.convert")) {
-                            updateConversion(for: testInput)
+                        Button(action: applyConversion) {
+                            Label(l10n.t("onboarding.step3.convert"), systemImage: "arrow.triangle.2.circlepath")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(testInput.isEmpty)
                     }
 
                     if !convertedPreview.isEmpty {
@@ -1087,6 +1091,16 @@ struct SetupSettingsTab: View {
         .onAppear {
             hasAccessibility = AccessibilityService.hasAccessibilityPermission
             updateConversion(for: testInput)
+        }
+    }
+
+    private func applyConversion() {
+        guard !testInput.isEmpty else { return }
+        updateConversion(for: testInput)
+        let converted = convertedPreview
+        if !converted.isEmpty && converted != testInput {
+            testInput = converted
+            updateConversion(for: converted)
         }
     }
 
