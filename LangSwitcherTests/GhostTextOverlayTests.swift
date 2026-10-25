@@ -1186,5 +1186,52 @@ extension GhostTextOverlayTests {
         controller.hide()
         XCTAssertNil(controller.lastFieldRect)
     }
+
+    func testTypeAheadRetainsExistingSuggestionTargetWhenOverlayIsDisplayed() {
+        let (service, ghost, _) = makeService()
+        defer { service.stop() }
+
+        let req = UUID()
+        service.presentAIPrediction(
+            suffix: "suggestion",
+            activeLayoutID: "com.apple.keylayout.US",
+            requestId: req,
+            fieldIdentifier: "field:1",
+            caretRect: CGRect(x: 100, y: 200, width: 2, height: 16)
+        )
+
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "suggestion")
+
+        // First matching character
+        XCTAssertTrue(service.handleTypeAhead(char: "s"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "uggestion")
+        XCTAssertEqual(ghost.currentSuffix, "uggestion")
+
+        // Second matching character
+        XCTAssertTrue(service.handleTypeAhead(char: "u"))
+        XCTAssertEqual(service.activeGhostState?.remainingSuffix, "ggestion")
+        XCTAssertEqual(ghost.currentSuffix, "ggestion")
+    }
+
+    func testAutoCompletionDefaultDelay() {
+        let refresh = AutocompletionRefresh()
+        var executed = false
+        refresh.schedule {
+            executed = true
+        }
+        XCTAssertFalse(executed, "Default autocompletion refresh must be delayed (150ms), not synchronous")
+        refresh.cancel()
+    }
+
+    func testAccessibilityServiceThreadSafeElectronDetection() {
+        let service = AccessibilityService()
+        let pids: [pid_t] = [1001, 1002, 1003, 1004, 1005]
+
+        DispatchQueue.concurrentPerform(iterations: 50) { index in
+            let pid = pids[index % pids.count]
+            _ = service.isElectronOrChromiumApp(pid: pid)
+        }
+    }
 }
 

@@ -384,7 +384,7 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(autoCompletionSuggestProfanity, forKey: Keys.autoCompletionSuggestProfanity) }
     }
 
-    /// Delay before showing autocompletion popup (in seconds). Default: 0.035 (35 ms).
+    /// Delay before showing autocompletion popup (in seconds). Default: 0.150 (150 ms).
     @Published var autoCompletionDelay: Double {
         didSet { defaults.set(autoCompletionDelay, forKey: Keys.autoCompletionDelay) }
     }
@@ -926,7 +926,7 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionSuggestProfanity = defaults.object(forKey: Keys.autoCompletionSuggestProfanity) as? Bool ?? false // Default: OFF
         let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
         self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? AutocompletionDisplayMode.ghostText.rawValue) ?? .ghostText
-        self.autoCompletionDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double ?? 0.035
+        self.autoCompletionDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double ?? 0.150
         
         let savedExcluded = defaults.stringArray(forKey: Keys.excludedAppBundleIDs)
         self.excludedAppBundleIDs = savedExcluded ?? Array(AutoCorrectionGate.defaultExcludedBundleIDs).sorted()

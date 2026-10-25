@@ -75,6 +75,7 @@ final class AutoCorrectionService {
     private var snoozeUntil: Date?
     private var snoozeFieldIdentifier: String?
     private let completionRefresh: AutocompletionRefresh
+    private let fieldAnchorDebounce = AutocompletionRefresh()
     private let aiDebounceTimer = AIDebounceTimer()
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
@@ -282,6 +283,7 @@ final class AutoCorrectionService {
     func stop() {
         consumedAcceptanceKeys.removeAll()
         completionRefresh.cancel()
+        fieldAnchorDebounce.cancel()
         phraseContinuationAnchor = nil
         physicalInputRevision &+= 1
         replacementSession.cancel()
@@ -772,10 +774,11 @@ final class AutoCorrectionService {
             wordBuffer.append(char)
         }
 
-        let updatedTarget = accessibilityService.captureReplacementTarget()
-        state.suggestionTarget = updatedTarget
-        self.suggestionTarget = updatedTarget
-        self.lastCaretContext = accessibilityService.captureCaretContext()
+        if state.suggestionTarget == nil {
+            let updatedTarget = accessibilityService.captureReplacementTarget()
+            state.suggestionTarget = updatedTarget
+            self.suggestionTarget = updatedTarget
+        }
 
         if state.remainingSuffix.isEmpty {
             activeGhostState = nil
@@ -799,15 +802,19 @@ final class AutoCorrectionService {
             hasScreenContext: ghostTextController.currentCandidate?.hasScreenContext ?? false
         )
 
-        let bounds = accessibilityService.caretAndFieldBounds()
-        let currentCaret = bounds?.caret ?? state.caretRect
+        let isOverlayDisplayed = ghostTextController.isVisible
+        let bounds = isOverlayDisplayed ? nil : accessibilityService.caretAndFieldBounds()
+        let currentCaret = bounds?.caret ?? ghostTextController.lastCaretRect ?? state.caretRect
+        state.caretRect = currentCaret
+        self.activeGhostState = state
+
         let displayMode = settingsManager.autoCompletionDisplayMode
         if displayMode == .ghostText || displayMode == .both {
             ghostTextController.show(
                 candidate: updatedCandidate,
                 suffix: state.remainingSuffix,
                 caretRect: currentCaret,
-                fieldRect: bounds?.fieldRect,
+                fieldRect: bounds?.fieldRect ?? ghostTextController.lastFieldRect,
                 caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
             )
         }
@@ -940,24 +947,11 @@ final class AutoCorrectionService {
 
         if typeAheadHandledCount > 0 {
             typeAheadHandledCount -= 1
-            if let bounds = accessibilityService.caretAndFieldBounds(), let state = activeGhostState {
-                let caret = bounds.caret
-                activeGhostState?.caretRect = caret
-                if let candidate = ghostTextController.currentCandidate {
-                    ghostTextController.show(
-                        candidate: candidate,
-                        suffix: state.remainingSuffix,
-                        caretRect: caret,
-                        fieldRect: bounds.fieldRect,
-                        caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
-                    )
-                }
+            if let char = characters?.first {
+                recentTextBuffer.append(char)
+                if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             }
-            if let target = accessibilityService.captureReplacementTarget() {
-                self.suggestionTarget = target
-                activeGhostState?.suggestionTarget = target
-            }
-            self.lastCaretContext = accessibilityService.captureCaretContext()
+            scheduleFieldAnchorDebounce()
             return
         }
 
@@ -1069,7 +1063,7 @@ final class AutoCorrectionService {
         if activeGhostState != nil && handleTypeAhead(char: char) {
             recentTextBuffer.append(char)
             if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
-            updateFieldAnchor()
+            scheduleFieldAnchorDebounce()
             return
         }
 
@@ -1188,6 +1182,7 @@ final class AutoCorrectionService {
         aiDebounceTimer.cancel()
         ScreenContextService.shared.invalidateCache()
         if hideFieldAnchor {
+            fieldAnchorDebounce.cancel()
             fieldAnchorController.hide()
             stopFieldAnchorPoll()
         }
@@ -1202,9 +1197,15 @@ final class AutoCorrectionService {
         // No-op
     }
 
+    private func scheduleFieldAnchorDebounce() {
+        fieldAnchorDebounce.schedule(delay: 0.500) { [weak self] in
+            self?.updateFieldAnchor()
+        }
+    }
+
     private func scheduleAutocompletion() {
         completionRefresh.cancel()
-        updateFieldAnchor()
+        scheduleFieldAnchorDebounce()
         // Measure after the editor receives the physical key, coalescing fast typing.
         let delay = settingsManager.autoCompletionDelay
         completionRefresh.schedule(delay: delay) { [weak self] in
@@ -2673,7 +2674,7 @@ final class AutocompletionRefresh {
         revision &+= 1
     }
 
-    func schedule(delay: Double = 0.035, _ refresh: @escaping @MainActor () -> Void) {
+    func schedule(delay: Double = 0.150, _ refresh: @escaping @MainActor () -> Void) {
         cancel()
         if delay <= 0 {
             refresh()

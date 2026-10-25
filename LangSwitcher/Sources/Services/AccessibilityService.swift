@@ -23,9 +23,39 @@ struct CaretContext: Equatable {
 // Handles getting and replacing selected text via macOS Accessibility API & pasteboard
 
 final class AccessibilityService {
-    private var preparedElectronPID: pid_t?
+    private let electronPIDLock = NSLock()
+    private var preparedElectronPIDs = Set<pid_t>()
+
+    func isElectronOrChromiumApp(pid: pid_t) -> Bool {
+        electronPIDLock.lock()
+        defer { electronPIDLock.unlock() }
+        return preparedElectronPIDs.contains(pid)
+    }
     private var pendingPaste: PasteConfirmation?
     private var pendingSelection: PasteConfirmation?
+    private var workspaceObserver: NSObjectProtocol?
+
+    init() {
+        workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            let app = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
+                ?? NSWorkspace.shared.frontmostApplication
+            guard let app else { return }
+            self?.prepareBrowserAccessibilityAsync(for: app)
+        }
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            prepareBrowserAccessibilityAsync(for: frontmost)
+        }
+    }
+
+    deinit {
+        if let observer = workspaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+    }
 
     var hasPendingPaste: Bool {
         pendingPaste != nil
@@ -902,7 +932,6 @@ final class AccessibilityService {
     }
 
     func focusedTextElement() -> AXUIElement? {
-        prepareBrowserAccessibility()
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, 0.05)
         var value: CFTypeRef?
@@ -983,12 +1012,25 @@ final class AccessibilityService {
         return result ?? webAreaFallback
     }
 
+    func prepareBrowserAccessibilityAsync(for app: NSRunningApplication) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.prepareBrowserAccessibility(for: app)
+        }
+    }
+
     /// Electron and Chromium document these attributes for third-party assistive applications.
-    /// Request once per active process, not on every keystroke.
-    private func prepareBrowserAccessibility() {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              preparedElectronPID != app.processIdentifier,
+    /// Request once per active process asynchronously on app activation, not on every keystroke.
+    func prepareBrowserAccessibility(for app: NSRunningApplication? = nil) {
+        guard let app = app ?? NSWorkspace.shared.frontmostApplication,
               AXIsProcessTrusted() else { return }
+
+        let pid = app.processIdentifier
+        electronPIDLock.lock()
+        if preparedElectronPIDs.contains(pid) {
+            electronPIDLock.unlock()
+            return
+        }
+        electronPIDLock.unlock()
 
         let bundlePath = app.bundleURL?.path ?? ""
         let bundleID = app.bundleIdentifier ?? ""
@@ -1006,10 +1048,14 @@ final class AccessibilityService {
                                     "Contents/Frameworks/Electron Framework.framework").path) ?? "")
 
         guard isElectronOrChromium else { return }
-        preparedElectronPID = app.processIdentifier
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+
+        let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+
+        electronPIDLock.lock()
+        preparedElectronPIDs.insert(pid)
+        electronPIDLock.unlock()
     }
 
     private func parameterizedRect(_ element: AXUIElement, attribute: String, parameter: CFTypeRef) -> CGRect? {
@@ -1124,7 +1170,7 @@ final class AccessibilityService {
               let focused = focusedTextElement(), CFEqual(focused, target.element) else { return false }
         // Electron acknowledges AX writes before its renderer applies them.
         // Use the confirmed asynchronous selection/paste path instead.
-        guard !preferPasteInWebEditors || preparedElectronPID != target.processID else { return false }
+        guard !preferPasteInWebEditors || !isElectronOrChromiumApp(pid: target.processID) else { return false }
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString,
                                             &settable) == .success, settable.boolValue else { return false }

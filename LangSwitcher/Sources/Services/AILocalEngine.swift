@@ -170,6 +170,14 @@ public actor AILocalEngine {
 
         self.currentModelPath = path
         self.isLoaded = true
+
+        // Background Metal GPU model warmup pass: compiles compute kernels, faults mmap pages,
+        // and initializes KV-cache buffers to eliminate 2-4s freeze on first word completion.
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            _ = try? await self.generateContinuation(prompt: "<bos>", maxTokens: 1)
+            await self.clearPrefixCache()
+        }
     }
 
     private static func makeSamplerChain(vocab: OpaquePointer, temperature: Float) -> UnsafeMutablePointer<llama_sampler>? {
