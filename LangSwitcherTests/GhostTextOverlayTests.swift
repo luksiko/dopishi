@@ -1075,13 +1075,16 @@ extension GhostTextOverlayTests {
         view.frame = NSRect(x: 0, y: 0, width: 25, height: ideal.height)
         
         let font = view.activeFont
-        let expectedHeight = ceil(font.ascender - font.descender + font.leading)
-        let expectedYOffset = max(0, (view.bounds.height - expectedHeight) / 2)
-        XCTAssertGreaterThanOrEqual(expectedYOffset, 0, "Vertical offset must never be negative")
-
-        // Constrain bounds height smaller than text height: offset must still be non-negative (0)
-        let constrainedYOffset = max(0, (10 - expectedHeight) / 2)
-        XCTAssertEqual(constrainedYOffset, 0, "Vertical offset must clamp to 0 when bounds height is smaller than font height")
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byClipping
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraphStyle
+        ]
+        let textSize = (view.text as NSString).size(withAttributes: attrs)
+        let expectedHeight = textSize.height
+        let expectedYOffset = (view.bounds.height - expectedHeight) / 2
+        XCTAssertEqual(expectedYOffset, (ideal.height - expectedHeight) / 2)
 
         // Draw in a dummy bitmap context to ensure draw executes cleanly without crashing or multiline wrapping
         let rep = NSBitmapImageRep(
@@ -1107,6 +1110,81 @@ extension GhostTextOverlayTests {
             view.draw(view.bounds)
             NSGraphicsContext.restoreGraphicsState()
         }
+    }
+
+    func testGhostTextOverlayFieldRectClipping() {
+        let controller = GhostTextOverlayController()
+        defer { controller.hide() }
+
+        let cand = AutocompletionCandidate(
+            word: "testingverylongwordcompletion",
+            targetLayoutID: "com.apple.keylayout.US"
+        )
+
+        let caret = CGRect(x: 100, y: 300, width: 2, height: 20)
+        let fieldRect = CGRect(x: 50, y: 280, width: 120, height: 40)
+        // caret.maxX = 102. fieldRect.maxX = 170.
+        // effectiveField.maxX - 4 = 166.
+        // availableWidth = 166 - 102 = 64 (>= 16).
+        controller.show(candidate: cand, suffix: "tingverylongwordcompletion", caretRect: caret, fieldRect: fieldRect)
+
+        XCTAssertTrue(controller.isVisible)
+        XCTAssertEqual(controller.currentSuffix, "tingverylongwordcompletion")
+        XCTAssertEqual(controller.lastFieldRect, fieldRect)
+
+        guard let frame = controller.panelFrame else {
+            XCTFail("Panel frame must not be nil")
+            return
+        }
+        XCTAssertEqual(frame.origin.x, caret.maxX)
+        XCTAssertEqual(frame.width, 64)
+    }
+
+    func testGhostTextOverlaySuppressionNearRightEdge() {
+        let controller = GhostTextOverlayController()
+        defer { controller.hide() }
+
+        let cand = AutocompletionCandidate(
+            word: "testing",
+            targetLayoutID: "com.apple.keylayout.US"
+        )
+
+        // 1. Caret too close to fieldRect.maxX (availableWidth < 16)
+        let caretNearFieldEdge = CGRect(x: 155, y: 300, width: 2, height: 20)
+        let fieldRect = CGRect(x: 50, y: 280, width: 120, height: 40)
+        // caret.maxX = 157. fieldRect.maxX - 4 = 166.
+        // availableWidth = 166 - 157 = 9 < 16.
+        controller.show(candidate: cand, suffix: "ting", caretRect: caretNearFieldEdge, fieldRect: fieldRect)
+        XCTAssertFalse(controller.isVisible, "Overlay must hide when availableWidth in field < 16")
+        XCTAssertEqual(controller.currentSuffix, "")
+
+        // 2. Caret too close to screen visibleFrame.maxX (availableWidth < 16)
+        let screen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen()
+        let vf = screen.visibleFrame
+        let caretNearScreenEdge = CGRect(x: vf.maxX - 10, y: 300, width: 2, height: 20)
+        // caret.maxX = vf.maxX - 8. vf.maxX - 2 - caret.maxX = 6 < 16.
+        controller.show(candidate: cand, suffix: "ting", caretRect: caretNearScreenEdge, fieldRect: nil)
+        XCTAssertFalse(controller.isVisible, "Overlay must hide when availableWidth on screen < 16")
+        XCTAssertEqual(controller.currentSuffix, "")
+    }
+
+    func testGhostTextOverlayLastFieldRectLifecycle() {
+        let controller = GhostTextOverlayController()
+        let cand = AutocompletionCandidate(word: "hello", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 100, y: 200, width: 2, height: 18)
+        let fieldRect = CGRect(x: 50, y: 190, width: 300, height: 40)
+
+        controller.show(candidate: cand, suffix: "llo", caretRect: caret, fieldRect: fieldRect)
+        XCTAssertEqual(controller.lastFieldRect, fieldRect)
+        XCTAssertTrue(controller.isVisible)
+
+        // Subsequent show without explicit fieldRect retains lastFieldRect
+        controller.show(candidate: cand, suffix: "lo", caretRect: CGRect(x: 110, y: 200, width: 2, height: 18), fieldRect: nil)
+        XCTAssertEqual(controller.lastFieldRect, fieldRect)
+
+        // hide resets lastFieldRect
+        controller.hide()
+        XCTAssertNil(controller.lastFieldRect)
     }
 }
 

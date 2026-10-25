@@ -13,6 +13,7 @@ final class GhostTextOverlayController: NSObject {
     private(set) var currentSuffix: String = ""
     private(set) var currentCandidate: AutocompletionCandidate?
     private(set) var lastCaretRect: CGRect?
+    private(set) var lastFieldRect: CGRect?
     private(set) var pendingCaretAnchor: CGRect?
     private var pendingCaretPollTask: Task<Void, Never>?
     private var pendingCaretPollDeadline: Date?
@@ -33,12 +34,17 @@ final class GhostTextOverlayController: NSObject {
         candidate: AutocompletionCandidate,
         suffix: String,
         caretRect: CGRect?,
+        fieldRect: CGRect? = nil,
         caretProvider: (() -> CGRect?)? = nil,
         bundleID: String? = nil
     ) {
         guard !suffix.isEmpty else {
             hide()
             return
+        }
+
+        if let fieldRect = fieldRect {
+            lastFieldRect = fieldRect
         }
 
         self.currentCandidate = candidate
@@ -62,7 +68,7 @@ final class GhostTextOverlayController: NSObject {
                 cancelPendingCaretPoll()
                 pendingCaretAnchor = initialCaret
                 lastCaretRect = initialCaret
-                positionAndDisplay(caret: initialCaret, suffix: suffix, bundleID: bundleID)
+                positionAndDisplay(caret: initialCaret, suffix: suffix, fieldRect: fieldRect, bundleID: bundleID)
             }
         } else if let provider = caretProvider {
             // Initial caret rect not available yet (e.g. during fast typing in webviews).
@@ -72,7 +78,12 @@ final class GhostTextOverlayController: NSObject {
         }
     }
 
-    private func positionAndDisplay(caret: CGRect, suffix: String, bundleID: String? = nil) {
+    func positionAndDisplay(caret: CGRect, suffix: String, fieldRect: CGRect? = nil, bundleID: String? = nil) {
+        if let fieldRect = fieldRect {
+            lastFieldRect = fieldRect
+        }
+        let effectiveField = fieldRect ?? lastFieldRect
+
         let p = getOrCreatePanel()
 
         if textView == nil {
@@ -107,12 +118,20 @@ final class GhostTextOverlayController: NSObject {
         } ?? NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
 
         let vf = screen.visibleFrame
+        var maxAllowedX = vf.maxX - 2
+        if let effectiveField = effectiveField {
+            maxAllowedX = min(maxAllowedX, effectiveField.maxX - 4)
+        }
+        let availableWidth = maxAllowedX - origin.x
+        if availableWidth < 16 {
+            hide()
+            return
+        }
+
         // Anchor origin.x strictly to caret.maxX. Never shift leftwards over typed text.
         var panelSize = fittingSize
-        if origin.x + panelSize.width > vf.maxX {
-            let availableWidth = max(0, vf.maxX - origin.x - 2)
-            panelSize.width = min(fittingSize.width, availableWidth)
-        }
+        panelSize.width = min(fittingSize.width, availableWidth)
+
         if origin.y < vf.minY {
             origin.y = vf.minY + 2
         }
@@ -136,6 +155,7 @@ final class GhostTextOverlayController: NSObject {
         currentSuffix = ""
         currentCandidate = nil
         lastCaretRect = nil
+        lastFieldRect = nil
         pendingCaretAnchor = nil
     }
 
@@ -344,10 +364,14 @@ final class GhostTextView: NSView {
         shadow.shadowOffset = NSSize(width: 0, height: -0.5)
         shadow.shadowBlurRadius = 1.0
 
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byClipping
+
         return [
             .font: activeFont,
             .foregroundColor: NSColor(white: 0.48, alpha: 0.88),
-            .shadow: shadow
+            .shadow: shadow,
+            .paragraphStyle: paragraphStyle
         ]
     }
 
@@ -356,29 +380,21 @@ final class GhostTextView: NSView {
         guard !text.isEmpty, bounds.width > 0, bounds.height > 0 else { return }
 
         let attrs = textAttributes()
-        let font = activeFont
-        let textHeight = ceil(font.ascender - font.descender + font.leading)
-        let yOffset = max(0, (bounds.height - textHeight) / 2)
+        let textSize = (text as NSString).size(withAttributes: attrs)
         let textRect = NSRect(
             x: 0,
-            y: yOffset,
+            y: (bounds.height - textSize.height) / 2,
             width: bounds.width,
-            height: textHeight
+            height: textSize.height
         )
-        (text as NSString).draw(with: textRect, options: [.usesFontLeading], attributes: attrs, context: nil)
+        (text as NSString).draw(in: textRect, withAttributes: attrs)
     }
 
     func idealSize() -> CGSize {
         guard !text.isEmpty else { return .zero }
         let attrs = textAttributes()
-        let font = activeFont
-        let singleLineHeight = max(16, ceil(font.ascender - font.descender + font.leading))
-        let rect = (text as NSString).boundingRect(
-            with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesFontLeading],
-            attributes: attrs
-        )
-        return CGSize(width: ceil(rect.width) + 8, height: max(singleLineHeight, ceil(rect.height)))
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        return CGSize(width: ceil(textSize.width) + 4, height: max(16, ceil(textSize.height)))
     }
 }
 

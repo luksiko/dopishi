@@ -810,9 +810,9 @@ final class AccessibilityService {
 
     // MARK: - Caret Positioning
 
-    /// Only return measured insertion bounds. Field bounds and mouse location
-    /// are not cursor positions and must never anchor inline suggestions.
-    func caretScreenRect() -> CGRect? {
+    /// Retrieves both the measured caret insertion rect and the enclosing input field bounds
+    /// converted to Cocoa screen coordinates (`primaryScreenMaxY - pt.y - sz.height`).
+    func caretAndFieldBounds() -> (caret: CGRect, fieldRect: CGRect?)? {
         guard let element = focusedTextElement(), let primaryScreen = NSScreen.screens.first else { return nil }
         var selectedValue: CFTypeRef?
         var selectedRange: CFRange?
@@ -822,8 +822,9 @@ final class AccessibilityService {
             var range = CFRange()
             if AXValueGetValue(value as! AXValue, .cfRange, &range) { selectedRange = range }
         }
+        let primaryScreenMaxY = primaryScreen.frame.maxY
         let caret = Self.resolveCaretBounds(selectedRange: selectedRange,
-            primaryScreenMaxY: primaryScreen.frame.maxY,
+            primaryScreenMaxY: primaryScreenMaxY,
             rangeBounds: { query in
                 var query = query
                 guard let value = AXValueCreate(.cfRange, &query) else { return nil }
@@ -832,7 +833,33 @@ final class AccessibilityService {
             }, markerBounds: { self.selectedMarkerCaretBounds(element) })
         guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else { return nil }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        return Self.adjustCaretForApp(caret: caret, bundleID: frontmostID)
+        let adjustedCaret = Self.adjustCaretForApp(caret: caret, bundleID: frontmostID)
+
+        var fieldRect: CGRect?
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+           AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+           let position = positionValue, let size = sizeValue,
+           CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() {
+            var pt = CGPoint.zero
+            var sz = CGSize.zero
+            if AXValueGetValue(position as! AXValue, .cgPoint, &pt),
+               AXValueGetValue(size as! AXValue, .cgSize, &sz),
+               pt.x.isFinite, pt.y.isFinite, sz.width.isFinite, sz.height.isFinite,
+               sz.width > 0, sz.height > 0 {
+                fieldRect = CGRect(x: pt.x, y: primaryScreenMaxY - pt.y - sz.height,
+                                   width: sz.width, height: sz.height)
+            }
+        }
+
+        return (caret: adjustedCaret, fieldRect: fieldRect)
+    }
+
+    /// Only return measured insertion bounds. Field bounds and mouse location
+    /// are not cursor positions and must never anchor inline suggestions.
+    func caretScreenRect() -> CGRect? {
+        caretAndFieldBounds()?.caret
     }
 
     /// App-specific coordinate corrections for applications with uncompensated container insets.

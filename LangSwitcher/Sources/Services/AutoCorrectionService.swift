@@ -799,13 +799,15 @@ final class AutoCorrectionService {
             hasScreenContext: ghostTextController.currentCandidate?.hasScreenContext ?? false
         )
 
-        let currentCaret = accessibilityService.caretScreenRect() ?? state.caretRect
+        let bounds = accessibilityService.caretAndFieldBounds()
+        let currentCaret = bounds?.caret ?? state.caretRect
         let displayMode = settingsManager.autoCompletionDisplayMode
         if displayMode == .ghostText || displayMode == .both {
             ghostTextController.show(
                 candidate: updatedCandidate,
                 suffix: state.remainingSuffix,
                 caretRect: currentCaret,
+                fieldRect: bounds?.fieldRect,
                 caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
             )
         }
@@ -938,13 +940,15 @@ final class AutoCorrectionService {
 
         if typeAheadHandledCount > 0 {
             typeAheadHandledCount -= 1
-            if let caret = accessibilityService.caretScreenRect(), let state = activeGhostState {
+            if let bounds = accessibilityService.caretAndFieldBounds(), let state = activeGhostState {
+                let caret = bounds.caret
                 activeGhostState?.caretRect = caret
                 if let candidate = ghostTextController.currentCandidate {
                     ghostTextController.show(
                         candidate: candidate,
                         suffix: state.remainingSuffix,
                         caretRect: caret,
+                        fieldRect: bounds.fieldRect,
                         caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
                     )
                 }
@@ -1585,7 +1589,8 @@ final class AutoCorrectionService {
 
         let effectiveFieldID = fieldIdentifier ?? accessibilityService.focusedFieldIdentifier() ?? ""
         let target = accessibilityService.captureReplacementTarget()
-        let liveCaret = accessibilityService.caretScreenRect() ?? caretRect ?? .zero
+        let bounds = accessibilityService.caretAndFieldBounds()
+        let liveCaret = bounds?.caret ?? caretRect ?? .zero
 
         let state = ActiveGhostState(
             requestId: effectiveRequestId,
@@ -1619,6 +1624,7 @@ final class AutoCorrectionService {
                 candidate: aiCandidate,
                 suffix: effectiveRemainingSuffix,
                 caretRect: liveCaret,
+                fieldRect: bounds?.fieldRect,
                 caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
             )
         }
@@ -1730,7 +1736,8 @@ final class AutoCorrectionService {
             suggestionTarget = accessibilityService.captureReplacementTarget()
             lastCaretContext = currentContext ?? accessibilityService.captureCaretContext()
         }
-        let caretRect = accessibilityService.caretScreenRect()
+        let bounds = accessibilityService.caretAndFieldBounds()
+        let caretRect = bounds?.caret
         let displayMode = settingsManager.autoCompletionDisplayMode
 
         // 1. Ghost text inline tail
@@ -1747,6 +1754,7 @@ final class AutoCorrectionService {
                     candidate: topCandidate,
                     suffix: suffix,
                     caretRect: caretRect,
+                    fieldRect: bounds?.fieldRect,
                     caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
                 )
             } else {
@@ -1967,8 +1975,9 @@ final class AutoCorrectionService {
                     self.suggestionTarget = self.accessibilityService.captureReplacementTarget() ?? validTarget
                     self.lastCaretContext = self.accessibilityService.captureCaretContext() ?? self.lastCaretContext
                     let anchorCaret = self.activeGhostState?.caretRect
-                    if let liveCaret = self.accessibilityService.caretScreenRect(),
-                       GhostTextOverlayController.hasCaretAdvanced(from: anchorCaret, to: liveCaret) {
+                    if let bounds = self.accessibilityService.caretAndFieldBounds(),
+                       GhostTextOverlayController.hasCaretAdvanced(from: anchorCaret, to: bounds.caret) {
+                        let liveCaret = bounds.caret
                         self.activeGhostState?.caretRect = liveCaret
                         if displayMode == .ghostText || displayMode == .both,
                            let currentCand = self.ghostTextController.currentCandidate {
@@ -1976,6 +1985,7 @@ final class AutoCorrectionService {
                                 candidate: currentCand,
                                 suffix: remaining,
                                 caretRect: liveCaret,
+                                fieldRect: bounds.fieldRect,
                                 caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
                             )
                         }
