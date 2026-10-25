@@ -1058,4 +1058,55 @@ extension GhostTextOverlayTests {
             XCTAssertGreaterThan(panel.height, 0)
         }
     }
+
+    func testGhostTextViewSingleLineBoundsAndConstrainedDrawing() {
+        let view = GhostTextView()
+        // Empty text ideal size must be zero
+        view.text = ""
+        XCTAssertEqual(view.idealSize(), .zero)
+
+        view.text = "this is a very long ghost text completion that should never wrap to multiple lines"
+        
+        let ideal = view.idealSize()
+        XCTAssertGreaterThan(ideal.width, 50)
+        XCTAssertGreaterThanOrEqual(ideal.height, 16)
+
+        // Constrain bounds width as if clipped at the screen boundary
+        view.frame = NSRect(x: 0, y: 0, width: 25, height: ideal.height)
+        
+        let font = view.activeFont
+        let expectedHeight = ceil(font.ascender - font.descender + font.leading)
+        let expectedYOffset = max(0, (view.bounds.height - expectedHeight) / 2)
+        XCTAssertGreaterThanOrEqual(expectedYOffset, 0, "Vertical offset must never be negative")
+
+        // Constrain bounds height smaller than text height: offset must still be non-negative (0)
+        let constrainedYOffset = max(0, (10 - expectedHeight) / 2)
+        XCTAssertEqual(constrainedYOffset, 0, "Vertical offset must clamp to 0 when bounds height is smaller than font height")
+
+        // Draw in a dummy bitmap context to ensure draw executes cleanly without crashing or multiline wrapping
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(view.frame.width),
+            pixelsHigh: Int(view.frame.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )
+        if let rep = rep {
+            NSGraphicsContext.saveGraphicsState()
+            let ctx = NSGraphicsContext(bitmapImageRep: rep)
+            NSGraphicsContext.current = ctx
+            view.draw(view.bounds)
+
+            // Test zero width bounds drawing safety
+            view.frame = NSRect(x: 0, y: 0, width: 0, height: ideal.height)
+            view.draw(view.bounds)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
 }
+

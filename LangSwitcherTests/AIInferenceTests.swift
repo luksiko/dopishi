@@ -470,4 +470,38 @@ extension AIInferenceTests {
         )
         XCTAssertEqual(clean, "отличная идея для проекта")
     }
+
+    func testSystemPromptCompletionInstructionsFocusOnContinuation() {
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("text completion engine"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("2-3 words"))
+        XCTAssertFalse(AIInferenceEngine.defaultSystemPromptEn.contains("up to 4 words"))
+
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("автодополнения текста"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("2-3 словами"))
+        XCTAssertFalse(AIInferenceEngine.defaultSystemPromptRu.contains("до 4 слов"))
+    }
+
+    func testPendingQuestionUsesConcisePrompt() {
+        let ruMsgs = AIInferenceEngine.completionMessages(
+            context: "Ты свободен?",
+            afterCaret: "",
+            instructions: nil,
+            hasPendingQuestion: true
+        )
+        let ruSystem = ruMsgs[0]["content"] ?? ""
+        XCTAssertTrue(ruSystem.contains("2-4 слова"))
+
+        let enMsgs = AIInferenceEngine.completionMessages(
+            context: "Are you free?",
+            afterCaret: "",
+            instructions: nil,
+            hasPendingQuestion: true
+        )
+        let enSystem = enMsgs[0]["content"] ?? ""
+        XCTAssertTrue(enSystem.contains("2-4 words"))
+    }
+
+    func testDefaultContinuationWordsIsConcise() {
+        XCTAssertEqual(SettingsManager.shared.aiMaxContinuationWords, 3)
+    }
 }

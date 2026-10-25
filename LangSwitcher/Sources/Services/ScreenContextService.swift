@@ -400,8 +400,49 @@ final class ScreenContextService: ObservableObject {
     nonisolated private static let emailRegex = try? NSRegularExpression(pattern: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#)
     nonisolated private static let phoneRegex = try? NSRegularExpression(pattern: #"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3}[-.\s]?\d{2,4}\b"#)
     nonisolated private static let secretTokenRegex = try? NSRegularExpression(pattern: #"(?:ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})"#)
-    nonisolated private static let timestampRegex = try? NSRegularExpression(pattern: #"^\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?$"#, options: .caseInsensitive)
-    nonisolated private static let dateLabelRegex = try? NSRegularExpression(pattern: #"^(today|yesterday|сегодня|вчера|just now|только что)$"#, options: .caseInsensitive)
+    nonisolated private static let timestampRegex = try? NSRegularExpression(
+        pattern: #"^\[?\(?\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]?\)?(?:\s*[,.]?\s*(?:[✓✔\u2713\u2714]+|[\[\(]?(?:изм\.?|ред\.?|edited|изменено)[\]\)]?))*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let dateLabelRegex = try? NSRegularExpression(
+        pattern: #"^(?:today|yesterday|сегодня|вчера|just now|только что)(?:\s*(?:at|в|,)\s*\[?\(?\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]?\)?)?$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let dayOfWeekRegex = try? NSRegularExpression(
+        pattern: #"^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|понедельник|вторник|среда|четверг|пятница|суббота|воскресенье|пн|вт|ср|чт|пт|сб|вс)$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let dateNumericOrMonthRegex = try? NSRegularExpression(
+        pattern: #"^(?:(?:\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})(?:\s*г\.?)?|\d{1,2}\s+(?:янв(?:аря)?|фев(?:раля)?|мар(?:та)?|апр(?:еля)?|ма[яй]|июн(?:я)?|июл(?:я)?|авг(?:уста)?|сен(?:тября)?|окт(?:ября)?|ноя(?:бря)?|дек(?:абря)?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun[e]?|jul[y]?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{2,4})?(?:\s*г\.?)?)$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let trailingMessengerTimeWithStatusRegex = try? NSRegularExpression(
+        pattern: #"\s+\[?\(?\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]?\)?(?:\s*[,.]?\s*(?:[✓✔\u2713\u2714]+|[\[\(]?(?:изм\.?|ред\.?|edited|изменено)[\]\)]?))+\s*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let trailingPrepositionWithTimeRegex = try? NSRegularExpression(
+        pattern: #"\b(?:в|во|к|ко|до|после|около|с|со|на|at|by|around|about|before|after|from|till|until)\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?(?:\s*[,.]?\s*(?:[✓✔\u2713\u2714]+|[\[\(]?(?:изм\.?|ред\.?|edited|изменено)[\]\)]?))+\s*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let trailingStatusOnlyRegex = try? NSRegularExpression(
+        pattern: #"\s*[,.]?\s*(?:[✓✔\u2713\u2714]+|[\[\(]?(?:изм\.?|ред\.?|edited|изменено)[\]\)]?)+\s*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let trailingBracketedTimestampRegex = try? NSRegularExpression(
+        pattern: #"\s*(?:\[\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\s*\]|\(\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\s*\))\s*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let trailingPunctuationSeparatedTimestampRegex = try? NSRegularExpression(
+        pattern: #"(?<=[.!?…\n\r|•·]|\s{2})\s*\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\s*$"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let roleRegex = try? NSRegularExpression(
+        pattern: #"^\[?\b(user|assistant|human|system|model)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\]"#,
+        options: .caseInsensitive
+    )
+    nonisolated private static let pendingQuestionRegex = try? NSRegularExpression(
+        pattern: #"[?？][^\p{L}\p{N}]*$"#
+    )
 
     private var consecutiveFailures = 0
     private var circuitBreakerUntil: Date?
@@ -453,6 +494,12 @@ final class ScreenContextService: ObservableObject {
         if let dateLabelRegex, dateLabelRegex.firstMatch(in: trimmed, range: range) != nil {
             return true
         }
+        if let dayOfWeekRegex, dayOfWeekRegex.firstMatch(in: trimmed, range: range) != nil {
+            return true
+        }
+        if let dateNumericOrMonthRegex, dateNumericOrMonthRegex.firstMatch(in: trimmed, range: range) != nil {
+            return true
+        }
         return false
     }
 
@@ -478,7 +525,7 @@ final class ScreenContextService: ObservableObject {
         }
 
         // Dialogue turn and role markers like "[User 001]", "User [002]", "[001]", "User:", "Model:"
-        if let roleRegex = try? NSRegularExpression(pattern: #"^\[?\b(user|assistant|human|system|model)\s*(\[?\d+\]?|:)|\[\s*\d{2,}\s*\]"#) {
+        if let roleRegex {
             let range = NSRange(location: 0, length: trimmed.utf16.count)
             if roleRegex.firstMatch(in: trimmed, range: range) != nil {
                 return true
@@ -521,6 +568,36 @@ final class ScreenContextService: ObservableObject {
         if let phoneRegex {
             sanitized = phoneRegex.stringByReplacingMatches(in: sanitized, range: updatedRange, withTemplate: "[phone]")
         }
+        // Strip trailing messenger timestamps without stripping normal speech times (e.g. "Встретимся в 14:00")
+        let finalRange = NSRange(location: 0, length: sanitized.utf16.count)
+        if let prepRegex = trailingPrepositionWithTimeRegex,
+           prepRegex.firstMatch(in: sanitized, range: finalRange) != nil {
+            if let statusRegex = trailingStatusOnlyRegex {
+                sanitized = statusRegex.stringByReplacingMatches(in: sanitized, range: finalRange, withTemplate: "")
+            }
+        } else if let timeWithStatusRegex = trailingMessengerTimeWithStatusRegex {
+            sanitized = timeWithStatusRegex.stringByReplacingMatches(in: sanitized, range: finalRange, withTemplate: "")
+        } else if let statusRegex = trailingStatusOnlyRegex {
+            sanitized = statusRegex.stringByReplacingMatches(in: sanitized, range: finalRange, withTemplate: "")
+        }
+
+        let bracketRange = NSRange(location: 0, length: sanitized.utf16.count)
+        if let bracketedRegex = trailingBracketedTimestampRegex {
+            sanitized = bracketedRegex.stringByReplacingMatches(in: sanitized, range: bracketRange, withTemplate: "")
+        }
+
+        let punctRange = NSRange(location: 0, length: sanitized.utf16.count)
+        if let afterPunctRegex = trailingPunctuationSeparatedTimestampRegex {
+            sanitized = afterPunctRegex.stringByReplacingMatches(in: sanitized, range: punctRange, withTemplate: "")
+        }
+
+        // Clean any remaining trailing status after bracketed or punctuation timestamps
+        let trailingRange = NSRange(location: 0, length: sanitized.utf16.count)
+        if let statusRegex = trailingStatusOnlyRegex {
+            sanitized = statusRegex.stringByReplacingMatches(in: sanitized, range: trailingRange, withTemplate: "")
+        }
+        sanitized = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sanitized.count >= 2 else { return nil }
 
         return sanitized
     }
@@ -532,10 +609,9 @@ final class ScreenContextService: ObservableObject {
         let trimmed = last.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         // Matches questions ending in ? optionally followed by smileys, emoji, quotes, brackets or whitespace
-        let pattern = #"[?？][^\p{L}\p{N}]*$"#
-        if let regex = try? NSRegularExpression(pattern: pattern) {
+        if let pendingQuestionRegex {
             let range = NSRange(location: 0, length: trimmed.utf16.count)
-            return regex.firstMatch(in: trimmed, range: range) != nil
+            return pendingQuestionRegex.firstMatch(in: trimmed, range: range) != nil
         }
         return trimmed.hasSuffix("?") || trimmed.hasSuffix("?!") || trimmed.hasSuffix("?..")
     }

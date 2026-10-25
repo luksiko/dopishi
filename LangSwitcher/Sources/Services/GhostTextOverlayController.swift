@@ -313,7 +313,7 @@ final class GhostTextOverlayController: NSObject {
 // MARK: - Native AppKit Ghost Text View
 // Ultra-lightweight native view: 0 SwiftUI constraints, 0 recursion, zero overhead.
 // Renders delicate inline completion ghost text matching native editor styling with universal contrast.
-private final class GhostTextView: NSView {
+final class GhostTextView: NSView {
     var text: String = "" {
         didSet {
             needsDisplay = true
@@ -334,45 +334,51 @@ private final class GhostTextView: NSView {
     }
 
     private var font = NSFont.systemFont(ofSize: 13.5, weight: .regular)
-    private var activeFont: NSFont {
+    var activeFont: NSFont {
         customFont ?? font
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard !text.isEmpty else { return }
-
-        // Neutral balanced graphite tone (~4.6:1 contrast against both pure white and pure black)
-        // with delicate micro-shadow for crisp legibility over any background.
+    private func textAttributes() -> [NSAttributedString.Key: Any] {
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
         shadow.shadowOffset = NSSize(width: 0, height: -0.5)
         shadow.shadowBlurRadius = 1.0
 
-        let attrs: [NSAttributedString.Key: Any] = [
+        return [
             .font: activeFont,
             .foregroundColor: NSColor(white: 0.48, alpha: 0.88),
             .shadow: shadow
         ]
+    }
 
-        let textSize = (text as NSString).size(withAttributes: attrs)
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard !text.isEmpty, bounds.width > 0, bounds.height > 0 else { return }
+
+        let attrs = textAttributes()
+        let font = activeFont
+        let textHeight = ceil(font.ascender - font.descender + font.leading)
+        let yOffset = max(0, (bounds.height - textHeight) / 2)
         let textRect = NSRect(
             x: 0,
-            y: (bounds.height - textSize.height) / 2,
+            y: yOffset,
             width: bounds.width,
-            height: textSize.height
+            height: textHeight
         )
-        (text as NSString).draw(in: textRect, withAttributes: attrs)
+        (text as NSString).draw(with: textRect, options: [.usesFontLeading], attributes: attrs, context: nil)
     }
 
     func idealSize() -> CGSize {
-        let shadow = NSShadow()
-        shadow.shadowBlurRadius = 1.0
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: activeFont,
-            .shadow: shadow
-        ]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        return CGSize(width: ceil(textSize.width) + 4, height: max(16, ceil(textSize.height)))
+        guard !text.isEmpty else { return .zero }
+        let attrs = textAttributes()
+        let font = activeFont
+        let singleLineHeight = max(16, ceil(font.ascender - font.descender + font.leading))
+        let rect = (text as NSString).boundingRect(
+            with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesFontLeading],
+            attributes: attrs
+        )
+        return CGSize(width: ceil(rect.width) + 8, height: max(singleLineHeight, ceil(rect.height)))
     }
 }
+

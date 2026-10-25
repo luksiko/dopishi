@@ -246,8 +246,8 @@ final class AIInferenceEngine: ObservableObject {
         }
     }
     
-    nonisolated static let defaultSystemPromptEn = "Continue the immediate thought naturally with a few words (up to 4 words). Maintain the existing context, language and style. Do not invent new unrelated topics, quotes, proper nouns or random questions. Do not explain."
-    nonisolated static let defaultSystemPromptRu = "Продолжи начатую мысль естественно несколькими словами (до 4 слов). Сохраняй контекст, язык и стиль. Не придумывай новые несвязанные темы, имена, названия в кавычках или вопросы. Не добавляй пояснений."
+    nonisolated static let defaultSystemPromptEn = "You are a text completion engine. Continue the immediate text naturally with 2-3 words. Maintain context, language and tone. Output only the direct continuation. Never act as a conversational chatbot, never output greetings or conversational replies, do not repeat the prompt, and do not explain."
+    nonisolated static let defaultSystemPromptRu = "Ты — сервис автодополнения текста. Продолжи начатую мысль естественно 2-3 словами. Сохраняй контекст, язык и стиль. Выводи только прямое продолжение. Не отвечай как собеседник в чате, не используй приветствия, не повторяй ввод и не добавляй пояснений."
     nonisolated static var defaultSystemPrompt: String { defaultSystemPromptEn }
 
     nonisolated static func containsCyrillic(_ text: String) -> Bool {
@@ -523,7 +523,7 @@ final class AIInferenceEngine: ObservableObject {
         context: String,
         afterCaret: String = "",
         wordBuffer: String = "",
-        maxWords: Int = 4,
+        maxWords: Int = 3,
         customInstructions: String? = nil,
         screenContext: String? = nil,
         hasPendingQuestion: Bool = false,
@@ -552,7 +552,7 @@ final class AIInferenceEngine: ObservableObject {
         context: String,
         afterCaret: String = "",
         wordBuffer: String = "",
-        maxWords: Int = 4,
+        maxWords: Int = 3,
         customInstructions: String? = nil,
         screenContext: String? = nil,
         hasPendingQuestion: Bool = false,
@@ -602,15 +602,14 @@ final class AIInferenceEngine: ObservableObject {
                     allowProfanity: allowProfanity
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
-                let paragraph = rawPrompt.components(separatedBy: .newlines).last ?? rawPrompt
                 if let formatted = await AILocalEngine.shared.applyChatTemplate(messages: msgs, addAssistant: true) {
-                    nativePrompt = formatted + String(paragraph.suffix(512))
+                    nativePrompt = formatted
                 } else {
                     var chatPrompt = ""
                     for msg in msgs {
                         chatPrompt += "<|im_start|>\(msg.role)\n\(msg.content)<|im_end|>\n"
                     }
-                    nativePrompt = chatPrompt + "<|im_start|>assistant\n" + String(paragraph.suffix(512))
+                    nativePrompt = chatPrompt + "<|im_start|>assistant\n"
                 }
             } else {
                 let basePrefix = Self.baseModelContextPrefix(
@@ -705,10 +704,7 @@ final class AIInferenceEngine: ObservableObject {
                 guard !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
                       let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let rendered = json["prompt"] as? String else { return nil }
-                // Prefill the assistant with the current paragraph. This makes
-                // generation continue text instead of answering or echoing it.
-                let paragraph = prompt.components(separatedBy: .newlines).last ?? prompt
-                prompt = rendered + String(paragraph.suffix(512))
+                prompt = rendered
             } catch {
                 if !Task.isCancelled {
                     NSLog("[LangSwitcher] AIInferenceEngine: template request failed (%@)", error.localizedDescription)

@@ -18,7 +18,7 @@ struct RecommendedAIModel: Identifiable, Hashable, Codable {
         id == Self.customModelID
     }
     
-    static let defaultModelID = "qwen2.5-0.5b"
+    static let defaultModelID = "gemma-4-e2b"
     static let customModelID = "custom-gguf"
     
     static let allModels: [RecommendedAIModel] = [
@@ -32,7 +32,7 @@ struct RecommendedAIModel: Identifiable, Hashable, Codable {
             estimatedSizeBytes: 491_400_032,
             fileName: "qwen2.5-0.5b-instruct-q4_k_m.gguf",
             downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf")!,
-            isDefault: true
+            isDefault: false
         ),
         RecommendedAIModel(
             id: "smollm2-360m",
@@ -116,7 +116,7 @@ struct RecommendedAIModel: Identifiable, Hashable, Codable {
             estimatedSizeBytes: 3_467_429_152,
             fileName: "gemma-4-E2B-i1-Q4_K_M.gguf",
             downloadURL: URL(string: "https://huggingface.co/mradermacher/gemma-4-E2B-i1-GGUF/resolve/main/gemma-4-E2B-i1-Q4_K_M.gguf")!,
-            isDefault: false
+            isDefault: true
         ),
         RecommendedAIModel(
             id: "qwen2.5-3b",
@@ -176,7 +176,7 @@ struct RecommendedAIModel: Identifiable, Hashable, Codable {
             let customPath = UserDefaults.standard.string(forKey: "customModelPath") ?? ""
             return customModel(for: customPath)
         }
-        return allModels.first(where: { $0.id == id }) ?? allModels[0]
+        return allModels.first(where: { $0.id == id }) ?? allModels.first(where: { $0.id == defaultModelID }) ?? allModels[0]
     }
     
     func localizedSize(language: String) -> String {

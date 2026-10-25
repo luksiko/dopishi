@@ -61,9 +61,37 @@ final class ScreenContextServiceTests: XCTestCase {
         XCTAssertTrue(ScreenContextService.isTimestampOrDate("Сегодня"))
         XCTAssertTrue(ScreenContextService.isTimestampOrDate("Вчера"))
         XCTAssertTrue(ScreenContextService.isTimestampOrDate("just now"))
-        
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 ✓✓"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("[14:25]"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("(14:25)"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 (изм.)"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("Сегодня в 14:25"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("Yesterday at 9:05 AM"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("Понедельник"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("Friday"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("25.10.2026"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("25.10.2026 г."))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("25.10.2026г."))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("25 октября"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("25 октября 2026 г."))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 (изменено)"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 [изменено]"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 [ред.]"))
+        XCTAssertTrue(ScreenContextService.isTimestampOrDate("14:25 [edited]"))
+
         XCTAssertFalse(ScreenContextService.isTimestampOrDate("Встретимся в 14:00 возле офиса"))
         XCTAssertFalse(ScreenContextService.isTimestampOrDate("Today is a good day to deploy"))
+
+        // Numbers, ranges, and fractions must NOT be classified as timestamps or dates
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("1-2"))
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("0.5"))
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("3/4"))
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("10/10"))
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("1.0"))
+
+        // Standalone "Сейчас" / "сейчас" must NOT be discarded as a date
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("Сейчас"))
+        XCTAssertFalse(ScreenContextService.isTimestampOrDate("сейчас"))
     }
     
     // MARK: - Privacy & Sanitization Tests
@@ -106,6 +134,58 @@ final class ScreenContextServiceTests: XCTestCase {
         
         let price = ScreenContextService.sanitizeMessage("$ 100 за лицензию")
         XCTAssertEqual(price, "$ 100 за лицензию")
+
+        // Trailing messenger timestamps are stripped cleanly
+        let withTime = ScreenContextService.sanitizeMessage("Привет, готовимся к релизу? 14:25 ✓✓")
+        XCTAssertEqual(withTime, "Привет, готовимся к релизу?")
+
+        let withEdited = ScreenContextService.sanitizeMessage("Все изменения запушены 17:40 (изм.)")
+        XCTAssertEqual(withEdited, "Все изменения запушены")
+
+        let bracketed = ScreenContextService.sanitizeMessage("Привет [14:25]")
+        XCTAssertEqual(bracketed, "Привет")
+
+        let parenthesized = ScreenContextService.sanitizeMessage("Привет (14:25)")
+        XCTAssertEqual(parenthesized, "Привет")
+
+        let afterPunct = ScreenContextService.sanitizeMessage("Привет, как дела? 14:25")
+        XCTAssertEqual(afterPunct, "Привет, как дела?")
+
+        // Trailing status without timestamp is also cleanly stripped
+        let withStatusOnly = ScreenContextService.sanitizeMessage("Все готово ✓✓")
+        XCTAssertEqual(withStatusOnly, "Все готово")
+
+        let withEditedOnly = ScreenContextService.sanitizeMessage("Все изменения запушены (изм.)")
+        XCTAssertEqual(withEditedOnly, "Все изменения запушены")
+
+        let withFullEditedOnly = ScreenContextService.sanitizeMessage("Все готово, (изменено)")
+        XCTAssertEqual(withFullEditedOnly, "Все готово")
+
+        let withBracketedEditedOnly = ScreenContextService.sanitizeMessage("Все готово [изменено]")
+        XCTAssertEqual(withBracketedEditedOnly, "Все готово")
+
+        // Standalone status or timestamp message drops completely
+        XCTAssertNil(ScreenContextService.sanitizeMessage("✓✓"))
+        XCTAssertNil(ScreenContextService.sanitizeMessage("(изменено)"))
+
+        // Normal conversational times are strictly preserved
+        let meetingTimeRu = ScreenContextService.sanitizeMessage("Встретимся в 14:00")
+        XCTAssertEqual(meetingTimeRu, "Встретимся в 14:00")
+
+        let meetingTimeEn = ScreenContextService.sanitizeMessage("Let's meet at 10:30 AM")
+        XCTAssertEqual(meetingTimeEn, "Let's meet at 10:30 AM")
+
+        let meetingWithChecks = ScreenContextService.sanitizeMessage("Созвон в 15:30 ✓✓")
+        XCTAssertEqual(meetingWithChecks, "Созвон в 15:30")
+
+        let meetingWithCommaEdited = ScreenContextService.sanitizeMessage("Созвон в 15:30, (изменено)")
+        XCTAssertEqual(meetingWithCommaEdited, "Созвон в 15:30")
+
+        let meetingWithDotEdited = ScreenContextService.sanitizeMessage("Созвон в 15:30. (изменено)")
+        XCTAssertEqual(meetingWithDotEdited, "Созвон в 15:30")
+
+        let meetingWithCommaChecks = ScreenContextService.sanitizeMessage("Созвон в 15:30, ✓✓")
+        XCTAssertEqual(meetingWithCommaChecks, "Созвон в 15:30")
     }
     
     // MARK: - Filter & Format Tests

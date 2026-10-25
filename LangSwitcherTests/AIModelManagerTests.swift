@@ -70,6 +70,8 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "gemma-4-e2b" }))
         let gemma4 = RecommendedAIModel.model(for: "gemma-4-e2b")
         XCTAssertTrue(gemma4.downloadURL.absoluteString.contains("mradermacher/gemma-4-E2B-i1-GGUF"))
+        XCTAssertTrue(gemma4.isDefault)
+        XCTAssertEqual(RecommendedAIModel.defaultModelID, "gemma-4-e2b")
         XCTAssertTrue(RecommendedAIModel.allModels.contains(where: { $0.id == "qwen2.5-3b" }))
         
         // Fallback for unknown model id

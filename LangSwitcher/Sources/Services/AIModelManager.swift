@@ -28,16 +28,16 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     static let shared = AIModelManager()
     
     static var defaultModelFileName: String {
-        RecommendedAIModel.allModels[0].fileName
+        RecommendedAIModel.model(for: RecommendedAIModel.defaultModelID).fileName
     }
     
     static var defaultModelName: String {
-        RecommendedAIModel.allModels[0].name
+        RecommendedAIModel.model(for: RecommendedAIModel.defaultModelID).name
     }
     
     @Published private(set) var state: AIModelState = .notDownloaded
     @Published private(set) var downloadSpeed: String = ""
-    @Published private(set) var currentModel: RecommendedAIModel = RecommendedAIModel.allModels[0]
+    @Published private(set) var currentModel: RecommendedAIModel = RecommendedAIModel.model(for: RecommendedAIModel.defaultModelID)
     
     private var downloadTask: URLSessionDownloadTask?
     private var urlSession: URLSession?
