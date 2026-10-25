@@ -26,3 +26,33 @@ final class UpdateManagerTests: XCTestCase {
         manager.checkForUpdates()
     }
 }
+
+@MainActor
+final class LaunchAtLoginHelperTests: XCTestCase {
+
+    func testLaunchAtLoginHelperStatusQuery() {
+        // Should query without crashing in test environment
+        _ = LaunchAtLoginHelper.isEnabled
+        _ = LaunchAtLoginHelper.requiresApproval
+        _ = LaunchAtLoginHelper.status
+    }
+
+    func testSettingsManagerLaunchAtLoginToggle() {
+        let settings = SettingsManager.shared
+        let original = settings.launchAtLogin
+        defer {
+            settings.launchAtLogin = original
+        }
+
+        settings.launchAtLogin = true
+        XCTAssertTrue(settings.launchAtLogin)
+        settings.launchAtLogin = false
+        XCTAssertFalse(settings.launchAtLogin)
+    }
+
+    func testLaunchAtLoginSyncStatusSafeInTestEnvironment() {
+        // Safe to call syncStatus without throwing or crashing
+        LaunchAtLoginHelper.syncStatus(preferenceEnabled: false)
+        LaunchAtLoginHelper.syncStatus(preferenceEnabled: true)
+    }
+}

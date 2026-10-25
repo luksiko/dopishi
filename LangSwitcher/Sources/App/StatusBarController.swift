@@ -501,7 +501,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         settingsManager.selectedSettingsTab = tab
         NSApp.activate(ignoringOtherApps: true)
 
-        if let window = settingsWindow, window.isVisible {
+        if let window = settingsWindow {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
             window.makeKeyAndOrderFront(nil)
             return
         }
@@ -521,7 +524,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         window.center()
         window.contentView = NSHostingView(rootView: settingsView)
         window.isReleasedWhenClosed = false
-        window.level = .floating
         window.makeKeyAndOrderFront(nil)
 
         settingsWindow = window

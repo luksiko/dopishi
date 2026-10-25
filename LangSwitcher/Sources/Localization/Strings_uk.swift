@@ -99,6 +99,8 @@ enum Strings_uk {
         "general.language":              "Мова",
         "general.statusBarIcon":         "Піктограма в рядку меню",
         "general.launchAtLogin":         "Запускати під час входу в систему",
+        "general.launchAtLoginApprovalRequired": "Потрібен дозвіл у Системних параметрах macOS",
+        "general.openSystemSettings":             "Відкрити параметри",
         "general.playSound":             "Звук під час конвертації",
         "general.showNotifications":     "Показувати сповіщення",
         "general.updates":               "Оновлення",

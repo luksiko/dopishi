@@ -100,6 +100,8 @@ enum Strings_en {
         "general.language":              "Language",
         "general.statusBarIcon":         "Menu Bar Icon",
         "general.launchAtLogin":         "Launch at Login",
+        "general.launchAtLoginApprovalRequired": "Approval required in macOS System Settings",
+        "general.openSystemSettings":             "Open Settings",
         "general.playSound":             "Play Sound on Conversion",
         "general.showNotifications":     "Show Notifications",
         "general.updates":               "Updates",

@@ -98,6 +98,8 @@ enum Strings_fr {
         "general.language":                      "Langue",
         "general.statusBarIcon":                 "Icône de la barre des menus",
         "general.launchAtLogin":                 "Lancer au démarrage de la session",
+        "general.launchAtLoginApprovalRequired": "Autorisation requise dans les Réglages Système de macOS",
+        "general.openSystemSettings":             "Ouvrir les réglages",
         "general.playSound":                     "Émettre un son lors de la conversion",
         "general.showNotifications":             "Afficher les notifications",
         "general.updates":                       "Mises à jour",

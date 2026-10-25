@@ -99,6 +99,8 @@ enum Strings_ru {
         "general.language":              "Язык",
         "general.statusBarIcon":         "Иконка в строке меню",
         "general.launchAtLogin":         "Запускать при входе в систему",
+        "general.launchAtLoginApprovalRequired": "Требуется разрешение в Системных настройках macOS",
+        "general.openSystemSettings":             "Открыть настройки",
         "general.playSound":             "Звук при конвертации",
         "general.showNotifications":     "Показывать уведомления",
         "general.updates":               "Обновления",

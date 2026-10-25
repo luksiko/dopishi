@@ -370,6 +370,21 @@ struct GeneralSettingsTab: View {
             // ── 4. System Integration ───────────────────────────────
             Section {
                 Toggle(l10n.t("general.launchAtLogin"), isOn: $settingsManager.launchAtLogin)
+                if LaunchAtLoginHelper.requiresApproval {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(l10n.t("general.launchAtLoginApprovalRequired"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(l10n.t("general.openSystemSettings")) {
+                            LaunchAtLoginHelper.openSystemSettings()
+                        }
+                        .font(.caption)
+                        .buttonStyle(.link)
+                    }
+                }
                 Toggle(l10n.t("general.playSound"), isOn: $settingsManager.playSounds)
                 Toggle(l10n.t("general.showNotifications"), isOn: $settingsManager.showNotifications)
 
@@ -398,6 +413,7 @@ struct GeneralSettingsTab: View {
         .formStyle(.grouped)
         .onAppear {
             settingsManager.refreshSystemLayouts()
+            settingsManager.refreshLaunchAtLoginStatus()
             hasAccessibility = AccessibilityService.hasAccessibilityPermission
         }
     }
@@ -1293,13 +1309,5 @@ struct UserDictionarySettingsSection: View {
         if userDictionary.learn(trimmed) {
             newWord = ""
         }
-    }
-}
-
-// MARK: - Launch at Login Helper
-
-enum LaunchAtLoginHelper {
-    static func setLaunchAtLogin(_ enabled: Bool) {
-        // SMAppService (macOS 13+) is managed by system or bundle helper
     }
 }

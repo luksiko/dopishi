@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Carbon
+import ServiceManagement
 
 // MARK: - Smart Conversion Mode
 /// Determines behavior when no text is selected and the hotkey is pressed
@@ -145,7 +146,10 @@ final class SettingsManager: ObservableObject {
     }
     
     @Published var launchAtLogin: Bool {
-        didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) }
+        didSet {
+            defaults.set(launchAtLogin, forKey: Keys.launchAtLogin)
+            LaunchAtLoginHelper.setLaunchAtLogin(launchAtLogin)
+        }
     }
     
     @Published var showNotifications: Bool {
@@ -858,7 +862,8 @@ final class SettingsManager: ObservableObject {
         let savedMods = defaults.object(forKey: Keys.hotkeyModifiers) as? UInt
         self.hotkeyModifiers = savedMods ?? NSEvent.ModifierFlags.option.rawValue
         
-        self.launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+        let savedLaunchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+        self.launchAtLogin = LaunchAtLoginHelper.isEnabled || savedLaunchAtLogin
         self.showNotifications = defaults.object(forKey: Keys.showNotifications) as? Bool ?? true
         self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true
         let savedSmartMode = defaults.object(forKey: Keys.smartConversionMode) as? Int
@@ -1088,9 +1093,91 @@ final class SettingsManager: ObservableObject {
         defaults.set(0, forKey: Keys.savedClicksCount)
     }
     
+    func refreshLaunchAtLoginStatus() {
+        if LaunchAtLoginHelper.isEnabled && !launchAtLogin {
+            launchAtLogin = true
+        }
+    }
+    
     private func saveLayouts() {
         if let data = try? JSONEncoder().encode(enabledLayouts) {
             defaults.set(data, forKey: Keys.enabledLayouts)
+        }
+    }
+}
+
+// MARK: - Launch at Login Helper
+
+public enum LaunchAtLoginHelper {
+    public static var isEnabled: Bool {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        }
+        return false
+    }
+
+    public static var status: SMAppService.Status {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status
+        }
+        return .notFound
+    }
+
+    public static var requiresApproval: Bool {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .requiresApproval
+        }
+        return false
+    }
+
+    @discardableResult
+    public static func setLaunchAtLogin(_ enabled: Bool) -> Bool {
+        if #available(macOS 13.0, *) {
+            do {
+                if enabled {
+                    if SMAppService.mainApp.status != .enabled {
+                        try SMAppService.mainApp.register()
+                        NSLog("[LangSwitcher] SMAppService registered mainApp for launch at login")
+                    }
+                } else {
+                    if SMAppService.mainApp.status == .enabled {
+                        try SMAppService.mainApp.unregister()
+                        NSLog("[LangSwitcher] SMAppService unregistered mainApp from launch at login")
+                    }
+                }
+                return true
+            } catch {
+                NSLog("[LangSwitcher] LaunchAtLoginHelper error (enabled=\(enabled)): \(error)")
+                return false
+            }
+        }
+        return false
+    }
+
+    public static func syncStatus(preferenceEnabled: Bool) {
+        if #available(macOS 13.0, *) {
+            let currentStatus = SMAppService.mainApp.status
+            if preferenceEnabled && currentStatus != .enabled && currentStatus != .requiresApproval {
+                do {
+                    try SMAppService.mainApp.register()
+                    NSLog("[LangSwitcher] Synced launch at login: registered")
+                } catch {
+                    NSLog("[LangSwitcher] Synced launch at login failed to register: \(error)")
+                }
+            } else if !preferenceEnabled && currentStatus == .enabled {
+                do {
+                    try SMAppService.mainApp.unregister()
+                    NSLog("[LangSwitcher] Synced launch at login: unregistered")
+                } catch {
+                    NSLog("[LangSwitcher] Synced launch at login failed to unregister: \(error)")
+                }
+            }
+        }
+    }
+
+    public static func openSystemSettings() {
+        if #available(macOS 13.0, *) {
+            SMAppService.openSystemSettingsLoginItems()
         }
     }
 }

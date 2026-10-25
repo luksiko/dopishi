@@ -92,6 +92,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Request notification permissions
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         
+        // Sync launch at login with system ServiceManagement
+        LaunchAtLoginHelper.syncStatus(preferenceEnabled: settingsManager.launchAtLogin)
+        
         // Listen for settings changes to re-register hotkeys
         NotificationCenter.default.addObserver(
             self,

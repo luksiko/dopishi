@@ -100,6 +100,8 @@ enum Strings_de {
         "general.language": "Sprache",
         "general.statusBarIcon": "Menüleistensymbol",
         "general.launchAtLogin": "Beim Anmelden starten",
+        "general.launchAtLoginApprovalRequired": "Genehmigung in den macOS-Systemeinstellungen erforderlich",
+        "general.openSystemSettings": "Einstellungen öffnen",
         "general.playSound": "Ton bei Konvertierung abspielen",
         "general.showNotifications": "Mitteilungen anzeigen",
         "general.updates": "Updates",
