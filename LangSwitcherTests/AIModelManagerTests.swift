@@ -175,4 +175,58 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertEqual(settings.savedCharactersCount, 0)
         XCTAssertEqual(settings.savedClicksCount, 0)
     }
+
+    func testDiscoverAndLinkLocalModels() {
+        SettingsManager.shared.selectedModelId = "qwen2.5-0.5b"
+        let manager = AIModelManager(modelsDirectory: tempDirectory)
+        
+        let externalDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CotypistModels_\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: externalDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: externalDir) }
+        
+        let gemmaFile = externalDir.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        var dummyData = Data("GGUF".utf8)
+        dummyData.append(Data(count: 12_000_000 - dummyData.count))
+        FileManager.default.createFile(atPath: gemmaFile.path, contents: dummyData)
+        
+        // Before discovery: gemma is not in tempDirectory
+        let destFile = tempDirectory.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destFile.path))
+        
+        // Run discovery targeting externalDir
+        let linked = manager.discoverAndLinkLocalModels(sourceDirectories: [externalDir])
+        XCTAssertTrue(linked)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destFile.path))
+        
+        // Calling checkExistingModel should recognize it as ready and migrate from Qwen
+        manager.checkExistingModel()
+        XCTAssertEqual(SettingsManager.shared.selectedModelId, "gemma-4-e2b")
+        XCTAssertEqual(manager.currentModel.id, "gemma-4-e2b")
+        XCTAssertTrue(manager.state.isReady)
+
+        // If user manually selects custom model, checkExistingModel does not overwrite it
+        SettingsManager.shared.selectedModelId = RecommendedAIModel.customModelID
+        manager.checkExistingModel()
+        XCTAssertEqual(SettingsManager.shared.selectedModelId, RecommendedAIModel.customModelID)
+    }
+
+    func testMigrateSelectedModelFromQwenIfGemmaAvailable() {
+        let settings = SettingsManager.shared
+        settings.selectedModelId = "qwen2.5-0.5b"
+        
+        let fakeGemmaPath = tempDirectory.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        
+        // Without file -> does not migrate
+        settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
+        XCTAssertEqual(settings.selectedModelId, "qwen2.5-0.5b")
+        
+        // With file > 10MB -> migrates to gemma-4-e2b
+        var dummyData = Data("GGUF".utf8)
+        dummyData.append(Data(count: 12_000_000 - dummyData.count))
+        FileManager.default.createFile(atPath: fakeGemmaPath.path, contents: dummyData)
+        
+        settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
+        XCTAssertEqual(settings.selectedModelId, "gemma-4-e2b")
+    }
 }

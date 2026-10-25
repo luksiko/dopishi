@@ -280,6 +280,15 @@ final class AIInferenceEngine: ObservableObject {
         return result
     }
 
+    nonisolated static func userContinuationDirective(for context: String) -> String {
+        let isCyrillic = containsCyrillic(activeParagraph(in: context))
+        if isCyrillic {
+            return "Продолжи начатый текст (выведи только следующие 2-3 слова продолжения, без приветствий, без повтора фразы и без ответов на вопросы):\n\n\(context)"
+        } else {
+            return "Continue the following text (output only the next 2-3 words of continuation, no greetings, no repeating the prompt, and no answering questions):\n\n\(context)"
+        }
+    }
+
     nonisolated static func completionMessages(
         context: String,
         afterCaret: String,
@@ -289,7 +298,8 @@ final class AIInferenceEngine: ObservableObject {
         appName: String? = nil,
         windowTitle: String? = nil,
         webDomain: String? = nil,
-        allowProfanity: Bool = false
+        allowProfanity: Bool = false,
+        frameUserDirective: Bool = false
     ) -> [[String: String]] {
         let isCyrillic = containsCyrillic(activeParagraph(in: context))
         var system = isCyrillic ? defaultSystemPromptRu : defaultSystemPromptEn
@@ -349,7 +359,8 @@ final class AIInferenceEngine: ObservableObject {
            let data = try? JSONSerialization.data(withJSONObject: ["after": afterCaret], options: [.sortedKeys]) {
             system += "\nInsert before the following existing suffix, without repeating it: " + String(decoding: data, as: UTF8.self)
         }
-        return [["role": "system", "content": system], ["role": "user", "content": context]]
+        let userContent = frameUserDirective ? userContinuationDirective(for: context) : context
+        return [["role": "system", "content": system], ["role": "user", "content": userContent]]
     }
 
     nonisolated static func baseModelContextPrefix(
@@ -599,7 +610,8 @@ final class AIInferenceEngine: ObservableObject {
                     appName: appName,
                     windowTitle: windowTitle,
                     webDomain: webDomain,
-                    allowProfanity: allowProfanity
+                    allowProfanity: allowProfanity,
+                    frameUserDirective: true
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
                 if let formatted = await AILocalEngine.shared.applyChatTemplate(messages: msgs, addAssistant: true) {
@@ -697,7 +709,8 @@ final class AIInferenceEngine: ObservableObject {
                     appName: appName,
                     windowTitle: windowTitle,
                     webDomain: webDomain,
-                    allowProfanity: allowProfanity
+                    allowProfanity: allowProfanity,
+                    frameUserDirective: true
                 )])
             do {
                 let (data, response) = try await session.data(for: templateRequest)
@@ -925,6 +938,62 @@ final class AIInferenceEngine: ObservableObject {
         }
         
         guard !text.isEmpty else { return nil }
+
+        // Filter leading conversational greetings, acknowledgments, or filler phrases
+        let greetingRegex = #"^\s*(да,?\s+конечно|yes,?\s+of\s+course|здравствуйте|здравствуй|приветствую|привет|добрый\s+(день|вечер)|доброе\s+утро|доброго\s+времени\s+суток|hello|hi|hey|greetings|good\s+(morning|afternoon|evening)|конечно|sure|certainly|of\s+course)(?=[!.,:;\s]|$)[!.,:;\s]*"#
+        var strippedGreeting = false
+        while let match = text.range(of: greetingRegex, options: [.regularExpression, .caseInsensitive]), match.lowerBound == text.startIndex {
+            strippedGreeting = true
+            text.removeSubrange(match)
+            while let f = text.first, (f.isWhitespace || [",", "!", ".", ":", ";", "-", "—"].contains(f)) {
+                text.removeFirst()
+            }
+        }
+        if strippedGreeting && !text.isEmpty {
+            text = " " + text
+        }
+
+        // Filter chatbot boilerplate responses
+        let lowerText = text.lowercased()
+        let conversationalBoilerplatePatterns = [
+            // Russian
+            "я готов помочь", "я готова помочь", "готов помочь", "готова помочь",
+            "я готов вам помочь", "я готова вам помочь", "готов вам помочь", "готова вам помочь",
+            "я готов тебе помочь", "я готова тебе помочь", "готов тебе помочь", "готова тебе помочь",
+            "я готов", "я готова",
+            "я могу помочь", "могу помочь", "я могу вам помочь", "я могу тебе помочь",
+            "чем могу помочь", "чем я могу помочь", "чем я могу вам помочь", "чем могу вам помочь",
+            "чем я могу тебе помочь", "чем могу тебе помочь", "чем вам помочь", "чем тебе помочь",
+            "как я могу помочь", "как могу помочь", "как вам помочь", "как я могу вам помочь",
+            "как я могу тебе помочь", "как могу вам помочь", "как могу тебе помочь",
+            "чем помочь", "что вас интересует", "что тебя интересует",
+            "чем могу быть полезен", "чем могу быть полезна", "чем я могу быть полезен", "чем я могу быть полезна",
+            "я здесь, чтобы помочь", "я здесь чтобы помочь", "я тут, чтобы помочь", "я тут чтобы помочь",
+            "рад помочь", "рада помочь", "буду рад помочь", "буду рада помочь",
+            "всегда рад помочь", "всегда рада помочь",
+            "я помогу", "помогу вам", "помогу тебе", "я помогу вам с этим", "я помогу тебе с этим",
+            "я с радостью помогу", "с радостью помогу",
+            "я языковая модель", "я большая языковая модель", "я искусственный интеллект", "я ии",
+            "как языковая модель", "как искусственный интеллект", "как ии", "как виртуальный ассистент",
+            "вот продолжение", "вот ваш текст", "вот твой текст", "вот ответ", "вот вариант",
+            "обращайтесь", "не за что", "всегда пожалуйста",
+            // English
+            "i can help", "i can help you", "i am here to help", "i'm here to help",
+            "how can i help", "how can i help you", "how may i help", "how may i help you",
+            "how can i assist", "how can i assist you", "how may i assist", "how may i assist you",
+            "i can assist", "i can assist you", "i am ready to help", "i'm ready to help",
+            "i am ready", "i'm ready", "ready to help", "happy to help", "glad to help",
+            "feel free to ask", "feel free to reach out",
+            "i'd be happy to help", "i would be happy to help", "i am happy to help",
+            "as an ai", "i am an ai", "i'm an ai", "as an ai language model", "as an ai assistant",
+            "here is the continuation", "here is your text", "here's the continuation",
+            "you're welcome", "no problem"
+        ]
+        if conversationalBoilerplatePatterns.contains(where: { lowerText.contains($0) }) {
+            return nil
+        }
+
+        guard text.contains(where: { $0.isLetter || $0.isNumber }) else { return nil }
         
         // Base checkpoints may emit web formatting. Preserve the words, not tags.
         text = strippingGeneratedMarkup(text)

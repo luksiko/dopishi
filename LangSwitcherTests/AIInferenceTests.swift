@@ -504,4 +504,69 @@ extension AIInferenceTests {
     func testDefaultContinuationWordsIsConcise() {
         XCTAssertEqual(SettingsManager.shared.aiMaxContinuationWords, 3)
     }
+
+    func testUserContinuationDirectiveFraming() {
+        let ruMsgs = AIInferenceEngine.completionMessages(
+            context: "Привет, как твои",
+            afterCaret: "",
+            instructions: nil,
+            frameUserDirective: true
+        )
+        let ruUser = ruMsgs.last?["content"] ?? ""
+        XCTAssertTrue(ruUser.contains("Продолжи начатый текст (выведи только следующие 2-3 слова продолжения, без приветствий, без повтора фразы и без ответов на вопросы):"))
+        XCTAssertTrue(ruUser.contains("Привет, как твои"))
+
+        let enMsgs = AIInferenceEngine.completionMessages(
+            context: "Hello, how are",
+            afterCaret: "",
+            instructions: nil,
+            frameUserDirective: true
+        )
+        let enUser = enMsgs.last?["content"] ?? ""
+        XCTAssertTrue(enUser.contains("Continue the following text (output only the next 2-3 words of continuation, no greetings, no repeating the prompt, and no answering questions):"))
+        XCTAssertTrue(enUser.contains("Hello, how are"))
+    }
+
+    func testConversationalGreetingsAndBoilerplateAreFiltered() {
+        // Standalone greetings or acknowledgments should be rejected (with or without leading space)
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Здравствуйте!", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Здравствуйте!", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "здравствуйте", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Конечно!", context: "Ты придешь? ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Конечно!", context: "Ты придешь? ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Sure!", context: "Will you come? ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Sure!", context: "Will you come? ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Hello!", context: "Hi ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Hello!", context: "Hi ", wordBuffer: "", maxWords: 3))
+
+        // Chatbot replies with boilerplate should be strictly rejected
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Здравствуйте! Чем я могу помочь?", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Здравствуйте! Чем я могу вам помочь?", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Конечно, я готов помочь с этим", context: "Помоги с кодом ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Конечно, я готов вам помочь", context: "Помоги с кодом ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Я могу помочь вам с этим вопросом", context: "Как сделать ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Я с радостью помогу вам", context: "Как сделать ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Привет! Чем могу помочь?", context: "Привет ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Hello! How can I help you today?", context: "Hi ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Hello! How can I assist you?", context: "Hi ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Sure, I can help you with that", context: "Can you help ", wordBuffer: "", maxWords: 3))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: " Sure, I can assist you with this", context: "Can you help ", wordBuffer: "", maxWords: 3))
+
+        // Greeting followed by real continuation should strip the greeting
+        let continuationNoSpace = AIInferenceEngine.cleanAndTrimContinuation(raw: "Конечно, мы поедем завтра", context: "Поедем ли мы? ", wordBuffer: "", maxWords: 3)
+        XCTAssertEqual(continuationNoSpace?.trimmingCharacters(in: .whitespaces), "мы поедем завтра")
+
+        let continuationWithSpace = AIInferenceEngine.cleanAndTrimContinuation(raw: " Конечно, мы поедем завтра", context: "Поедем ли мы? ", wordBuffer: "", maxWords: 3)
+        XCTAssertEqual(continuationWithSpace?.trimmingCharacters(in: .whitespaces), "мы поедем завтра")
+
+        let enContinuation = AIInferenceEngine.cleanAndTrimContinuation(raw: " Sure, we will go tomorrow", context: "Will we go? ", wordBuffer: "", maxWords: 3)
+        XCTAssertEqual(enContinuation?.trimmingCharacters(in: .whitespaces), "we will go")
+
+        // Words that start with greeting prefixes (e.g. Приветствие, Конечность, History) must NOT be truncated
+        let greetingPrefixCollisionRu = AIInferenceEngine.cleanAndTrimContinuation(raw: "Приветствие участников начнется скоро", context: "Когда начнется? ", wordBuffer: "", maxWords: 3)
+        XCTAssertEqual(greetingPrefixCollisionRu?.trimmingCharacters(in: .whitespaces), "Приветствие участников начнется")
+
+        let historyPrefixCollisionEn = AIInferenceEngine.cleanAndTrimContinuation(raw: "History was made today", context: "What happened? ", wordBuffer: "", maxWords: 3)
+        XCTAssertEqual(historyPrefixCollisionEn?.trimmingCharacters(in: .whitespaces), "History was made")
+    }
 }

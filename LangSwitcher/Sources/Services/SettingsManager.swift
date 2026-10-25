@@ -993,10 +993,40 @@ final class SettingsManager: ObservableObject {
             self.enabledLayouts = systemLayouts
         }
 
+        migrateSelectedModelFromQwenIfGemmaAvailable()
         setupInputSourceObservers()
     }
     
     // MARK: - Methods
+    
+    func migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [String]? = nil) {
+        guard selectedModelId.hasPrefix("qwen") else { return }
+        let fm = FileManager.default
+        let paths: [String]
+        if let customPaths = candidatePaths {
+            paths = customPaths
+        } else if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let gemmaFileName = "gemma-4-E2B-i1-Q4_K_M.gguf"
+            paths = [
+                appSupport.appendingPathComponent("Dopishi/Models/\(gemmaFileName)").path,
+                appSupport.appendingPathComponent("app.cotypist.Cotypist/Models/\(gemmaFileName)").path,
+                appSupport.appendingPathComponent("LangSwitcher/Models/\(gemmaFileName)").path
+            ]
+        } else {
+            paths = []
+        }
+        
+        let gemmaExistsLocally = paths.contains { path in
+            let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+            return fm.fileExists(atPath: resolved) && ((try? fm.attributesOfItem(atPath: resolved)[.size] as? Int64) ?? 0) > 10_000_000
+        }
+        
+        if gemmaExistsLocally {
+            NSLog("[LangSwitcher] SettingsManager: migrating selectedModelId from %@ to gemma-4-e2b because Gemma 4 E2B is available locally", selectedModelId)
+            selectedModelId = "gemma-4-e2b"
+            defaults.set("gemma-4-e2b", forKey: Keys.selectedModelId)
+        }
+    }
     
     private func setupInputSourceObservers() {
         DistributedNotificationCenter.default().addObserver(

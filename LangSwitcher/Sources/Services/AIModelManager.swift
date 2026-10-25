@@ -50,9 +50,88 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     init(modelsDirectory: URL? = nil) {
         self.customModelsDirectory = modelsDirectory
         super.init()
+        discoverAndLinkLocalModels()
         let selectedID = SettingsManager.shared.selectedModelId
         self.currentModel = RecommendedAIModel.model(for: selectedID)
         checkExistingModel()
+    }
+    
+    /// Discovers existing models from local apps (e.g. Cotypist) and links them into Dopishi/Models
+    @discardableResult
+    func discoverAndLinkLocalModels(sourceDirectories: [URL]? = nil) -> Bool {
+        let fileManager = FileManager.default
+        let destDir = modelsDirectoryURL
+        
+        do {
+            try fileManager.createDirectory(at: destDir, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[LangSwitcher] AIModelManager: failed to create models directory at %@: %@", destDir.path, error.localizedDescription)
+            return false
+        }
+        
+        let discoverySourceDirs: [URL]
+        if let customSources = sourceDirectories {
+            discoverySourceDirs = customSources
+        } else if customModelsDirectory == nil, let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            discoverySourceDirs = [
+                appSupport.appendingPathComponent("app.cotypist.Cotypist/Models", isDirectory: true),
+                appSupport.appendingPathComponent("LangSwitcher/Models", isDirectory: true)
+            ]
+        } else {
+            discoverySourceDirs = []
+        }
+        
+        var linkedAny = false
+        
+        for sourceDir in discoverySourceDirs {
+            guard fileManager.fileExists(atPath: sourceDir.path) else { continue }
+            
+            for model in RecommendedAIModel.allModels {
+                guard model.id != RecommendedAIModel.customModelID else { continue }
+                let sourceFile = sourceDir.appendingPathComponent(model.fileName)
+                let destFile = destDir.appendingPathComponent(model.fileName)
+                
+                // If destination already exists, no need to link
+                if fileManager.fileExists(atPath: destFile.path) {
+                    continue
+                }
+                
+                // Check if source file exists, is valid GGUF and has sufficient size
+                guard fileManager.fileExists(atPath: sourceFile.path),
+                      Self.hasGGUFHeader(at: sourceFile.path),
+                      let size = Self.fileSize(at: sourceFile.path), size > 10_000_000 else {
+                    continue
+                }
+                
+                // Try creating symbolic link first
+                do {
+                    try fileManager.createSymbolicLink(at: destFile, withDestinationURL: sourceFile)
+                    NSLog("[LangSwitcher] AIModelManager: linked model %@ from %@", model.fileName, sourceFile.path)
+                    linkedAny = true
+                } catch {
+                    NSLog("[LangSwitcher] AIModelManager: symlink failed (%@), attempting copy...", error.localizedDescription)
+                    do {
+                        try fileManager.copyItem(at: sourceFile, to: destFile)
+                        NSLog("[LangSwitcher] AIModelManager: copied model %@ from %@", model.fileName, sourceFile.path)
+                        linkedAny = true
+                    } catch {
+                        NSLog("[LangSwitcher] AIModelManager: failed to copy model %@: %@", model.fileName, error.localizedDescription)
+                    }
+                }
+            }
+        }
+        
+        // If gemma-4-E2B-i1-Q4_K_M.gguf is available, ensure selectedModelId is migrated from Qwen to gemma-4-e2b
+        let gemmaModel = RecommendedAIModel.model(for: "gemma-4-e2b")
+        if isDownloaded(model: gemmaModel) {
+            if SettingsManager.shared.selectedModelId.hasPrefix("qwen") {
+                NSLog("[LangSwitcher] AIModelManager: gemma-4-e2b is available, switching selectedModelId from %@", SettingsManager.shared.selectedModelId)
+                SettingsManager.shared.selectedModelId = "gemma-4-e2b"
+                self.currentModel = gemmaModel
+            }
+        }
+        
+        return linkedAny
     }
     
     nonisolated var modelsDirectoryURL: URL {
@@ -87,6 +166,13 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         guard let file = FileHandle(forReadingAtPath: path) else { return false }
         defer { try? file.close() }
         return (try? file.read(upToCount: 4)) == Data("GGUF".utf8)
+    }
+
+    /// Resolves symlinks and returns the size of the target file
+    nonisolated static func fileSize(at path: String) -> Int64? {
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: resolved) else { return nil }
+        return attrs[.size] as? Int64
     }
 
     /// Switch active model
@@ -143,15 +229,13 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         let fileManager = FileManager.default
         let standardPath = modelFileURL(for: model).path
         if fileManager.fileExists(atPath: standardPath),
-           let attrs = try? fileManager.attributesOfItem(atPath: standardPath),
-           let size = attrs[.size] as? Int64, size > (model.id == RecommendedAIModel.customModelID ? 1_000_000 : 10_000_000) {
+           let size = Self.fileSize(at: standardPath), size > (model.id == RecommendedAIModel.customModelID ? 1_000_000 : 10_000_000) {
             return model.id == RecommendedAIModel.customModelID ? Self.hasGGUFHeader(at: standardPath) : true
         }
         for path in candidatePaths(for: model) {
             if path != standardPath, fileManager.fileExists(atPath: path),
                Self.hasGGUFHeader(at: path),
-               let attrs = try? fileManager.attributesOfItem(atPath: path),
-               let size = attrs[.size] as? Int64, size > 10_000_000 {
+               let size = Self.fileSize(at: path), size > 10_000_000 {
                 return true
             }
         }
@@ -179,6 +263,10 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
     /// Check whether the active model file exists on disk
     func checkExistingModel() {
         let fileManager = FileManager.default
+        discoverAndLinkLocalModels()
+        if currentModel.id != SettingsManager.shared.selectedModelId {
+            self.currentModel = RecommendedAIModel.model(for: SettingsManager.shared.selectedModelId)
+        }
         
         if currentModel.id == RecommendedAIModel.customModelID {
             let customPath = SettingsManager.shared.customModelPath
@@ -187,8 +275,7 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
                     self.state = .error(message: LocalizationManager.shared.t("ai.model.invalidGGUF"))
                     return
                 }
-                if let attrs = try? fileManager.attributesOfItem(atPath: customPath),
-                   let size = attrs[.size] as? Int64, size > 1_000_000 {
+                if let size = Self.fileSize(at: customPath), size > 1_000_000 {
                     self.state = .ready(modelPath: customPath, fileSize: size)
                     return
                 }
@@ -201,8 +288,7 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         
         // 1. Check primary Application Support path
         if fileManager.fileExists(atPath: targetURL.path) {
-            if let attrs = try? fileManager.attributesOfItem(atPath: targetURL.path),
-               let size = attrs[.size] as? Int64, size > 10_000_000 {
+            if let size = Self.fileSize(at: targetURL.path), size > 10_000_000 {
                 self.state = .ready(modelPath: targetURL.path, fileSize: size)
                 return
             }
@@ -212,8 +298,7 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
         for path in candidatePaths(for: currentModel) {
             if path != targetURL.path, fileManager.fileExists(atPath: path),
                Self.hasGGUFHeader(at: path),
-               let attrs = try? fileManager.attributesOfItem(atPath: path),
-               let size = attrs[.size] as? Int64, size > 10_000_000 {
+               let size = Self.fileSize(at: path), size > 10_000_000 {
                 self.state = .ready(modelPath: path, fileSize: size)
                 return
             }
