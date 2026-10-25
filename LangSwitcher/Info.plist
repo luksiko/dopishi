@@ -38,6 +38,8 @@
 	<string>MsZRN8OExsTi4d5F3XoGpwo9cxsrFiAMaHDMSzUVI9I=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>

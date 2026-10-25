@@ -30,7 +30,7 @@ final class LocalizationManagerTests: XCTestCase {
     @MainActor
     func testKeyParityAcrossAllCatalogs() {
         let enKeys = Set(Strings_en.strings.keys)
-        XCTAssertEqual(enKeys.count, 579)
+        XCTAssertEqual(enKeys.count, 580)
 
         let catalogs: [(String, [String: String])] = [
             ("ru", Strings_ru.strings),

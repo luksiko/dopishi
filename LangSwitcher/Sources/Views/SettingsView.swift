@@ -401,6 +401,9 @@ struct GeneralSettingsTab: View {
             // ── 5. Updates ──────────────────────────────────────────
             Section(l10n.t("general.updates")) {
                 Toggle(l10n.t("general.autoUpdateCheck"), isOn: $updateManager.automaticallyChecksForUpdates)
+                if updateManager.automaticallyChecksForUpdates {
+                    Toggle(l10n.t("general.autoUpdateDownload"), isOn: $updateManager.automaticallyDownloadsUpdates)
+                }
                 Text(l10n.t("general.updatesDesc"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -414,6 +417,7 @@ struct GeneralSettingsTab: View {
         .onAppear {
             settingsManager.refreshSystemLayouts()
             settingsManager.refreshLaunchAtLoginStatus()
+            updateManager.refreshStatus()
             hasAccessibility = AccessibilityService.hasAccessibilityPermission
         }
     }

@@ -20,10 +20,20 @@ final class UpdateManagerTests: XCTestCase {
         XCTAssertEqual(manager.automaticallyChecksForUpdates, original)
     }
 
+    func testToggleAutomaticallyDownloadsUpdates() {
+        let manager = UpdateManager.shared
+        let original = manager.automaticallyDownloadsUpdates
+        manager.automaticallyDownloadsUpdates = false
+        XCTAssertFalse(manager.automaticallyDownloadsUpdates)
+        manager.automaticallyDownloadsUpdates = original
+        XCTAssertEqual(manager.automaticallyDownloadsUpdates, original)
+    }
+
     func testCheckForUpdatesSafeInTestEnvironment() {
         let manager = UpdateManager.shared
         // In test host environment, this should safely execute without crashing
         manager.checkForUpdates()
+        manager.refreshStatus()
     }
 }
 

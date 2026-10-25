@@ -10,6 +10,14 @@ final class UpdateManager: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published var automaticallyChecksForUpdates: Bool = true {
         didSet {
             updaterController?.updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+            if !automaticallyChecksForUpdates {
+                automaticallyDownloadsUpdates = false
+            }
+        }
+    }
+    @Published var automaticallyDownloadsUpdates: Bool = true {
+        didSet {
+            updaterController?.updater.automaticallyDownloadsUpdates = automaticallyDownloadsUpdates
         }
     }
 
@@ -35,6 +43,15 @@ final class UpdateManager: NSObject, ObservableObject, SPUUpdaterDelegate {
         self.updaterController = controller
         self.canCheckForUpdates = controller.updater.canCheckForUpdates
         self.automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
+        self.automaticallyDownloadsUpdates = controller.updater.automaticallyDownloadsUpdates
+    }
+
+    /// Refreshes current updater settings from Sparkle
+    func refreshStatus() {
+        guard let controller = updaterController else { return }
+        self.canCheckForUpdates = controller.updater.canCheckForUpdates
+        self.automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
+        self.automaticallyDownloadsUpdates = controller.updater.automaticallyDownloadsUpdates
     }
 
     /// Triggers an interactive update check with user-facing dialogs
