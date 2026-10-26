@@ -953,43 +953,41 @@ final class AIInferenceEngine: ObservableObject {
             text = " " + text
         }
 
-        // Filter chatbot boilerplate responses
+        // Filter explicit chatbot service phrases and assistant boilerplate
+        let chatbotServiceRegexes = [
+            // Russian chatbot service openings
+            #"^\s*[!.,:;—\-]*\s*(?:я\s+)?готов[а]?\s+(?:вам|тебе)?\s*помочь"#,
+            #"^\s*[!.,:;—\-]*\s*(?:я\s+)?могу\s+(?:вам|тебе)?\s*помочь"#,
+            #"^\s*[!.,:;—\-]*\s*чем\s+(?:я\s+)?(?:могу\s+)?(?:вам|тебе)?\s*(?:помочь|быть\s+полез(?:ен|на))"#,
+            #"^\s*[!.,:;—\-]*\s*как\s+(?:я\s+)?могу\s+(?:вам|тебе)?\s*помочь"#,
+            #"^\s*[!.,:;—\-]*\s*я\s+(?:здесь|тут),?\s*чтобы\s+помочь"#,
+            #"^\s*[!.,:;—\-]*\s*(?:всегда\s+|буду\s+)?рад[а]?\s+помочь"#,
+            #"^\s*[!.,:;—\-]*\s*(?:я\s+)?с\s+радостью\s+помогу"#,
+            #"^\s*[!.,:;—\-]*\s*(?:я\s+)?помогу\s+(?:вам|тебе)\b"#,
+            #"^\s*[!.,:;—\-]*\s*вот\s+(?:продолжение|ваш\s+текст|твой\s+текст|ответ|вариант)"#,
+            // English chatbot service openings
+            #"^\s*[!.,:;—\-]*\s*how\s+(?:can|may)\s+i\s+(?:help|assist)"#,
+            #"^\s*[!.,:;—\-]*\s*i\s+(?:am|'m)\s+(?:here|ready)\s+to\s+(?:help|assist)"#,
+            #"^\s*[!.,:;—\-]*\s*(?:ready|happy|glad)\s+to\s+(?:help|assist)"#,
+            #"^\s*[!.,:;—\-]*\s*i(?:'d|\s+would|\s+am)?\s*(?:be\s+)?happy\s+to\s+(?:help|assist)"#,
+            #"^\s*[!.,:;—\-]*\s*feel\s+free\s+to\s+(?:ask|reach\s+out)"#,
+            #"^\s*[!.,:;—\-]*\s*here(?:'s|\s+is)\s+(?:the\s+continuation|your\s+text)"#,
+            #"^\s*[!.,:;—\-]*\s*i\s+can\s+(?:help|assist)\s+you\b"#
+        ]
+        for pattern in chatbotServiceRegexes {
+            if text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                return nil
+            }
+        }
+
+        // Filter chatbot meta-commentary and identity disclosure
         let lowerText = text.lowercased()
-        let conversationalBoilerplatePatterns = [
-            // Russian
-            "я готов помочь", "я готова помочь", "готов помочь", "готова помочь",
-            "я готов вам помочь", "я готова вам помочь", "готов вам помочь", "готова вам помочь",
-            "я готов тебе помочь", "я готова тебе помочь", "готов тебе помочь", "готова тебе помочь",
-            "я готов", "я готова",
-            "я могу помочь", "могу помочь", "я могу вам помочь", "я могу тебе помочь",
-            "чем могу помочь", "чем я могу помочь", "чем я могу вам помочь", "чем могу вам помочь",
-            "чем я могу тебе помочь", "чем могу тебе помочь", "чем вам помочь", "чем тебе помочь",
-            "как я могу помочь", "как могу помочь", "как вам помочь", "как я могу вам помочь",
-            "как я могу тебе помочь", "как могу вам помочь", "как могу тебе помочь",
-            "чем помочь", "что вас интересует", "что тебя интересует",
-            "чем могу быть полезен", "чем могу быть полезна", "чем я могу быть полезен", "чем я могу быть полезна",
-            "я здесь, чтобы помочь", "я здесь чтобы помочь", "я тут, чтобы помочь", "я тут чтобы помочь",
-            "рад помочь", "рада помочь", "буду рад помочь", "буду рада помочь",
-            "всегда рад помочь", "всегда рада помочь",
-            "я помогу", "помогу вам", "помогу тебе", "я помогу вам с этим", "я помогу тебе с этим",
-            "я с радостью помогу", "с радостью помогу",
+        let chatbotIdentityPatterns = [
             "я языковая модель", "я большая языковая модель", "я искусственный интеллект", "я ии",
             "как языковая модель", "как искусственный интеллект", "как ии", "как виртуальный ассистент",
-            "вот продолжение", "вот ваш текст", "вот твой текст", "вот ответ", "вот вариант",
-            "обращайтесь", "не за что", "всегда пожалуйста",
-            // English
-            "i can help", "i can help you", "i am here to help", "i'm here to help",
-            "how can i help", "how can i help you", "how may i help", "how may i help you",
-            "how can i assist", "how can i assist you", "how may i assist", "how may i assist you",
-            "i can assist", "i can assist you", "i am ready to help", "i'm ready to help",
-            "i am ready", "i'm ready", "ready to help", "happy to help", "glad to help",
-            "feel free to ask", "feel free to reach out",
-            "i'd be happy to help", "i would be happy to help", "i am happy to help",
-            "as an ai", "i am an ai", "i'm an ai", "as an ai language model", "as an ai assistant",
-            "here is the continuation", "here is your text", "here's the continuation",
-            "you're welcome", "no problem"
+            "as an ai", "i am an ai", "i'm an ai", "as an ai language model", "as an ai assistant"
         ]
-        if conversationalBoilerplatePatterns.contains(where: { lowerText.contains($0) }) {
+        if chatbotIdentityPatterns.contains(where: { lowerText.contains($0) }) {
             return nil
         }
 

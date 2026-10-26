@@ -569,4 +569,26 @@ extension AIInferenceTests {
         let historyPrefixCollisionEn = AIInferenceEngine.cleanAndTrimContinuation(raw: "History was made today", context: "What happened? ", wordBuffer: "", maxWords: 3)
         XCTAssertEqual(historyPrefixCollisionEn?.trimmingCharacters(in: .whitespaces), "History was made")
     }
+
+    func testNaturalDialoguePhrasesAreNotDropped() {
+        let ru1 = AIInferenceEngine.cleanAndTrimContinuation(raw: "я готов встретиться завтра", context: "Когда ты свободен? ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(ru1, "'я готов встретиться завтра' should not be dropped")
+        XCTAssertEqual(ru1?.trimmingCharacters(in: .whitespaces), "я готов встретиться завтра")
+
+        let ru2 = AIInferenceEngine.cleanAndTrimContinuation(raw: "обращайтесь в любое время", context: "Спасибо за консультацию! ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(ru2, "'обращайтесь в любое время' should not be dropped")
+        XCTAssertEqual(ru2?.trimmingCharacters(in: .whitespaces), "обращайтесь в любое время")
+
+        let ru3 = AIInferenceEngine.cleanAndTrimContinuation(raw: "не за что!", context: "Большое спасибо! ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(ru3, "'не за что!' should not be dropped")
+        XCTAssertEqual(ru3?.trimmingCharacters(in: .whitespaces), "не за что!")
+
+        let en1 = AIInferenceEngine.cleanAndTrimContinuation(raw: "i can help with that", context: "Who knows Swift? ", wordBuffer: "", maxWords: 5)
+        XCTAssertNotNil(en1, "'i can help with that' should not be dropped")
+        XCTAssertEqual(en1?.trimmingCharacters(in: .whitespaces), "i can help with that")
+
+        let en2 = AIInferenceEngine.cleanAndTrimContinuation(raw: "no problem at all", context: "Thanks for the help! ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(en2, "'no problem at all' should not be dropped")
+        XCTAssertEqual(en2?.trimmingCharacters(in: .whitespaces), "no problem at all")
+    }
 }
