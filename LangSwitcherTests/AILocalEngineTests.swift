@@ -126,6 +126,13 @@ final class AILocalEngineTests: XCTestCase {
         XCTAssertFalse(hasTemplate)
     }
 
+    func testPerformWarmupWhenUnloadedIsSafe() async {
+        let engine = AILocalEngine()
+        await engine.performWarmup()
+        let isLoaded = await engine.isLoaded
+        XCTAssertFalse(isLoaded)
+    }
+
     func testStrippingGeneratedMarkupRemovesStandaloneVoidAndFormTags() {
         let raw = "<code><input></code> будет выбран."
         let stripped = AIInferenceEngine.strippingGeneratedMarkup(raw)

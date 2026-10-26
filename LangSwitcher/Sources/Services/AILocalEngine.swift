@@ -175,8 +175,7 @@ public actor AILocalEngine {
         // and initializes KV-cache buffers to eliminate 2-4s freeze on first word completion.
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            _ = try? await self.generateContinuation(prompt: "<bos>", maxTokens: 1)
-            await self.clearPrefixCache()
+            await self.performWarmup()
         }
     }
 
@@ -225,6 +224,16 @@ public actor AILocalEngine {
         if let c = context, let memory = llama_get_memory(c) {
             llama_memory_clear(memory, true)
         }
+    }
+
+    /// Background Metal GPU model warmup pass: compiles compute kernels, faults mmap pages,
+    /// and initializes KV-cache buffers to eliminate 2-4s freeze on first word completion.
+    /// Combines warmup inference and prefix cache reset into an uninterrupted actor operation
+    /// so concurrent requests cannot interleave between generation and cache clearing.
+    public func performWarmup() {
+        guard isLoaded else { return }
+        _ = try? generateContinuation(prompt: "<bos>", maxTokens: 1)
+        clearPrefixCache()
     }
 
     // MARK: - Tokenization
@@ -285,7 +294,7 @@ public actor AILocalEngine {
         temperature: Float = 0.2,
         stopSequences: [String] = ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "<eos>", "\n"],
         onToken: (@Sendable (String) -> Void)? = nil
-    ) async throws -> String {
+    ) throws -> String {
         guard isLoaded, let ctx = context, let v = vocab, var b = batch else {
             throw AILocalEngineError.notLoaded
         }
