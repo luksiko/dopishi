@@ -177,7 +177,7 @@ final class AIModelManagerTests: XCTestCase {
     }
 
     func testDiscoverAndLinkLocalModels() {
-        SettingsManager.shared.selectedModelId = "qwen2.5-0.5b"
+        SettingsManager.shared.selectedModelId = "gemma-4-e2b"
         let manager = AIModelManager(modelsDirectory: tempDirectory)
         
         let externalDir = FileManager.default.temporaryDirectory
@@ -199,7 +199,7 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertTrue(linked)
         XCTAssertTrue(FileManager.default.fileExists(atPath: destFile.path))
         
-        // Calling checkExistingModel should recognize it as ready and migrate from Qwen
+        // Calling checkExistingModel should recognize it as ready
         manager.checkExistingModel()
         XCTAssertEqual(SettingsManager.shared.selectedModelId, "gemma-4-e2b")
         XCTAssertEqual(manager.currentModel.id, "gemma-4-e2b")
@@ -211,8 +211,25 @@ final class AIModelManagerTests: XCTestCase {
         XCTAssertEqual(SettingsManager.shared.selectedModelId, RecommendedAIModel.customModelID)
     }
 
+    func testQwenModelNotOverwrittenByCheckExistingModel() {
+        let manager = AIModelManager(modelsDirectory: tempDirectory)
+        
+        let gemmaFile = tempDirectory.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        var dummyData = Data("GGUF".utf8)
+        dummyData.append(Data(count: 12_000_000 - dummyData.count))
+        FileManager.default.createFile(atPath: gemmaFile.path, contents: dummyData)
+        
+        SettingsManager.shared.selectedModelId = "qwen2.5-0.5b"
+        manager.selectModel(RecommendedAIModel.model(for: "qwen2.5-0.5b"))
+        
+        manager.checkExistingModel()
+        XCTAssertEqual(SettingsManager.shared.selectedModelId, "qwen2.5-0.5b")
+        XCTAssertEqual(manager.currentModel.id, "qwen2.5-0.5b")
+    }
+
     func testMigrateSelectedModelFromQwenIfGemmaAvailable() {
         let settings = SettingsManager.shared
+        settings.hasMigratedDefaultModelToGemma = false
         settings.selectedModelId = "qwen2.5-0.5b"
         
         let fakeGemmaPath = tempDirectory.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
@@ -220,13 +237,20 @@ final class AIModelManagerTests: XCTestCase {
         // Without file -> does not migrate
         settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
         XCTAssertEqual(settings.selectedModelId, "qwen2.5-0.5b")
+        XCTAssertFalse(settings.hasMigratedDefaultModelToGemma)
         
-        // With file > 10MB -> migrates to gemma-4-e2b
+        // With file > 10MB -> migrates to gemma-4-e2b and sets flag
         var dummyData = Data("GGUF".utf8)
         dummyData.append(Data(count: 12_000_000 - dummyData.count))
         FileManager.default.createFile(atPath: fakeGemmaPath.path, contents: dummyData)
         
         settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
         XCTAssertEqual(settings.selectedModelId, "gemma-4-e2b")
+        XCTAssertTrue(settings.hasMigratedDefaultModelToGemma)
+        
+        // User later chooses Qwen -> second migration check does nothing because flag is true
+        settings.selectedModelId = "qwen2.5-0.5b"
+        settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
+        XCTAssertEqual(settings.selectedModelId, "qwen2.5-0.5b")
     }
 }

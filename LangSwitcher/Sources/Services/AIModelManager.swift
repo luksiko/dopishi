@@ -121,16 +121,6 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
             }
         }
         
-        // If gemma-4-E2B-i1-Q4_K_M.gguf is available, ensure selectedModelId is migrated from Qwen to gemma-4-e2b
-        let gemmaModel = RecommendedAIModel.model(for: "gemma-4-e2b")
-        if isDownloaded(model: gemmaModel) {
-            if SettingsManager.shared.selectedModelId.hasPrefix("qwen") {
-                NSLog("[LangSwitcher] AIModelManager: gemma-4-e2b is available, switching selectedModelId from %@", SettingsManager.shared.selectedModelId)
-                SettingsManager.shared.selectedModelId = "gemma-4-e2b"
-                self.currentModel = gemmaModel
-            }
-        }
-        
         return linkedAny
     }
     

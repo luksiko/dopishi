@@ -542,6 +542,10 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
     }
 
+    @Published var hasMigratedDefaultModelToGemma: Bool {
+        didSet { defaults.set(hasMigratedDefaultModelToGemma, forKey: Keys.hasMigratedDefaultModelToGemma) }
+    }
+
     /// Computed check: whether AI inference is allowed based on preferences and battery state.
     var isAIAllowed: Bool {
         guard aiPredictiveEnabled else { return false }
@@ -843,6 +847,7 @@ final class SettingsManager: ObservableObject {
         static let proFimEnabled = "proFimEnabled"
         static let proDeepContextEnabled = "proDeepContextEnabled"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let hasMigratedDefaultModelToGemma = "hasMigratedDefaultModelToGemma"
     }
     
     // MARK: - Init
@@ -961,6 +966,7 @@ final class SettingsManager: ObservableObject {
         self.proFimEnabled = defaults.bool(forKey: Keys.proFimEnabled)
         self.proDeepContextEnabled = defaults.bool(forKey: Keys.proDeepContextEnabled)
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        self.hasMigratedDefaultModelToGemma = defaults.bool(forKey: Keys.hasMigratedDefaultModelToGemma)
         
         let savedIconStyle = defaults.object(forKey: Keys.statusBarIconStyle) as? Int
         self.statusBarIconStyle = StatusBarIconStyle(rawValue: savedIconStyle ?? 0) ?? .languageBadge
@@ -1000,6 +1006,7 @@ final class SettingsManager: ObservableObject {
     // MARK: - Methods
     
     func migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [String]? = nil) {
+        guard !hasMigratedDefaultModelToGemma else { return }
         guard selectedModelId.hasPrefix("qwen") else { return }
         let fm = FileManager.default
         let paths: [String]
@@ -1025,6 +1032,7 @@ final class SettingsManager: ObservableObject {
             NSLog("[LangSwitcher] SettingsManager: migrating selectedModelId from %@ to gemma-4-e2b because Gemma 4 E2B is available locally", selectedModelId)
             selectedModelId = "gemma-4-e2b"
             defaults.set("gemma-4-e2b", forKey: Keys.selectedModelId)
+            hasMigratedDefaultModelToGemma = true
         }
     }
     
