@@ -133,6 +133,13 @@ final class AILocalEngineTests: XCTestCase {
         XCTAssertFalse(isLoaded)
     }
 
+    func testClearPrefixCacheResetsActiveStitchSession() async {
+        let engine = AILocalEngine()
+        await engine.clearPrefixCache()
+        let session = await engine.activeStitchSession
+        XCTAssertNil(session)
+    }
+
     func testStrippingGeneratedMarkupRemovesStandaloneVoidAndFormTags() {
         let raw = "<code><input></code> будет выбран."
         let stripped = AIInferenceEngine.strippingGeneratedMarkup(raw)

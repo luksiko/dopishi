@@ -221,6 +221,7 @@ public actor AILocalEngine {
     /// Clears the prompt prefix cache and KV cache memory.
     public func clearPrefixCache() {
         self.cachedPromptTokens.removeAll()
+        self.activeStitchSession = nil
         if let c = context, let memory = llama_get_memory(c) {
             llama_memory_clear(memory, true)
         }

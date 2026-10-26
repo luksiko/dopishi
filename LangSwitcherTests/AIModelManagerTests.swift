@@ -5,9 +5,16 @@ import XCTest
 final class AIModelManagerTests: XCTestCase {
     
     var tempDirectory: URL!
+    var initialSelectedModelId: String = ""
+    var initialHasMigratedToGemma: Bool = false
+    var initialAutoCompletionDelay: Double = 0.150
     
     override func setUp() {
         super.setUp()
+        initialSelectedModelId = SettingsManager.shared.selectedModelId
+        initialHasMigratedToGemma = SettingsManager.shared.hasMigratedDefaultModelToGemma
+        initialAutoCompletionDelay = SettingsManager.shared.autoCompletionDelay
+
         SettingsManager.shared.selectedModelId = RecommendedAIModel.defaultModelID
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LangSwitcherModelTests_\(UUID().uuidString)")
@@ -15,7 +22,13 @@ final class AIModelManagerTests: XCTestCase {
     }
     
     override func tearDown() {
-        SettingsManager.shared.selectedModelId = RecommendedAIModel.defaultModelID
+        SettingsManager.shared.selectedModelId = initialSelectedModelId
+        SettingsManager.shared.hasMigratedDefaultModelToGemma = initialHasMigratedToGemma
+        SettingsManager.shared.autoCompletionDelay = initialAutoCompletionDelay
+        UserDefaults.standard.set(initialSelectedModelId, forKey: "selectedModelId")
+        UserDefaults.standard.set(initialHasMigratedToGemma, forKey: "hasMigratedDefaultModelToGemma")
+        UserDefaults.standard.set(initialAutoCompletionDelay, forKey: "autoCompletionDelay")
+
         if let temp = tempDirectory {
             try? FileManager.default.removeItem(at: temp)
         }

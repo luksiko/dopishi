@@ -959,7 +959,7 @@ final class AIInferenceEngine: ObservableObject {
             #"^\s*[!.,:;—\-]*\s*(?:я\s+)?готов[а]?\s+(?:вам|тебе)?\s*помочь"#,
             #"^\s*[!.,:;—\-]*\s*(?:я\s+)?могу\s+(?:вам|тебе)?\s*помочь"#,
             #"^\s*[!.,:;—\-]*\s*чем\s+(?:я\s+)?(?:могу\s+)?(?:вам|тебе)?\s*(?:помочь|быть\s+полез(?:ен|на))"#,
-            #"^\s*[!.,:;—\-]*\s*как\s+(?:я\s+)?могу\s+(?:вам|тебе)?\s*помочь"#,
+            #"^\s*[!.,:;—\-]*\s*как\s+(?:я\s+)?(?:могу\s+)?(?:вам|тебе)?\s*помочь"#,
             #"^\s*[!.,:;—\-]*\s*я\s+(?:здесь|тут),?\s*чтобы\s+помочь"#,
             #"^\s*[!.,:;—\-]*\s*(?:всегда\s+|буду\s+)?рад[а]?\s+помочь"#,
             #"^\s*[!.,:;—\-]*\s*(?:я\s+)?с\s+радостью\s+помогу"#,
@@ -981,14 +981,17 @@ final class AIInferenceEngine: ObservableObject {
         }
 
         // Filter chatbot meta-commentary and identity disclosure
-        let lowerText = text.lowercased()
-        let chatbotIdentityPatterns = [
-            "я языковая модель", "я большая языковая модель", "я искусственный интеллект", "я ии",
-            "как языковая модель", "как искусственный интеллект", "как ии", "как виртуальный ассистент",
-            "as an ai", "i am an ai", "i'm an ai", "as an ai language model", "as an ai assistant"
+        let chatbotIdentityRegexes = [
+            #"(?:^|[^\p{L}])(?:я|как)\s+(?:большая\s+)?языковая\s+модель\b"#,
+            #"(?:^|[^\p{L}])(?:я|как)\s+искусственный\s+интеллект\b"#,
+            #"^\s*[!.,:;—\-]*\s*(?:я|как)\s+[-—]?\s*(?:ии|виртуальный\s+ассистент)\b(?!\s+(?:разработчик|исследователь|инженер|специалист|эксперт))"#,
+            #"(?:^|[^\p{L}])as\s+an\s+ai\s+(?:language\s+model|assistant)\b"#,
+            #"^\s*[!.,:;—\-]*\s*(?:as\s+an\s+ai|i\s+am\s+an\s+ai|i'm\s+an\s+ai)\b(?!\s+(?:researcher|engineer|developer|scientist|specialist|student|enthusiast|practitioner|architect))"#
         ]
-        if chatbotIdentityPatterns.contains(where: { lowerText.contains($0) }) {
-            return nil
+        for pattern in chatbotIdentityRegexes {
+            if text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                return nil
+            }
         }
 
         guard text.contains(where: { $0.isLetter || $0.isNumber }) else { return nil }

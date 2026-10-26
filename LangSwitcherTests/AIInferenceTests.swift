@@ -590,5 +590,24 @@ extension AIInferenceTests {
         let en2 = AIInferenceEngine.cleanAndTrimContinuation(raw: "no problem at all", context: "Thanks for the help! ", wordBuffer: "", maxWords: 4)
         XCTAssertNotNil(en2, "'no problem at all' should not be dropped")
         XCTAssertEqual(en2?.trimmingCharacters(in: .whitespaces), "no problem at all")
+
+        // Domain phrases discussing AI must not be falsely dropped
+        let aiDomainRu1 = AIInferenceEngine.cleanAndTrimContinuation(raw: "концепция ИИ изменилась", context: "Наша ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(aiDomainRu1, "'концепция ИИ изменилась' should not be dropped")
+        XCTAssertEqual(aiDomainRu1?.trimmingCharacters(in: .whitespaces), "концепция ИИ изменилась")
+
+        let aiDomainRu2 = AIInferenceEngine.cleanAndTrimContinuation(raw: "развития ИИ в компании", context: "Стратегия ", wordBuffer: "", maxWords: 4)
+        XCTAssertNotNil(aiDomainRu2, "'развития ИИ в компании' should not be dropped")
+
+        let aiDomainEn = AIInferenceEngine.cleanAndTrimContinuation(raw: "as an AI researcher at Stanford", context: "I work ", wordBuffer: "", maxWords: 6)
+        XCTAssertNotNil(aiDomainEn, "'as an AI researcher at Stanford' should not be dropped")
+        XCTAssertEqual(aiDomainEn?.trimmingCharacters(in: .whitespaces), "as an AI researcher at Stanford")
+
+        // Explicit chatbot identity disclosures must still be dropped
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "As an AI language model, I cannot do that", context: "Help me ", wordBuffer: "", maxWords: 6))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Я искусственный интеллект, созданный для помощи", context: "Кто ты? ", wordBuffer: "", maxWords: 6))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Как языковая модель, я не имею своего мнения", context: "Что думаешь? ", wordBuffer: "", maxWords: 6))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Я — ИИ, и я готов помочь", context: "Привет ", wordBuffer: "", maxWords: 6))
+        XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Как вам помочь?", context: "Привет ", wordBuffer: "", maxWords: 4))
     }
 }
