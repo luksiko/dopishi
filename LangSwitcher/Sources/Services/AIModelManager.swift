@@ -103,7 +103,8 @@ final class AIModelManager: NSObject, ObservableObject, URLSessionDownloadDelega
                     continue
                 }
                 
-                // Try creating symbolic link first
+                // Try creating symbolic link first (remove stale/broken symlink if present to prevent EEXIST)
+                try? fileManager.removeItem(at: destFile)
                 do {
                     try fileManager.createSymbolicLink(at: destFile, withDestinationURL: sourceFile)
                     NSLog("[LangSwitcher] AIModelManager: linked model %@ from %@", model.fileName, sourceFile.path)

@@ -931,7 +931,13 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionSuggestProfanity = defaults.object(forKey: Keys.autoCompletionSuggestProfanity) as? Bool ?? false // Default: OFF
         let savedDisplayMode = defaults.object(forKey: Keys.autoCompletionDisplayMode) as? Int
         self.autoCompletionDisplayMode = AutocompletionDisplayMode(rawValue: savedDisplayMode ?? AutocompletionDisplayMode.ghostText.rawValue) ?? .ghostText
-        self.autoCompletionDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double ?? 0.150
+        let savedDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double
+        if let saved = savedDelay, abs(saved - 0.035) < 0.001 {
+            self.autoCompletionDelay = 0.150
+            defaults.set(0.150, forKey: Keys.autoCompletionDelay)
+        } else {
+            self.autoCompletionDelay = savedDelay ?? 0.150
+        }
         
         let savedExcluded = defaults.stringArray(forKey: Keys.excludedAppBundleIDs)
         self.excludedAppBundleIDs = savedExcluded ?? Array(AutoCorrectionGate.defaultExcludedBundleIDs).sorted()
@@ -1033,6 +1039,15 @@ final class SettingsManager: ObservableObject {
             selectedModelId = "gemma-4-e2b"
             defaults.set("gemma-4-e2b", forKey: Keys.selectedModelId)
             hasMigratedDefaultModelToGemma = true
+        }
+    }
+
+    func migrateAutoCompletionDelayIfNeeded() {
+        let savedDelay = defaults.object(forKey: Keys.autoCompletionDelay) as? Double
+        if let saved = savedDelay, abs(saved - 0.035) < 0.001 {
+            NSLog("[LangSwitcher] SettingsManager: migrating autoCompletionDelay from 0.035 to 0.150")
+            autoCompletionDelay = 0.150
+            defaults.set(0.150, forKey: Keys.autoCompletionDelay)
         }
     }
     

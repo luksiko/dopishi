@@ -253,4 +253,48 @@ final class AIModelManagerTests: XCTestCase {
         settings.migrateSelectedModelFromQwenIfGemmaAvailable(candidatePaths: [fakeGemmaPath.path])
         XCTAssertEqual(settings.selectedModelId, "qwen2.5-0.5b")
     }
+
+    func testDiscoverAndLinkLocalModelsOverwritesBrokenSymlink() {
+        let manager = AIModelManager(modelsDirectory: tempDirectory)
+        
+        let externalDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CotypistModels_\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: externalDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: externalDir) }
+        
+        let gemmaFile = externalDir.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        var dummyData = Data("GGUF".utf8)
+        dummyData.append(Data(count: 12_000_000 - dummyData.count))
+        FileManager.default.createFile(atPath: gemmaFile.path, contents: dummyData)
+        
+        // Create a broken symlink in tempDirectory pointing to a non-existent path
+        let destFile = tempDirectory.appendingPathComponent("gemma-4-E2B-i1-Q4_K_M.gguf")
+        let nonExistentTarget = tempDirectory.appendingPathComponent("deleted_target.gguf")
+        try? FileManager.default.createSymbolicLink(at: destFile, withDestinationURL: nonExistentTarget)
+        
+        // fileExists at path returns false because target does not exist
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destFile.path))
+        
+        // Running discovery must safely remove the broken symlink and establish a valid link
+        let linked = manager.discoverAndLinkLocalModels(sourceDirectories: [externalDir])
+        XCTAssertTrue(linked)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destFile.path))
+    }
+
+    func testMigrateAutoCompletionDelayFromOldDefault() {
+        let settings = SettingsManager.shared
+        // Set old default value 0.035 in defaults and property
+        UserDefaults.standard.set(0.035, forKey: "autoCompletionDelay")
+        settings.autoCompletionDelay = 0.035
+        
+        settings.migrateAutoCompletionDelayIfNeeded()
+        XCTAssertEqual(settings.autoCompletionDelay, 0.150, accuracy: 0.0001)
+        XCTAssertEqual(UserDefaults.standard.double(forKey: "autoCompletionDelay"), 0.150, accuracy: 0.0001)
+        
+        // Custom value (e.g. 0.250) must not be overwritten
+        UserDefaults.standard.set(0.250, forKey: "autoCompletionDelay")
+        settings.autoCompletionDelay = 0.250
+        settings.migrateAutoCompletionDelayIfNeeded()
+        XCTAssertEqual(settings.autoCompletionDelay, 0.250, accuracy: 0.0001)
+    }
 }
