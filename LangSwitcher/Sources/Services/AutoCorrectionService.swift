@@ -80,6 +80,7 @@ final class AutoCorrectionService {
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
     private var physicalInputRevision = 0
+    private var lastPhysicalKeyTime: TimeInterval = 0
     private var consumedAcceptanceKeys: Set<UInt16> = []
     private var replacementSession = ReplacementSession()
     private var isProcessingCorrection: Bool { replacementSession.isBusy }
@@ -322,6 +323,17 @@ final class AutoCorrectionService {
     }
 
     @objc private func handleLayoutChanged() {
+        if KeyboardLayoutDetector.isProgrammaticSwitchActive {
+            NSLog("[LangSwitcher] handleLayoutChanged: ignoring programmatic layout switch notification")
+            dismissSuggestionsOnly()
+            return
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - lastPhysicalKeyTime < 0.4 && !wordBuffer.isEmpty {
+            NSLog("[LangSwitcher] handleLayoutChanged: user is actively typing ('\(wordBuffer)'), preserving wordBuffer")
+            dismissSuggestionsOnly()
+            return
+        }
         wordBuffer = ""
         dismissSuggestionsOnly()
     }
@@ -927,6 +939,8 @@ final class AutoCorrectionService {
     private func processKey(keyCode: UInt16, flags: CGEventFlags, characters: String?) {
         guard settingsManager.autoCorrectionEnabled || settingsManager.autoCompletionEnabled else { return }
         guard !settingsManager.isTemporarilyPaused else { return }
+
+        lastPhysicalKeyTime = ProcessInfo.processInfo.systemUptime
 
         // Ignore events with Command or Control modifier (⌘C, ⌘V, ⌃Space layout switch, etc.)
         if flags.contains(.maskCommand) || flags.contains(.maskControl) {
@@ -2041,7 +2055,8 @@ final class AutoCorrectionService {
 
     /// Check the buffered word and correct it if it looks like wrong layout.
     private func triggerCheckAndCorrect(triggerChar: Character) {
-        let bufferedWord = wordBuffer
+        var bufferedWord = wordBuffer
+        let initialWord = bufferedWord
         wordBuffer = ""
         guard !isProcessingCorrection, !NSApp.isActive else { return }
 
@@ -2055,7 +2070,7 @@ final class AutoCorrectionService {
         )
         // Conversion and spell checking log text. The gate must run before either
         // the ambiguous-key classifier or dictionary validation can inspect it.
-        guard let token = CorrectionToken.analyze(bufferedWord, whenAllowed: allowed,
+        guard let initialToken = CorrectionToken.analyze(bufferedWord, whenAllowed: allowed,
             ambiguous: isAlternativeLetterKey, validConversion: { candidate in
                 guard let info = self.textConverter.convertSelectedTextWithInfo(candidate),
                       let lang = self.settingsManager.enabledLayouts.first(where: { $0.id == info.targetLayoutID })?.languageCode
@@ -2065,31 +2080,56 @@ final class AutoCorrectionService {
             previousWord = nil
             return
         }
-        let word = token.word
-        guard !AutoCorrectionGate.isPotentialSecret(word) else {
-            previousWord = nil
-            return
-        }
-        if !word.isEmpty { previousWord = word.lowercased() }
 
         let axBefore = accessibilityService.captureCaretContext()?.textBeforeCaret
         let withTrigger = bufferedWord + String(triggerChar)
-        let textBeforeWord: String
+        let effectiveRecent = recentTextBuffer.hasSuffix(String(triggerChar)) ? recentTextBuffer : (recentTextBuffer + String(triggerChar))
+        var textBeforeWord: String
         if let ax = axBefore, !ax.isEmpty {
             if ax.hasSuffix(withTrigger) {
                 textBeforeWord = String(ax.dropLast(withTrigger.count))
             } else if ax.hasSuffix(bufferedWord) {
                 textBeforeWord = String(ax.dropLast(bufferedWord.count))
-            } else if recentTextBuffer.hasSuffix(bufferedWord) {
-                textBeforeWord = String(recentTextBuffer.dropLast(bufferedWord.count))
+            } else if effectiveRecent.hasSuffix(withTrigger) {
+                textBeforeWord = String(effectiveRecent.dropLast(withTrigger.count))
+            } else if effectiveRecent.hasSuffix(bufferedWord) {
+                textBeforeWord = String(effectiveRecent.dropLast(bufferedWord.count))
             } else {
-                textBeforeWord = recentTextBuffer
+                textBeforeWord = effectiveRecent
             }
-        } else if recentTextBuffer.hasSuffix(bufferedWord) {
-            textBeforeWord = String(recentTextBuffer.dropLast(bufferedWord.count))
+        } else if effectiveRecent.hasSuffix(withTrigger) {
+            textBeforeWord = String(effectiveRecent.dropLast(withTrigger.count))
+        } else if effectiveRecent.hasSuffix(bufferedWord) {
+            textBeforeWord = String(effectiveRecent.dropLast(bufferedWord.count))
         } else {
-            textBeforeWord = recentTextBuffer
+            textBeforeWord = effectiveRecent
         }
+
+        if let lastChar = textBeforeWord.last, lastChar.isLetter || lastChar.isNumber {
+            let missingPrefix = String(textBeforeWord.reversed().prefix(while: { $0.isLetter || $0.isNumber }).reversed())
+            textBeforeWord = String(textBeforeWord.dropLast(missingPrefix.count))
+            bufferedWord = missingPrefix + bufferedWord
+            NSLog("[LangSwitcher] AutoCorrection: reconciled truncated buffer '\(initialWord)' with prefix '\(missingPrefix)' -> '\(bufferedWord)'")
+        }
+
+        let token: CorrectionToken.Parts
+        if bufferedWord == initialWord {
+            token = initialToken
+        } else {
+            token = CorrectionToken.split(bufferedWord, ambiguous: isAlternativeLetterKey, validConversion: { candidate in
+                guard let info = self.textConverter.convertSelectedTextWithInfo(candidate),
+                      let lang = self.settingsManager.enabledLayouts.first(where: { $0.id == info.targetLayoutID })?.languageCode
+                else { return false }
+                return self.spellCheckService.isValidWord(info.text, language: lang)
+            })
+        }
+        let word = token.word
+
+        guard !AutoCorrectionGate.isPotentialSecret(word) else {
+            previousWord = nil
+            return
+        }
+        if !word.isEmpty { previousWord = word.lowercased() }
 
         // Check for comma before Russian coordinating conjunctions «а» and «но»
         if settingsManager.autoCorrectionCommaBeforeConjunctions && triggerChar == " " {
@@ -2414,12 +2454,25 @@ final class AutoCorrectionService {
 
         guard let target = existingTarget ?? accessibilityService.captureReplacementTarget() else {
             // Target app does not expose accessible text node (e.g. Electron / Chromium web view).
-            // Fall back to synthetic backspaces + paste!
-            NSLog("[LangSwitcher] performCheckedReplacement: no AX target, using backspace fallback for '\(expected)' → '\(replacement)'")
-            accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] applied in
+            // Wait 35ms to let the trailing delimiter settle in the web editor event loop before backspacing!
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.035) { [weak self] in
                 guard let self, self.replacementSession.isCurrent(operation) else { return }
-                self.replacementSession.finish(operation)
-                if applied { onSuccess(true) }
+                let effectiveRecent = self.recentTextBuffer.hasSuffix(expected) ? self.recentTextBuffer : (self.recentTextBuffer + expected.suffix(1))
+                if effectiveRecent.hasSuffix(expected) {
+                    let textBefore = effectiveRecent.dropLast(expected.count)
+                    if let preceding = textBefore.last, preceding.isLetter || preceding.isNumber {
+                        NSLog("[LangSwitcher] performCheckedReplacement: no AX target and '\(expected)' is a tail of larger word in recentTextBuffer ('\(preceding)'), aborting backspaces")
+                        self.replacementSession.finish(operation)
+                        return
+                    }
+                }
+                // Fall back to synthetic backspaces + paste!
+                NSLog("[LangSwitcher] performCheckedReplacement: no AX target, using backspace fallback for '\(expected)' → '\(replacement)'")
+                self.accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] applied in
+                    guard let self, self.replacementSession.isCurrent(operation) else { return }
+                    self.replacementSession.finish(operation)
+                    if applied { onSuccess(true) }
+                }
             }
             return true
         }
@@ -2454,9 +2507,19 @@ final class AutoCorrectionService {
                         onSuccess(true)
                     } else {
                         // AX paste verification failed (common in Electron / web contenteditable).
+                        if self.accessibilityService.isTailOfLargerWord(expected: expected, target: target) {
+                            NSLog("[LangSwitcher] performCheckedReplacement: '\(expected)' is a partial tail of a larger word, aborting backspace fallback to prevent duplicate prefix")
+                            self.replacementSession.finish(operation)
+                            return
+                        }
+                        guard let backspaceCount = self.accessibilityService.effectiveBackspaceCount(expected: expected, target: target) else {
+                            NSLog("[LangSwitcher] performCheckedReplacement: editor does not match '\(expected)' or trimmed word, aborting backspaces to avoid corrupting text")
+                            self.replacementSession.finish(operation)
+                            return
+                        }
                         // Fall back to synthetic backspaces + paste!
-                        NSLog("[LangSwitcher] performCheckedReplacement: AX paste failed, falling back to backspaces for '\(expected)' → '\(replacement)'")
-                        self.accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] backspaceApplied in
+                        NSLog("[LangSwitcher] performCheckedReplacement: AX paste failed, falling back to \(backspaceCount) backspaces for '\(expected)' → '\(replacement)'")
+                        self.accessibilityService.replaceWithBackspaces(count: backspaceCount, replacement: replacement) { [weak self] backspaceApplied in
                             guard let self, self.replacementSession.isCurrent(operation) else { return }
                             self.replacementSession.finish(operation)
                             if backspaceApplied { onSuccess(true) }

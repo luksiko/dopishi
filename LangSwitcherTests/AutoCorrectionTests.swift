@@ -1575,4 +1575,71 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         UserDictionary.shared.forget("новоеслово")
         XCTAssertFalse(UserDictionary.shared.contains("новоеслово"))
     }
+
+    func testProgrammaticSwitchActiveWindow() {
+        KeyboardLayoutDetector.lastProgrammaticSwitchTime = Date()
+        XCTAssertTrue(KeyboardLayoutDetector.isProgrammaticSwitchActive)
+
+        // Expired switch window
+        KeyboardLayoutDetector.lastProgrammaticSwitchTime = Date().addingTimeInterval(-1.0)
+        XCTAssertFalse(KeyboardLayoutDetector.isProgrammaticSwitchActive)
+
+        KeyboardLayoutDetector.lastProgrammaticSwitchTime = nil
+        XCTAssertFalse(KeyboardLayoutDetector.isProgrammaticSwitchActive)
+    }
+
+    func testTruncatedBufferPrefixReconciliationPreventsDoubleInitialLetter() {
+        // When user types 'И' + 'егова', if layout switch resets buffer mid-word,
+        // textBeforeWord will be 'И' and bufferedWord is 'егова'.
+        let bufferedWord = "егова"
+        let textBeforeWord = "И"
+
+        var effectiveBufferedWord = bufferedWord
+        var effectiveTextBeforeWord = textBeforeWord
+        if let lastChar = effectiveTextBeforeWord.last, lastChar.isLetter || lastChar.isNumber {
+            let missingPrefix = String(effectiveTextBeforeWord.reversed().prefix(while: { $0.isLetter || $0.isNumber }).reversed())
+            effectiveTextBeforeWord = String(effectiveTextBeforeWord.dropLast(missingPrefix.count))
+            effectiveBufferedWord = missingPrefix + effectiveBufferedWord
+        }
+
+        XCTAssertEqual(effectiveBufferedWord, "Иегова")
+        XCTAssertEqual(effectiveTextBeforeWord, "")
+
+        // Full word "Иегова" is valid Russian and must not be flagged as typo
+        let typo = TypoCorrectionEngine.correctTypo(effectiveBufferedWord)
+        XCTAssertNil(typo, "Valid word 'Иегова' must not be corrected as a typo")
+
+        // In AutoCorrectionService, valid word in source language prevents layout conversion:
+        let isSourceValid = SpellCheckService.shared.isValidWordInAnyLanguage(effectiveBufferedWord, languages: ["ru", "en"])
+        XCTAssertTrue(isSourceValid, "'Иегова' is valid Russian, so layout conversion will be skipped")
+    }
+
+    func testEffectiveBackspaceCountProtectsPrecedingSpace() {
+        // Case 1: Trailing space IS committed in the editor
+        let textWithSpace = "у негго "
+        let caretWithSpace = CFRange(location: (textWithSpace as NSString).length, length: 0)
+        let count1 = AccessibilityService.effectiveBackspaceCount(text: textWithSpace, selection: caretWithSpace, expected: "негго ")
+        XCTAssertEqual(count1, 6)
+        XCTAssertFalse(AccessibilityService.isTailOfLargerWord(text: textWithSpace, selection: caretWithSpace, expected: "негго "))
+
+        // Case 2: Trailing space is NOT yet committed in the editor (or delayed)
+        // Backspaces must be adjusted to 5 so that the space between 'у' and 'негго' is NOT deleted!
+        let textWithoutSpace = "у негго"
+        let caretWithoutSpace = CFRange(location: (textWithoutSpace as NSString).length, length: 0)
+        let count2 = AccessibilityService.effectiveBackspaceCount(text: textWithoutSpace, selection: caretWithoutSpace, expected: "негго ")
+        XCTAssertEqual(count2, 5, "Must only delete 5 characters ('негго'), preserving the space after 'у' to avoid 'унего'")
+        XCTAssertFalse(AccessibilityService.isTailOfLargerWord(text: textWithoutSpace, selection: caretWithoutSpace, expected: "негго "))
+
+        // Case 3: Editor text has a preceding letter ('И' + 'егова') without trailing space
+        let textWithLetterPrefix = "Иегова"
+        let caretLetter = CFRange(location: (textWithLetterPrefix as NSString).length, length: 0)
+        XCTAssertTrue(AccessibilityService.isTailOfLargerWord(text: textWithLetterPrefix, selection: caretLetter, expected: "егова "),
+                      "Must detect 'егова' is a tail of 'Иегова' even when trailing space is not in editor")
+
+        // Case 4: Text does not match at all -> nil (avoids corrupting text)
+        let mismatchedText = "у другое"
+        let caretMismatch = CFRange(location: (mismatchedText as NSString).length, length: 0)
+        let count4 = AccessibilityService.effectiveBackspaceCount(text: mismatchedText, selection: caretMismatch, expected: "негго ")
+        XCTAssertNil(count4, "Must return nil when editor matches neither full expected nor trimmed word")
+    }
 }

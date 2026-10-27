@@ -490,7 +490,8 @@ final class AccessibilityService {
             simulateKeystroke(virtualKey: 0x33) // Backspace key
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in
+        let delay = max(0.045, Double(count) * 0.008 + 0.02)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { completion?(false); return }
             self.simulatePaste()
             if appendTrailingSpace {
@@ -504,6 +505,106 @@ final class AccessibilityService {
                 }
             }
         }
+    }
+
+    /// Checks if the expected text suffix in the target element is immediately preceded by a word character
+    /// (letter or number), which indicates that `expected` is only a partial tail of a larger word.
+    func isTailOfLargerWord(expected: String, target: ReplacementTarget) -> Bool {
+        guard isCurrentReplacementTarget(target) else { return false }
+        var value: CFTypeRef?
+        var selectionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(target.element, kAXValueAttribute as CFString, &value) == .success,
+              let text = value as? String,
+              AXUIElementCopyAttributeValue(target.element, kAXSelectedTextRangeAttribute as CFString, &selectionValue) == .success,
+              let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { return false }
+        var selection = CFRange()
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection) else { return false }
+        return Self.isTailOfLargerWord(text: text, selection: selection, expected: expected)
+    }
+
+    static func isTailOfLargerWord(text: String, selection: CFRange, expected: String) -> Bool {
+        let string = text as NSString
+        let loc = selection.location
+
+        let count = expected.utf16.count
+        if count > 0, loc >= count, loc <= string.length {
+            let range = NSRange(location: loc - count, length: count)
+            if string.substring(with: range) == expected {
+                if range.location > 0,
+                   let preceding = (string.substring(to: range.location)).last,
+                   preceding.isLetter || preceding.isNumber {
+                    return true
+                }
+                return false
+            }
+        }
+
+        // Also check if editor has word without trailing delimiter (e.g. space was not yet committed)
+        if expected.hasSuffix(" ") || expected.hasSuffix("\n") {
+            let trimmed = String(expected.dropLast())
+            let trimmedCount = trimmed.utf16.count
+            if trimmedCount > 0, loc >= trimmedCount, loc <= string.length {
+                let range = NSRange(location: loc - trimmedCount, length: trimmedCount)
+                if string.substring(with: range) == trimmed {
+                    if range.location > 0,
+                       let preceding = (string.substring(to: range.location)).last,
+                       preceding.isLetter || preceding.isNumber {
+                        return true
+                    }
+                    return false
+                }
+            }
+        }
+
+        return false
+    }
+
+    /// Determines the exact number of backspaces needed to delete `expected` text before the caret.
+    /// If the editor has already committed the trailing delimiter (e.g. space), returns `expected.count`.
+    /// If the editor only has the word without the trailing delimiter (e.g. space was not committed or delayed),
+    /// returns the word count (`expected.count - 1`), preventing deletion of the character preceding the word.
+    /// Returns nil if the editor text matches neither `expected` nor `trimmedExpected`.
+    func effectiveBackspaceCount(expected: String, target: ReplacementTarget) -> Int? {
+        guard isCurrentReplacementTarget(target) else { return expected.count }
+        var value: CFTypeRef?
+        var selectionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(target.element, kAXValueAttribute as CFString, &value) == .success,
+              let text = value as? String,
+              AXUIElementCopyAttributeValue(target.element, kAXSelectedTextRangeAttribute as CFString, &selectionValue) == .success,
+              let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else {
+            return expected.count
+        }
+        var selection = CFRange()
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection) else { return expected.count }
+        return Self.effectiveBackspaceCount(text: text, selection: selection, expected: expected)
+    }
+
+    static func effectiveBackspaceCount(text: String, selection: CFRange, expected: String) -> Int? {
+        let string = text as NSString
+        let loc = selection.location
+
+        let fullCount = expected.utf16.count
+        if fullCount > 0, loc >= fullCount, loc <= string.length {
+            let fullRange = NSRange(location: loc - fullCount, length: fullCount)
+            if string.substring(with: fullRange) == expected {
+                return expected.count
+            }
+        }
+
+        // Check if the editor has the word without trailing delimiter
+        if expected.hasSuffix(" ") || expected.hasSuffix("\n") {
+            let trimmed = String(expected.dropLast())
+            let trimmedCount = trimmed.utf16.count
+            if trimmedCount > 0, loc >= trimmedCount, loc <= string.length {
+                let trimmedRange = NSRange(location: loc - trimmedCount, length: trimmedCount)
+                if string.substring(with: trimmedRange) == trimmed {
+                    NSLog("[LangSwitcher] effectiveBackspaceCount: editor has '\(trimmed)' without trailing delimiter, adjusting backspaces from \(expected.count) to \(trimmed.count)")
+                    return trimmed.count
+                }
+            }
+        }
+
+        return nil
     }
 
     /// Copy text to the clipboard without touching any app.

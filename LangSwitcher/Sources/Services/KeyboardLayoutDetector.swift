@@ -84,9 +84,17 @@ final class KeyboardLayoutDetector {
         return KeyboardLayout(id: sourceID, localizedName: name, languageCode: langCode)
     }
     
+    public static var lastProgrammaticSwitchTime: Date?
+
+    public static var isProgrammaticSwitchActive: Bool {
+        guard let last = lastProgrammaticSwitchTime else { return false }
+        return Date().timeIntervalSince(last) < 0.6
+    }
+    
     /// Switch the active keyboard layout to the one matching the given source ID.
     /// Uses TISSelectInputSource from the Carbon Input Source API.
     static func switchToLayout(_ targetID: String) {
+        lastProgrammaticSwitchTime = Date()
         guard let inputSources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource] else {
             NSLog("[LangSwitcher] switchToLayout: failed to get input source list")
             return
