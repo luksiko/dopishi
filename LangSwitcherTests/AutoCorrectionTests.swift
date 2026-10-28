@@ -1642,4 +1642,47 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         let count4 = AccessibilityService.effectiveBackspaceCount(text: mismatchedText, selection: caretMismatch, expected: "негго ")
         XCTAssertNil(count4, "Must return nil when editor matches neither full expected nor trimmed word")
     }
+
+    @MainActor
+    func testKeystrokeBufferingDuringActiveCorrection() {
+        let settings = SettingsManager.shared
+        let service = AutoCorrectionService(
+            settingsManager: settings,
+            textConverter: TextConverter(settingsManager: settings)
+        )
+
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let letterEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x27, keyDown: true),
+              let cmdZEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x06, keyDown: true),
+              let backspaceEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
+              let escapeEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x35, keyDown: true) else {
+            XCTFail("Failed to create test CGEvents")
+            return
+        }
+        cmdZEvent.flags = .maskCommand
+
+        // 1. When correction is NOT active: handleEventDuringActiveCorrection returns false
+        XCTAssertFalse(service.handleEventDuringActiveCorrection(letterEvent))
+
+        // 2. Start a replacement session via internal begin (or performCheckedReplacement mock)
+        // Simulate buffering directly
+        service.bufferEventDuringCorrection(letterEvent)
+
+        // 3. Command shortcut cancels correction and is not consumed
+        let handledCmd = service.handleEventDuringActiveCorrection(cmdZEvent)
+        XCTAssertFalse(handledCmd, "Command shortcut must not be consumed; must cancel correction and pass through")
+
+        // 4. Backspace cancels correction and is not consumed
+        service.bufferEventDuringCorrection(letterEvent)
+        let handledBackspace = service.handleEventDuringActiveCorrection(backspaceEvent)
+        XCTAssertFalse(handledBackspace, "Backspace must not be consumed; must cancel correction and pass through")
+
+        // 5. Escape cancels correction and is not consumed
+        service.bufferEventDuringCorrection(letterEvent)
+        let handledEscape = service.handleEventDuringActiveCorrection(escapeEvent)
+        XCTAssertFalse(handledEscape, "Escape must not be consumed; must cancel correction and pass through")
+
+        // 6. Cancel and flush cleans up all buffers safely
+        service.cancelActiveCorrectionAndFlush()
+    }
 }

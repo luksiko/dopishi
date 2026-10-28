@@ -84,6 +84,8 @@ final class AutoCorrectionService {
     private var consumedAcceptanceKeys: Set<UInt16> = []
     private var replacementSession = ReplacementSession()
     private var isProcessingCorrection: Bool { replacementSession.isBusy }
+    private var pendingCorrectionEvents: [CGEvent] = []
+    private var correctionSafetyTimer: DispatchWorkItem?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
@@ -287,8 +289,7 @@ final class AutoCorrectionService {
         fieldAnchorDebounce.cancel()
         phraseContinuationAnchor = nil
         physicalInputRevision &+= 1
-        replacementSession.cancel()
-        accessibilityService.cancelPendingReplacement()
+        cancelActiveCorrectionAndFlush()
         overlayController.hide()
         ghostTextController.hide()
         activeGhostState = nil
@@ -368,6 +369,9 @@ final class AutoCorrectionService {
 
     /// Reset word buffer when user clicks with mouse outside the autocompletion popup
     func handleMouseDown() {
+        if isProcessingCorrection {
+            cancelActiveCorrectionAndFlush()
+        }
         accessibilityService.confirmPendingPasteBeforeInput()
         physicalInputRevision &+= 1
         if overlayController.isVisible && overlayController.containsPoint(NSEvent.mouseLocation) {
@@ -1846,6 +1850,7 @@ final class AutoCorrectionService {
         let accessibility = accessibilityService
         
         guard let operation = replacementSession.begin() else { return false }
+        startReplacementWatchdog(operation: operation)
         let replay = failureEvent?.copy()
         var submitting = true
         var rejected = false
@@ -1866,7 +1871,7 @@ final class AutoCorrectionService {
                    || (suffix != nil && phraseContinuationAnchor != nil)
                    || context.textBeforeCaret.hasSuffix(acceptance.expected)) else {
                 NSLog("[LangSwitcher] Completion rejected: prefix unavailable or changed")
-                replacementSession.finish(operation)
+                finishReplacementSession(operation)
                 dismissAutocompletion()
                 return false
             }
@@ -1876,7 +1881,7 @@ final class AutoCorrectionService {
             // Allow appending continuations at caret as long as the replacement target is still valid.
             guard suffix != nil else {
                 NSLog("[LangSwitcher] Completion rejected: no AX caret context for full replacement")
-                replacementSession.finish(operation)
+                finishReplacementSession(operation)
                 dismissAutocompletion()
                 return false
             }
@@ -1974,7 +1979,7 @@ final class AutoCorrectionService {
 
         let appliedReceipt: (Bool) -> Void = { [weak self] applied in
                 guard let self, self.replacementSession.isCurrent(operation) else { return }
-                self.replacementSession.finish(operation)
+                self.finishReplacementSession(operation)
                 guard applied else {
                     NSLog("[LangSwitcher] Completion paste unconfirmed; acceptance key remains consumed")
                     recoverShortcut(after: .unconfirmed)
@@ -2034,7 +2039,7 @@ final class AutoCorrectionService {
                                                                    onApplied: appliedReceipt)
             if !dispatched {
                 rejected = true
-                replacementSession.finish(operation)
+                finishReplacementSession(operation)
                 dismissAutocompletion()
             }
         } else {
@@ -2042,7 +2047,7 @@ final class AutoCorrectionService {
                 completion: { [weak self] dispatched in
                     guard !dispatched, let self else { return }
                     rejected = true
-                    self.replacementSession.finish(operation)
+                    self.finishReplacementSession(operation)
                     self.dismissAutocompletion()
                     recoverShortcut(after: .notDispatched)
                 }, onApplied: appliedReceipt)
@@ -2447,9 +2452,106 @@ final class AutoCorrectionService {
         settingsManager.incrementConversionCount()
     }
 
+    // MARK: - Input Buffering During Active Replacement
+
+    func bufferEventDuringCorrection(_ event: CGEvent) {
+        guard pendingCorrectionEvents.count < 10 else {
+            NSLog("[LangSwitcher] AutoCorrection: pending keys buffer limit reached, cancelling correction")
+            cancelActiveCorrectionAndFlush()
+            return
+        }
+        if let copy = event.copy() {
+            pendingCorrectionEvents.append(copy)
+        }
+    }
+
+    func flushPendingCorrectionEvents() {
+        correctionSafetyTimer?.cancel()
+        correctionSafetyTimer = nil
+        guard !pendingCorrectionEvents.isEmpty else { return }
+        let events = pendingCorrectionEvents
+        pendingCorrectionEvents.removeAll()
+
+        for event in events {
+            event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
+            event.post(tap: .cgAnnotatedSessionEventTap)
+
+            if event.type == .keyDown {
+                let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+                let flags = event.flags
+                let characters = getCharactersFromEvent(event)
+                processKey(keyCode: keyCode, flags: flags, characters: characters)
+            }
+        }
+    }
+
+    func finishReplacementSession(_ operation: Int, onSuccess: (() -> Void)? = nil) {
+        guard replacementSession.isCurrent(operation) else { return }
+        correctionSafetyTimer?.cancel()
+        correctionSafetyTimer = nil
+        replacementSession.finish(operation)
+        onSuccess?()
+        flushPendingCorrectionEvents()
+    }
+
+    func cancelActiveCorrectionAndFlush() {
+        correctionSafetyTimer?.cancel()
+        correctionSafetyTimer = nil
+        replacementSession.cancel()
+        accessibilityService.cancelPendingReplacement()
+        flushPendingCorrectionEvents()
+    }
+
+    /// Handles keyboard events when a replacement is currently in flight.
+    /// Returns true if the event was consumed (e.g. buffered), false if it should be passed through.
+    func handleEventDuringActiveCorrection(_ event: CGEvent) -> Bool {
+        guard isProcessingCorrection else { return false }
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+
+        // 1. Modifiers or shortcuts (Command or Control, e.g. ⌘Z, ⌘C, ⌘V, ⌘A):
+        // Cancel active correction and let the shortcut through immediately!
+        if flags.contains(.maskCommand) || flags.contains(.maskControl) {
+            cancelActiveCorrectionAndFlush()
+            return false // not consumed, let through
+        }
+
+        // 2. Accept shortcuts for autocompletion that can finalize pending paste:
+        let isAcceptShortcut = settingsManager.isAutocompletionAcceptKey(keyCode: keyCode, flags: flags)
+            || settingsManager.isAutocompletionAcceptAllKey(keyCode: keyCode, flags: flags)
+        if isAcceptShortcut && accessibilityService.hasPendingPaste {
+            if interceptCompletionKeyEvent(event) {
+                return true // consumed
+            }
+        }
+
+        // 3. Navigation / deletion keys (Escape, Backspace, Arrows, Tab, Enter):
+        if keyCode == 0x35 || keyCode == 0x33 || (keyCode >= 0x7B && keyCode <= 0x7E) || keyCode == 0x30 || keyCode == 0x24 || keyCode == 0x4C {
+            cancelActiveCorrectionAndFlush()
+            return false // not consumed, let through
+        }
+
+        // 4. Normal typing keys (characters, space, punctuation):
+        // Buffer this key so it does not interleave with backspaces or paste!
+        bufferEventDuringCorrection(event)
+        return true // consumed / intercepted
+    }
+
+    private func startReplacementWatchdog(operation: Int) {
+        correctionSafetyTimer?.cancel()
+        let timer = DispatchWorkItem { [weak self] in
+            guard let self, self.replacementSession.isCurrent(operation) else { return }
+            NSLog("[LangSwitcher] AutoCorrection: replacement watchdog timeout (350ms), aborting to unblock user typing")
+            self.cancelActiveCorrectionAndFlush()
+        }
+        correctionSafetyTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: timer)
+    }
+
     @discardableResult
     private func performCheckedReplacement(expected: String, replacement: String, target existingTarget: AccessibilityService.ReplacementTarget? = nil, onSuccess: @escaping (Bool) -> Void) -> Bool {
         guard let operation = replacementSession.begin() else { return false }
+        startReplacementWatchdog(operation: operation)
         completionRefresh.cancel()
 
         guard let target = existingTarget ?? accessibilityService.captureReplacementTarget() else {
@@ -2462,7 +2564,7 @@ final class AutoCorrectionService {
                     let textBefore = effectiveRecent.dropLast(expected.count)
                     if let preceding = textBefore.last, preceding.isLetter || preceding.isNumber {
                         NSLog("[LangSwitcher] performCheckedReplacement: no AX target and '\(expected)' is a tail of larger word in recentTextBuffer ('\(preceding)'), aborting backspaces")
-                        self.replacementSession.finish(operation)
+                        self.finishReplacementSession(operation)
                         return
                     }
                 }
@@ -2470,8 +2572,9 @@ final class AutoCorrectionService {
                 NSLog("[LangSwitcher] performCheckedReplacement: no AX target, using backspace fallback for '\(expected)' → '\(replacement)'")
                 self.accessibilityService.replaceWithBackspaces(count: expected.count, replacement: replacement) { [weak self] applied in
                     guard let self, self.replacementSession.isCurrent(operation) else { return }
-                    self.replacementSession.finish(operation)
-                    if applied { onSuccess(true) }
+                    self.finishReplacementSession(operation) {
+                        if applied { onSuccess(true) }
+                    }
                 }
             }
             return true
@@ -2480,8 +2583,9 @@ final class AutoCorrectionService {
         // 1. Immediate path: replace immediately if the editor has already committed the delimiter
         if accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target,
                                                           preferPasteInWebEditors: true) {
-            replacementSession.finish(operation)
-            onSuccess(true)
+            finishReplacementSession(operation) {
+                onSuccess(true)
+            }
             return true
         }
 
@@ -2490,39 +2594,42 @@ final class AutoCorrectionService {
             guard let self else { return }
             guard self.replacementSession.isCurrent(operation) else { return }
             guard self.accessibilityService.isCurrentReplacementTarget(target) else {
-                self.replacementSession.finish(operation)
+                self.finishReplacementSession(operation)
                 return
             }
             if self.accessibilityService.replaceVerifiedSuffix(expected, with: replacement, target: target,
                                                               preferPasteInWebEditors: true) {
-                self.replacementSession.finish(operation)
-                onSuccess(true)
+                self.finishReplacementSession(operation) {
+                    onSuccess(true)
+                }
             } else {
                 // Some web editors expose a writable AXSelectedText but ignore
                 // its setter. Paste only into a freshly verified selection.
                 self.accessibilityService.pasteVerifiedSuffix(expected, with: replacement, target: target) { [weak self] applied in
                     guard let self, self.replacementSession.isCurrent(operation) else { return }
                     if applied {
-                        self.replacementSession.finish(operation)
-                        onSuccess(true)
+                        self.finishReplacementSession(operation) {
+                            onSuccess(true)
+                        }
                     } else {
                         // AX paste verification failed (common in Electron / web contenteditable).
                         if self.accessibilityService.isTailOfLargerWord(expected: expected, target: target) {
                             NSLog("[LangSwitcher] performCheckedReplacement: '\(expected)' is a partial tail of a larger word, aborting backspace fallback to prevent duplicate prefix")
-                            self.replacementSession.finish(operation)
+                            self.finishReplacementSession(operation)
                             return
                         }
                         guard let backspaceCount = self.accessibilityService.effectiveBackspaceCount(expected: expected, target: target) else {
                             NSLog("[LangSwitcher] performCheckedReplacement: editor does not match '\(expected)' or trimmed word, aborting backspaces to avoid corrupting text")
-                            self.replacementSession.finish(operation)
+                            self.finishReplacementSession(operation)
                             return
                         }
                         // Fall back to synthetic backspaces + paste!
                         NSLog("[LangSwitcher] performCheckedReplacement: AX paste failed, falling back to \(backspaceCount) backspaces for '\(expected)' → '\(replacement)'")
                         self.accessibilityService.replaceWithBackspaces(count: backspaceCount, replacement: replacement) { [weak self] backspaceApplied in
                             guard let self, self.replacementSession.isCurrent(operation) else { return }
-                            self.replacementSession.finish(operation)
-                            if backspaceApplied { onSuccess(true) }
+                            self.finishReplacementSession(operation) {
+                                if backspaceApplied { onSuccess(true) }
+                            }
                         }
                     }
                 }
@@ -2589,6 +2696,15 @@ private func autoCorrectionEventCallback(
 
     guard type == .keyDown || type == .keyUp else {
         return Unmanaged.passUnretained(event)
+    }
+
+    if Thread.isMainThread {
+        let handledDuringCorrection = MainActor.assumeIsolated {
+            service.handleEventDuringActiveCorrection(event)
+        }
+        if handledDuringCorrection {
+            return nil
+        }
     }
 
     // Check if the key should be consumed by active autocompletion overlay.
