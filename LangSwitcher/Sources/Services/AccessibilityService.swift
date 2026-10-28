@@ -468,6 +468,33 @@ final class AccessibilityService {
         simulatePaste()
     }
 
+    struct PreparedReplacement: Equatable {
+        let text: String
+        let prependLeadingSpace: Bool
+        let appendTrailingSpace: Bool
+    }
+
+    /// Prepares replacement text for clipboard paste. Modern macOS apps (browsers, Electron, Qt,
+    /// messaging apps) strip trailing ASCII whitespace on pasteboard import, causing concatenated
+    /// words ("семейныйдоступ") when replacing words triggered by space. Additionally, Microsoft Office
+    /// ("Smart Cut and Paste") strips both leading and trailing boundary spaces.
+    /// Trailing space is always typed via synthetic space keystrokes; leading space is stripped and typed for smart-paste apps.
+    static func prepareClipboardReplacement(for replacement: String, bundleID: String?) -> PreparedReplacement {
+        let isSmartPasteApp = Self.isSmartPasteApp(bundleID: bundleID)
+        let hasLeadingSpace = isSmartPasteApp && replacement.hasPrefix(" ")
+        let hasTrailingSpace = replacement.hasSuffix(" ")
+
+        var clipboardReplacement = replacement
+        if hasLeadingSpace { clipboardReplacement = String(clipboardReplacement.dropFirst()) }
+        if hasTrailingSpace && clipboardReplacement.hasSuffix(" ") { clipboardReplacement = String(clipboardReplacement.dropLast()) }
+
+        return PreparedReplacement(
+            text: clipboardReplacement,
+            prependLeadingSpace: hasLeadingSpace,
+            appendTrailingSpace: hasTrailingSpace
+        )
+    }
+
     /// Replaces trailing text using synthetic Backspace strokes followed by clipboard paste.
     /// Used as a universal hardware-level fallback when Accessibility API cannot manipulate selection directly
     /// (e.g. Electron apps, Chromium contenteditable web inputs, chat boxes).
@@ -478,13 +505,11 @@ final class AccessibilityService {
         }
 
         let appBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
-        let appendTrailingSpace = isSmartPasteApp && replacement.hasSuffix(" ")
-        let clipboardText = appendTrailingSpace ? String(replacement.dropLast()) : replacement
+        let prepared = Self.prepareClipboardReplacement(for: replacement, bundleID: appBundleID)
 
         let pasteboard = NSPasteboard.general
         let savedContents = TransientPasteboard.snapshot(pasteboard: pasteboard)
-        let revision = TransientPasteboard.writeString(clipboardText, pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(prepared.text, pasteboard: pasteboard)
 
         for _ in 0..<count {
             simulateKeystroke(virtualKey: 0x33) // Backspace key
@@ -493,8 +518,11 @@ final class AccessibilityService {
         let delay = max(0.045, Double(count) * 0.008 + 0.02)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { completion?(false); return }
+            if prepared.prependLeadingSpace {
+                self.simulateKeystroke(virtualKey: 0x31)
+            }
             self.simulatePaste()
-            if appendTrailingSpace {
+            if prepared.appendTrailingSpace {
                 self.simulateKeystroke(virtualKey: 0x31) // Space key
             }
             completion?(true)
@@ -1306,6 +1334,10 @@ final class AccessibilityService {
             restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
             return false
         }
+        var endRange = CFRange(location: plan.location + (replacement as NSString).length, length: 0)
+        if let rangeValue = AXValueCreate(.cfRange, &endRange) {
+            AXUIElementSetAttributeValue(focused, kAXSelectedTextRangeAttribute as CFString, rangeValue)
+        }
         return true
     }
 
@@ -1331,19 +1363,11 @@ final class AccessibilityService {
         let element = target.element
         let appBundleID = NSRunningApplication(processIdentifier: target.processID)?.bundleIdentifier
             ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
+        let prepared = Self.prepareClipboardReplacement(for: text, bundleID: appBundleID)
         let source = CGEventSource(stateID: .hidSystemState)
 
-        let hasLeadingSpace = isSmartPasteApp && text.hasPrefix(" ")
-        let hasTrailingSpace = isSmartPasteApp && text.hasSuffix(" ")
-
-        var clipboardText = text
-        if hasLeadingSpace { clipboardText = String(clipboardText.dropFirst()) }
-        if hasTrailingSpace && clipboardText.hasSuffix(" ") { clipboardText = String(clipboardText.dropLast()) }
-
-        // If the destination app strips trailing spaces on paste (e.g. Word Smart Cut and Paste),
-        // pure whitespace cannot be pasted via Cmd+V and must be sent as a synthetic keystroke.
-        if isSmartPasteApp && clipboardText.isEmpty {
+        // If pure whitespace cannot be pasted via Cmd+V, send as synthetic keystroke.
+        if (prepared.prependLeadingSpace || prepared.appendTrailingSpace) && prepared.text.isEmpty {
             guard let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
                   let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) else { return false }
             spaceDown.flags = []
@@ -1382,12 +1406,12 @@ final class AccessibilityService {
 
         let pasteboard = NSPasteboard.general
         let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
-        let revision = TransientPasteboard.writeString(clipboardText, pasteboard: pasteboard)
+        let revision = TransientPasteboard.writeString(prepared.text, pasteboard: pasteboard)
         let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
             self.isCurrentReplacementTarget(target) && (originalCaret == nil || caret() == originalCaret)
                 && (original == nil || value() == original)
         }, post: { _ in
-            if hasLeadingSpace {
+            if prepared.prependLeadingSpace {
                 if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
                    let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
                     spaceDown.flags = []
@@ -1403,7 +1427,7 @@ final class AccessibilityService {
                 event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
                 event.post(tap: .cgAnnotatedSessionEventTap)
             }
-            if hasTrailingSpace {
+            if prepared.appendTrailingSpace {
                 if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
                    let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
                     spaceDown.flags = []
@@ -1540,17 +1564,11 @@ final class AccessibilityService {
             }
             let appBundleID = NSRunningApplication(processIdentifier: target.processID)?.bundleIdentifier
                 ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let isSmartPasteApp = Self.isSmartPasteApp(bundleID: appBundleID)
-            let hasLeadingSpace = isSmartPasteApp && replacement.hasPrefix(" ")
-            let hasTrailingSpace = isSmartPasteApp && replacement.hasSuffix(" ")
-
-            var clipboardReplacement = replacement
-            if hasLeadingSpace { clipboardReplacement = String(clipboardReplacement.dropFirst()) }
-            if hasTrailingSpace && clipboardReplacement.hasSuffix(" ") { clipboardReplacement = String(clipboardReplacement.dropLast()) }
+            let prepared = Self.prepareClipboardReplacement(for: replacement, bundleID: appBundleID)
 
             let pasteboard = NSPasteboard.general
             let saved = TransientPasteboard.snapshot(pasteboard: pasteboard)
-            let pasteboardRevision = TransientPasteboard.writeString(clipboardReplacement, pasteboard: pasteboard)
+            let pasteboardRevision = TransientPasteboard.writeString(prepared.text, pasteboard: pasteboard)
             let sent = Self.dispatchVerifiedPaste(to: target.processID, verifySelection: {
                 guard self.isCurrentReplacementTarget(target) else { return false }
                 var selectedText: CFTypeRef?
@@ -1563,7 +1581,7 @@ final class AccessibilityService {
                 return AXValueGetValue(selectedRangeValue as! AXValue, .cfRange, &currentRange)
                     && currentRange.location == range.location && currentRange.length == range.length
             }, post: { _ in
-                if hasLeadingSpace {
+                if prepared.prependLeadingSpace {
                     if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
                        let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
                         spaceDown.flags = []
@@ -1579,7 +1597,7 @@ final class AccessibilityService {
                     event.setIntegerValueField(.eventSourceUserData, value: AutoCorrectionService.syntheticEventMarker)
                     event.post(tap: .cgAnnotatedSessionEventTap)
                 }
-                if hasTrailingSpace {
+                if prepared.appendTrailingSpace {
                     if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: true),
                        let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 0x31, keyDown: false) {
                         spaceDown.flags = []

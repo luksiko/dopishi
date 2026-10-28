@@ -1685,4 +1685,43 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         // 6. Cancel and flush cleans up all buffers safely
         service.cancelActiveCorrectionAndFlush()
     }
+
+    func testPrepareClipboardReplacementTrailingSpacePreservation() {
+        // Case 1: Standard application (Telegram, Chrome, Notes, etc.) with trailing space
+        // Space must be stripped from clipboard and marked for synthetic typing to avoid being eaten by the app
+        let nonSmartResult = AccessibilityService.prepareClipboardReplacement(
+            for: "семейный ",
+            bundleID: "ru.keepcoder.Telegram"
+        )
+        XCTAssertEqual(nonSmartResult.text, "семейный", "Must drop trailing space from pasteboard text")
+        XCTAssertTrue(nonSmartResult.appendTrailingSpace, "Must mark trailing space for synthetic key event")
+        XCTAssertFalse(nonSmartResult.prependLeadingSpace, "Non-smart app must not prepend leading space")
+
+        // Case 2: Word without trailing space
+        let wordResult = AccessibilityService.prepareClipboardReplacement(
+            for: "семейный",
+            bundleID: "com.apple.Safari"
+        )
+        XCTAssertEqual(wordResult.text, "семейный")
+        XCTAssertFalse(wordResult.appendTrailingSpace)
+        XCTAssertFalse(wordResult.prependLeadingSpace)
+
+        // Case 3: Microsoft Office app with leading and trailing space
+        let smartResult = AccessibilityService.prepareClipboardReplacement(
+            for: " семейный ",
+            bundleID: "com.microsoft.Word"
+        )
+        XCTAssertEqual(smartResult.text, "семейный")
+        XCTAssertTrue(smartResult.prependLeadingSpace)
+        XCTAssertTrue(smartResult.appendTrailingSpace)
+
+        // Case 4: Nil bundleID (unidentified application fallback)
+        let fallbackResult = AccessibilityService.prepareClipboardReplacement(
+            for: "привет ",
+            bundleID: nil
+        )
+        XCTAssertEqual(fallbackResult.text, "привет")
+        XCTAssertTrue(fallbackResult.appendTrailingSpace)
+        XCTAssertFalse(fallbackResult.prependLeadingSpace)
+    }
 }
