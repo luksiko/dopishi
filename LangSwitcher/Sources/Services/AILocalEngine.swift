@@ -1,5 +1,232 @@
 import Foundation
+import Accelerate
 import LlamaSwift
+
+// MARK: - Vectorized Sampler (Apple Accelerate vDSP)
+// High-performance vectorized token sampling using Apple Silicon vector units (vDSP / NEON).
+// Eliminates CPU heap allocations and vocab sorting of llama_sampler_chain.
+
+public struct VectorizedSampler {
+    public struct Candidate: Equatable {
+        public let token: llama_token
+        public let logit: Float
+
+        public init(token: llama_token, logit: Float) {
+            self.token = token
+            self.logit = logit
+        }
+    }
+
+    @inline(__always)
+    private static func siftDown(_ heap: inout [Candidate], _ index: Int, _ count: Int) {
+        var idx = index
+        while true {
+            let left = 2 * idx + 1
+            let right = 2 * idx + 2
+            var smallest = idx
+            if left < count && heap[left].logit < heap[smallest].logit {
+                smallest = left
+            }
+            if right < count && heap[right].logit < heap[smallest].logit {
+                smallest = right
+            }
+            if smallest != idx {
+                heap.swapAt(idx, smallest)
+                idx = smallest
+            } else {
+                break
+            }
+        }
+    }
+
+    /// Finds top-K candidates using an efficient min-heap over the logits array.
+    public static func topKCandidates(
+        logits: UnsafePointer<Float>,
+        count: Int,
+        k: Int
+    ) -> [Candidate] {
+        guard count > 0, k > 0 else { return [] }
+        let actualK = min(k, count)
+        var heap = [Candidate]()
+        heap.reserveCapacity(actualK)
+
+        for i in 0..<actualK {
+            let val = logits[i]
+            let sanitized = val.isNaN ? -Float.infinity : val
+            heap.append(Candidate(token: llama_token(i), logit: sanitized))
+        }
+
+        for i in stride(from: actualK / 2 - 1, through: 0, by: -1) {
+            siftDown(&heap, i, actualK)
+        }
+
+        var minVal = heap[0].logit
+        for i in actualK..<count {
+            let val = logits[i]
+            guard !val.isNaN else { continue }
+            if val > minVal {
+                heap[0] = Candidate(token: llama_token(i), logit: val)
+                siftDown(&heap, 0, actualK)
+                minVal = heap[0].logit
+            }
+        }
+
+        heap.sort { $0.logit > $1.logit }
+        return heap
+    }
+
+    /// Computes softmax probabilities on candidates using Apple Accelerate vDSP & vForce routines in-place.
+    public static func computeSoftmax(
+        candidates: [Candidate],
+        temperature: Float
+    ) -> [Float] {
+        let count = candidates.count
+        guard count > 0 else { return [] }
+        if count == 1 { return [1.0] }
+
+        // Allocate a single probability buffer initialized with candidate logits
+        var probs = candidates.map { $0.logit }
+
+        // 1. Shift by -maxLogit to prevent exp overflow
+        var maxVal: Float = 0
+        var maxIdx: vDSP_Length = 0
+        vDSP_maxvi(probs, 1, &maxVal, &maxIdx, vDSP_Length(count))
+
+        guard !maxVal.isNaN && !maxVal.isInfinite else {
+            var fallback = [Float](repeating: 0, count: count)
+            fallback[0] = 1.0
+            return fallback
+        }
+
+        var negMax = -maxVal
+        vDSP_vsadd(probs, 1, &negMax, &probs, 1, vDSP_Length(count))
+
+        // 2. Scale by temperature (in-place)
+        let safeTemp = (temperature.isNaN || temperature <= 0.001) ? 0.001 : temperature
+        var invTemp: Float = 1.0 / safeTemp
+        vDSP_vsmul(probs, 1, &invTemp, &probs, 1, vDSP_Length(count))
+
+        // 3. Vector exp using vvexpf (in-place)
+        var countInt32 = Int32(count)
+        vvexpf(&probs, probs, &countInt32)
+
+        // 4. Sum of exponents
+        var sumExp: Float = 0
+        vDSP_sve(probs, 1, &sumExp, vDSP_Length(count))
+
+        guard sumExp > 0 && !sumExp.isNaN else {
+            var fallback = [Float](repeating: 0, count: count)
+            fallback[0] = 1.0
+            return fallback
+        }
+
+        // 5. Normalize probabilities (in-place)
+        vDSP_vsdiv(probs, 1, &sumExp, &probs, 1, vDSP_Length(count))
+        return probs
+    }
+
+    /// Fast greedy sampling via vDSP_maxvi (O(1) vectorized execution on Apple Silicon).
+    public static func sampleGreedy(
+        logits: UnsafePointer<Float>,
+        count: Int
+    ) -> llama_token {
+        guard count > 0 else { return 0 }
+        var maxVal: Float = 0
+        var maxIdx: vDSP_Length = 0
+        vDSP_maxvi(logits, 1, &maxVal, &maxIdx, vDSP_Length(count))
+        return llama_token(maxIdx)
+    }
+
+    /// Sample token using Accelerate routines with temperature, top-K, and top-P.
+    public static func sample(
+        logits: UnsafePointer<Float>,
+        count: Int,
+        temperature: Float = 0.2,
+        topK: Int = 40,
+        topP: Float = 0.9,
+        randomValue: Float? = nil
+    ) -> llama_token {
+        guard count > 0 else { return 0 }
+
+        if temperature <= 0.05 || temperature.isNaN || topK <= 1 {
+            return sampleGreedy(logits: logits, count: count)
+        }
+
+        let candidates = topKCandidates(logits: logits, count: count, k: topK)
+        guard !candidates.isEmpty else { return 0 }
+        if candidates.count == 1 { return candidates[0].token }
+
+        let probs = computeSoftmax(candidates: candidates, temperature: temperature)
+
+        var cutoff = candidates.count
+        let effectiveTopP = (topP.isNaN || topP <= 0.0) ? 0.0 : min(1.0, topP)
+        if effectiveTopP < 1.0 {
+            var cumProb: Float = 0
+            for i in 0..<candidates.count {
+                cumProb += probs[i]
+                if cumProb >= effectiveTopP {
+                    cutoff = i + 1
+                    break
+                }
+            }
+        }
+
+        if cutoff <= 1 {
+            return candidates[0].token
+        }
+
+        var activeSum: Float = 0
+        vDSP_sve(probs, 1, &activeSum, vDSP_Length(cutoff))
+        guard activeSum > 0 && !activeSum.isNaN else {
+            return candidates[0].token
+        }
+
+        let rawR: Float
+        if let r = randomValue, !r.isNaN {
+            rawR = max(0.0, min(1.0, r))
+        } else {
+            rawR = Float.random(in: 0..<1)
+        }
+        let r = rawR * activeSum
+
+        var acc: Float = 0
+        for i in 0..<cutoff {
+            acc += probs[i]
+            if acc >= r {
+                return candidates[i].token
+            }
+        }
+        return candidates[cutoff - 1].token
+    }
+
+    // Convenience overloads for Swift arrays
+    public static func sampleGreedy(logits: [Float]) -> llama_token {
+        logits.withUnsafeBufferPointer { buf in
+            guard let base = buf.baseAddress, !buf.isEmpty else { return 0 }
+            return sampleGreedy(logits: base, count: buf.count)
+        }
+    }
+
+    public static func sample(
+        logits: [Float],
+        temperature: Float = 0.2,
+        topK: Int = 40,
+        topP: Float = 0.9,
+        randomValue: Float? = nil
+    ) -> llama_token {
+        logits.withUnsafeBufferPointer { buf in
+            guard let base = buf.baseAddress, !buf.isEmpty else { return 0 }
+            return sample(
+                logits: base,
+                count: buf.count,
+                temperature: temperature,
+                topK: topK,
+                topP: topP,
+                randomValue: randomValue
+            )
+        }
+    }
+}
 
 // MARK: - AI Local Engine Errors
 
@@ -83,8 +310,6 @@ public actor AILocalEngine {
     private var model: OpaquePointer?                          // llama_model*
     private var context: OpaquePointer?                        // llama_context*
     private var vocab: OpaquePointer?                          // const llama_vocab*
-    private var sampler: UnsafeMutablePointer<llama_sampler>?  // llama_sampler*
-    private var currentSamplerTemperature: Float = 0.2
     private var batch: llama_batch?
 
     public private(set) var currentModelPath: String?
@@ -104,9 +329,6 @@ public actor AILocalEngine {
     deinit {
         if let b = batch {
             llama_batch_free(b)
-        }
-        if let s = sampler {
-            llama_sampler_free(s)
         }
         if let c = context {
             llama_free(c)
@@ -160,14 +382,6 @@ public actor AILocalEngine {
         // 4. Batch buffer
         self.batch = llama_batch_init(512, 0, 1)
 
-        // 5. Sampler chain
-        guard let chain = Self.makeSamplerChain(vocab: modelVocab, temperature: 0.2) else {
-            unload()
-            throw AILocalEngineError.contextInitFailed
-        }
-        self.sampler = chain
-        self.currentSamplerTemperature = 0.2
-
         self.currentModelPath = path
         self.isLoaded = true
 
@@ -179,17 +393,52 @@ public actor AILocalEngine {
         }
     }
 
-    private static func makeSamplerChain(vocab: OpaquePointer, temperature: Float) -> UnsafeMutablePointer<llama_sampler>? {
-        let sparams = llama_sampler_chain_default_params()
-        guard let chain = llama_sampler_chain_init(sparams) else {
-            return nil
+    /// Vectorized token sampling from model logits.
+    /// Extracts raw logits pointer via llama_get_logits_ith(ctx, -1) and processes
+    /// on Apple Silicon vector hardware (vDSP_maxvi for greedy, vDSP routines for temperature/top-k/top-p).
+    public func sampleToken(
+        temperature: Float = 0.2,
+        topK: Int = 40,
+        topP: Float = 0.9,
+        repeatPenalty: Float = 1.15,
+        recentTokens: [llama_token] = []
+    ) -> llama_token? {
+        guard let ctx = context, let v = vocab else { return nil }
+        guard let logitsPtr = llama_get_logits_ith(ctx, -1) else { return nil }
+        let vocabSize = Int(llama_vocab_n_tokens(v))
+        guard vocabSize > 0 else { return nil }
+
+        // Apply repetition penalty if specified
+        var savedLogits: [(Int, Float)] = []
+        if repeatPenalty > 1.0 && !repeatPenalty.isNaN && !repeatPenalty.isInfinite && !recentTokens.isEmpty {
+            savedLogits.reserveCapacity(min(recentTokens.count, 64))
+            var seen = Set<llama_token>()
+            for tok in recentTokens.suffix(64) {
+                guard seen.insert(tok).inserted else { continue }
+                let idx = Int(tok)
+                guard idx >= 0 && idx < vocabSize else { continue }
+                let original = logitsPtr[idx]
+                savedLogits.append((idx, original))
+                logitsPtr[idx] = original > 0 ? original / repeatPenalty : original * repeatPenalty
+            }
         }
-        llama_sampler_chain_add(chain, llama_sampler_init_top_k(40))
-        llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9, 1))
-        llama_sampler_chain_add(chain, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.15, 0.0, 0.2))
-        llama_sampler_chain_add(chain, llama_sampler_init_temp(temperature))
-        llama_sampler_chain_add(chain, llama_sampler_init_dist(42))
-        return chain
+        defer {
+            for (idx, original) in savedLogits {
+                logitsPtr[idx] = original
+            }
+        }
+
+        if temperature <= 0.05 || temperature.isNaN {
+            return VectorizedSampler.sampleGreedy(logits: logitsPtr, count: vocabSize)
+        } else {
+            return VectorizedSampler.sample(
+                logits: logitsPtr,
+                count: vocabSize,
+                temperature: temperature,
+                topK: topK,
+                topP: topP
+            )
+        }
     }
 
     /// Unload model and free all C/Metal memory buffers.
@@ -197,10 +446,6 @@ public actor AILocalEngine {
         if let b = batch {
             llama_batch_free(b)
             self.batch = nil
-        }
-        if let s = sampler {
-            llama_sampler_free(s)
-            self.sampler = nil
         }
         if let c = context {
             llama_free(c)
@@ -318,17 +563,6 @@ public actor AILocalEngine {
         }
         defer { self.batch = b }
 
-        if sampler == nil || abs(temperature - currentSamplerTemperature) > 0.001 {
-            if let old = sampler {
-                llama_sampler_free(old)
-            }
-            sampler = Self.makeSamplerChain(vocab: v, temperature: temperature)
-            currentSamplerTemperature = temperature
-        }
-        guard let smpl = sampler else {
-            throw AILocalEngineError.notLoaded
-        }
-
         guard !Task.isCancelled else {
             throw AILocalEngineError.executionCancelled
         }
@@ -363,7 +597,6 @@ public actor AILocalEngine {
         } else {
             llama_memory_clear(memory, true)
         }
-        llama_sampler_reset(smpl)
 
         // 3. Feed delta tokens into batch
         b.n_tokens = 0
@@ -395,14 +628,22 @@ public actor AILocalEngine {
         var accumulatedBytes: [UInt8] = []
         var accumulatedText = ""
         var decodedStep = 0
+        var recentTokens: [llama_token] = Array(promptTokens.suffix(64))
 
         for step in 0..<maxTokens {
             if Task.isCancelled {
                 break
             }
 
-            let nextTok = llama_sampler_sample(smpl, ctx, -1)
-            llama_sampler_accept(smpl, nextTok)
+            guard let nextTok = sampleToken(
+                temperature: temperature,
+                topK: 40,
+                topP: 0.9,
+                repeatPenalty: 1.15,
+                recentTokens: recentTokens
+            ) else {
+                break
+            }
 
             if llama_vocab_is_eog(v, nextTok) {
                 break
@@ -412,6 +653,10 @@ public actor AILocalEngine {
             accumulatedBytes.append(contentsOf: pieceBytes)
             accumulatedText = String(decoding: accumulatedBytes, as: UTF8.self)
             generatedTokens.append(nextTok)
+            recentTokens.append(nextTok)
+            if recentTokens.count > 64 {
+                recentTokens.removeFirst()
+            }
 
             let validText = accumulatedText.replacingOccurrences(of: "\u{FFFD}", with: "")
             if !validText.isEmpty {

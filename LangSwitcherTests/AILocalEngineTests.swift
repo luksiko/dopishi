@@ -184,4 +184,202 @@ final class AILocalEngineTests: XCTestCase {
         // Current longer than cached
         XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2, 3], current: [1, 2, 3, 4, 5]), 3)
     }
+
+    // MARK: - Vectorized Sampler (Accelerate vDSP) Tests
+
+    func testVectorizedSamplerGreedyPicksMaximumLogit() {
+        let logits: [Float] = [1.2, 5.8, -3.1, 12.4, 9.0, 0.5]
+        let token = VectorizedSampler.sampleGreedy(logits: logits)
+        XCTAssertEqual(token, 3, "Index 3 has the highest logit (12.4)")
+    }
+
+    func testVectorizedSamplerGreedyEdgeCases() {
+        // Empty array returns 0
+        XCTAssertEqual(VectorizedSampler.sampleGreedy(logits: []), 0)
+
+        // Single element returns 0
+        XCTAssertEqual(VectorizedSampler.sampleGreedy(logits: [42.0]), 0)
+
+        // All negative values
+        let negativeLogits: [Float] = [-100.0, -25.5, -5.2, -80.0]
+        XCTAssertEqual(VectorizedSampler.sampleGreedy(logits: negativeLogits), 2, "Least negative is -5.2 at index 2")
+
+        // Large 256K vocabulary (e.g. Gemma 2B)
+        var vocab256K = [Float](repeating: -10.0, count: 256_000)
+        vocab256K[185_432] = 99.5
+        let sampled = VectorizedSampler.sampleGreedy(logits: vocab256K)
+        XCTAssertEqual(sampled, 185_432, "Must accurately find max across 256,000 tokens")
+    }
+
+    func testVectorizedSamplerTopKCandidates() {
+        let logits: [Float] = [10.0, 50.0, 20.0, 40.0, 30.0]
+        logits.withUnsafeBufferPointer { buf in
+            let candidates = VectorizedSampler.topKCandidates(logits: buf.baseAddress!, count: buf.count, k: 3)
+            XCTAssertEqual(candidates.count, 3)
+            XCTAssertEqual(candidates[0].token, 1) // logit 50.0
+            XCTAssertEqual(candidates[0].logit, 50.0)
+            XCTAssertEqual(candidates[1].token, 3) // logit 40.0
+            XCTAssertEqual(candidates[1].logit, 40.0)
+            XCTAssertEqual(candidates[2].token, 4) // logit 30.0
+            XCTAssertEqual(candidates[2].logit, 30.0)
+        }
+    }
+
+    func testVectorizedSamplerTopKWhenKExceedsCount() {
+        let logits: [Float] = [5.0, 15.0]
+        logits.withUnsafeBufferPointer { buf in
+            let candidates = VectorizedSampler.topKCandidates(logits: buf.baseAddress!, count: buf.count, k: 10)
+            XCTAssertEqual(candidates.count, 2)
+            XCTAssertEqual(candidates[0].token, 1)
+            XCTAssertEqual(candidates[1].token, 0)
+        }
+    }
+
+    func testVectorizedSamplerSoftmaxSumAndOverflowProtection() {
+        let candidates = [
+            VectorizedSampler.Candidate(token: 0, logit: 1000.0),
+            VectorizedSampler.Candidate(token: 1, logit: 999.0),
+            VectorizedSampler.Candidate(token: 2, logit: 998.0)
+        ]
+
+        let probs = VectorizedSampler.computeSoftmax(candidates: candidates, temperature: 1.0)
+        XCTAssertEqual(probs.count, 3)
+
+        // Softmax sum should equal ~1.0
+        let sum = probs.reduce(0, +)
+        XCTAssertEqual(sum, 1.0, accuracy: 0.001)
+
+        // Token 0 should have the largest probability
+        XCTAssertGreaterThan(probs[0], probs[1])
+        XCTAssertGreaterThan(probs[1], probs[2])
+
+        // Verify no NaN or Inf despite huge 1000.0 logits due to vDSP -maxVal shift
+        XCTAssertFalse(probs[0].isNaN)
+        XCTAssertFalse(probs[0].isInfinite)
+    }
+
+    func testVectorizedSamplerTemperatureSharpeningAndFlattening() {
+        let candidates = [
+            VectorizedSampler.Candidate(token: 0, logit: 2.0),
+            VectorizedSampler.Candidate(token: 1, logit: 1.0)
+        ]
+
+        let sharpProbs = VectorizedSampler.computeSoftmax(candidates: candidates, temperature: 0.1)
+        let flatProbs = VectorizedSampler.computeSoftmax(candidates: candidates, temperature: 2.0)
+
+        // Lower temperature should make top token much more probable
+        XCTAssertGreaterThan(sharpProbs[0], 0.99)
+        // Higher temperature should make probabilities closer to uniform
+        XCTAssertLessThan(flatProbs[0], 0.7)
+        XCTAssertGreaterThan(flatProbs[1], 0.3)
+    }
+
+    func testVectorizedSamplerGreedyFastPathOnLowTemperature() {
+        // Temperature <= 0.05 must take greedy path directly
+        let logits: [Float] = [1.0, 10.0, 3.0]
+        let sampled = VectorizedSampler.sample(logits: logits, temperature: 0.02, topK: 40)
+        XCTAssertEqual(sampled, 1)
+    }
+
+    func testVectorizedSamplerDeterministicSamplingWithRandomValue() {
+        // Candidate 0 has ~52.5% prob, Candidate 1 has ~47.5% prob
+        let logits: [Float] = [10.0, 9.9]
+
+        // r = 0.1 should pick candidate 0
+        let pick0 = VectorizedSampler.sample(
+            logits: logits,
+            temperature: 1.0,
+            topK: 2,
+            topP: 1.0,
+            randomValue: 0.1
+        )
+        XCTAssertEqual(pick0, 0)
+
+        // r = 0.9 should pick candidate 1
+        let pick1 = VectorizedSampler.sample(
+            logits: logits,
+            temperature: 1.0,
+            topK: 2,
+            topP: 1.0,
+            randomValue: 0.9
+        )
+        XCTAssertEqual(pick1, 1)
+    }
+
+    func testVectorizedSamplerTopPNucleusCutoff() {
+        // Logits: token 0 dominates
+        let logits: [Float] = [20.0, 5.0, 2.0]
+
+        // With topP = 0.8, only token 0 enters the nucleus since its softmax prob is > 0.99
+        let picked = VectorizedSampler.sample(
+            logits: logits,
+            temperature: 1.0,
+            topK: 3,
+            topP: 0.8,
+            randomValue: 0.99 // Even with high r, cannot pick excluded tokens
+        )
+        XCTAssertEqual(picked, 0)
+    }
+
+    func testVectorizedSamplerTopKHandlesNaNsInInitialWindow() {
+        // Token 0 has NaN logit, but tokens 3 and 4 have highest valid logits
+        let logits: [Float] = [Float.nan, 10.0, 20.0, 500.0, 1000.0]
+        logits.withUnsafeBufferPointer { buf in
+            let candidates = VectorizedSampler.topKCandidates(logits: buf.baseAddress!, count: buf.count, k: 3)
+            XCTAssertEqual(candidates.count, 3)
+            // NaN must not block the heap or be selected as top token
+            XCTAssertEqual(candidates[0].token, 4) // 1000.0
+            XCTAssertEqual(candidates[0].logit, 1000.0)
+            XCTAssertEqual(candidates[1].token, 3) // 500.0
+            XCTAssertEqual(candidates[1].logit, 500.0)
+            XCTAssertEqual(candidates[2].token, 2) // 20.0
+            XCTAssertEqual(candidates[2].logit, 20.0)
+        }
+    }
+
+    func testVectorizedSamplerTopKHandlesNaNsInSubsequentWindow() {
+        let logits: [Float] = [10.0, 50.0, 20.0, Float.nan, 80.0, Float.nan]
+        logits.withUnsafeBufferPointer { buf in
+            let candidates = VectorizedSampler.topKCandidates(logits: buf.baseAddress!, count: buf.count, k: 3)
+            XCTAssertEqual(candidates.count, 3)
+            XCTAssertEqual(candidates[0].token, 4) // 80.0
+            XCTAssertEqual(candidates[1].token, 1) // 50.0
+            XCTAssertEqual(candidates[2].token, 2) // 20.0
+        }
+    }
+
+    func testVectorizedSamplerSoftmaxDegenerateAndInfiniteFallback() {
+        // All candidates have -infinity or NaN
+        let candidates = [
+            VectorizedSampler.Candidate(token: 0, logit: -Float.infinity),
+            VectorizedSampler.Candidate(token: 1, logit: -Float.infinity)
+        ]
+        let probs = VectorizedSampler.computeSoftmax(candidates: candidates, temperature: 1.0)
+        XCTAssertEqual(probs.count, 2)
+        XCTAssertEqual(probs[0], 1.0)
+        XCTAssertEqual(probs[1], 0.0)
+    }
+
+    func testVectorizedSamplerResilienceToNaNHyperparameters() {
+        let logits: [Float] = [10.0, 50.0, 20.0]
+
+        // NaN temperature should fall back cleanly to greedy sampling (token 1 = 50.0)
+        let sampledWithNanTemp = VectorizedSampler.sample(
+            logits: logits,
+            temperature: Float.nan,
+            topK: 3
+        )
+        XCTAssertEqual(sampledWithNanTemp, 1)
+
+        // NaN randomValue should fall back cleanly without selecting excluded or crashing
+        let sampledWithNanRandom = VectorizedSampler.sample(
+            logits: logits,
+            temperature: 1.0,
+            topK: 3,
+            topP: Float.nan,
+            randomValue: Float.nan
+        )
+        XCTAssertTrue([0, 1, 2].contains(sampledWithNanRandom))
+    }
 }
+
