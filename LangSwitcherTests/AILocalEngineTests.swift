@@ -164,4 +164,24 @@ final class AILocalEngineTests: XCTestCase {
         )
         XCTAssertEqual(resolved, 3)
     }
+
+    func testCommonPrefixLengthMatching() {
+        // Disjoint tokens -> prefixLen = 0
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2, 3], current: [4, 5, 6]), 0)
+
+        // Empty cached -> prefixLen = 0
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [], current: [1, 2, 3]), 0)
+
+        // Empty current -> prefixLen = 0
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2], current: []), 0)
+
+        // Partial match
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2, 3, 4], current: [1, 2, 5]), 2)
+
+        // Identical tokens leaves 1 token for sampling logits
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2, 3], current: [1, 2, 3]), 2)
+
+        // Current longer than cached
+        XCTAssertEqual(AILocalEngine.commonPrefixLength(cached: [1, 2, 3], current: [1, 2, 3, 4, 5]), 3)
+    }
 }

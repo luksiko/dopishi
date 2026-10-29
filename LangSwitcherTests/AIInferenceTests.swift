@@ -472,13 +472,10 @@ extension AIInferenceTests {
     }
 
     func testSystemPromptCompletionInstructionsFocusOnContinuation() {
-        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("text completion engine"))
-        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("2-3 words"))
-        XCTAssertFalse(AIInferenceEngine.defaultSystemPromptEn.contains("up to 4 words"))
-
-        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("автодополнения текста"))
-        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("2-3 словами"))
-        XCTAssertFalse(AIInferenceEngine.defaultSystemPromptRu.contains("до 4 слов"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("Now, please complete the following text"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptEn.contains("preferred languages: ru, en"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("Now, please complete the following text"))
+        XCTAssertTrue(AIInferenceEngine.defaultSystemPromptRu.contains("preferred languages: ru, en"))
     }
 
     func testPendingQuestionUsesConcisePrompt() {
@@ -513,7 +510,7 @@ extension AIInferenceTests {
             frameUserDirective: true
         )
         let ruUser = ruMsgs.last?["content"] ?? ""
-        XCTAssertTrue(ruUser.contains("Продолжи начатый текст (выведи только следующие 2-3 слова продолжения, без приветствий, без повтора фразы и без ответов на вопросы):"))
+        XCTAssertTrue(ruUser.hasPrefix("/no_think\n"))
         XCTAssertTrue(ruUser.contains("Привет, как твои"))
 
         let enMsgs = AIInferenceEngine.completionMessages(
@@ -523,7 +520,7 @@ extension AIInferenceTests {
             frameUserDirective: true
         )
         let enUser = enMsgs.last?["content"] ?? ""
-        XCTAssertTrue(enUser.contains("Continue the following text (output only the next 2-3 words of continuation, no greetings, no repeating the prompt, and no answering questions):"))
+        XCTAssertTrue(enUser.hasPrefix("/no_think\n"))
         XCTAssertTrue(enUser.contains("Hello, how are"))
     }
 
@@ -609,5 +606,27 @@ extension AIInferenceTests {
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Как языковая модель, я не имею своего мнения", context: "Что думаешь? ", wordBuffer: "", maxWords: 6))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Я — ИИ, и я готов помочь", context: "Привет ", wordBuffer: "", maxWords: 6))
         XCTAssertNil(AIInferenceEngine.cleanAndTrimContinuation(raw: "Как вам помочь?", context: "Привет ", wordBuffer: "", maxWords: 4))
+    }
+
+    func testClosedThinkingBlockSuppression() {
+        // Standard template output without thinking tag
+        let standard = "<|im_start|>assistant\n"
+        let res1 = AIInferenceEngine.appendingClosedThinkingBlock(to: standard)
+        XCTAssertEqual(res1, "<|im_start|>assistant\n<think>\n\n</think>\n")
+
+        // DeepSeek-style template that already ends with <think>\n
+        let deepseek = "<｜Assistant｜><think>\n"
+        let res2 = AIInferenceEngine.appendingClosedThinkingBlock(to: deepseek)
+        XCTAssertEqual(res2, "<｜Assistant｜><think>\n\n</think>\n")
+
+        // Template that ends with <think> without trailing newline
+        let partial = "<start_of_turn>model\n<think>"
+        let res3 = AIInferenceEngine.appendingClosedThinkingBlock(to: partial)
+        XCTAssertEqual(res3, "<start_of_turn>model\n<think>\n\n</think>\n")
+
+        // Template that already contains a closed thinking block
+        let closed = "<|im_start|>assistant\n<think>done</think>\n"
+        let res4 = AIInferenceEngine.appendingClosedThinkingBlock(to: closed)
+        XCTAssertEqual(res4, closed)
     }
 }

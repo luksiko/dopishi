@@ -246,9 +246,23 @@ final class AIInferenceEngine: ObservableObject {
         }
     }
     
-    nonisolated static let defaultSystemPromptEn = "You are a text completion engine. Continue the immediate text naturally with 2-3 words. Maintain context, language and tone. Output only the direct continuation. Never act as a conversational chatbot, never output greetings or conversational replies, do not repeat the prompt, and do not explain."
-    nonisolated static let defaultSystemPromptRu = "Ты — сервис автодополнения текста. Продолжи начатую мысль естественно 2-3 словами. Сохраняй контекст, язык и стиль. Выводи только прямое продолжение. Не отвечай как собеседник в чате, не используй приветствия, не повторяй ввод и не добавляй пояснений."
-    nonisolated static var defaultSystemPrompt: String { defaultSystemPromptEn }
+    nonisolated static let cotypistContinuationPrompt = "Now, please complete the following text that I am typing. Write full, grammatically correct sentences in the language and style of the existing text. Avoid using placeholders. Do not mention that your task is to provide completions, or e.g. the fact that I am typing, etc.; just try to complete the sentence. [preferred languages: ru, en]"
+    nonisolated static let defaultSystemPromptEn = cotypistContinuationPrompt
+    nonisolated static let defaultSystemPromptRu = cotypistContinuationPrompt
+    nonisolated static var defaultSystemPrompt: String { cotypistContinuationPrompt }
+
+    nonisolated static func appendingClosedThinkingBlock(to prompt: String) -> String {
+        if prompt.contains("</think>") {
+            return prompt
+        }
+        if prompt.hasSuffix("<think>\n") {
+            return prompt + "\n</think>\n"
+        }
+        if prompt.hasSuffix("<think>") {
+            return prompt + "\n\n</think>\n"
+        }
+        return prompt + "<think>\n\n</think>\n"
+    }
 
     nonisolated static func containsCyrillic(_ text: String) -> Bool {
         text.contains { ("\u{0400}"..."\u{04FF}").contains($0) }
@@ -281,12 +295,10 @@ final class AIInferenceEngine: ObservableObject {
     }
 
     nonisolated static func userContinuationDirective(for context: String) -> String {
-        let isCyrillic = containsCyrillic(activeParagraph(in: context))
-        if isCyrillic {
-            return "Продолжи начатый текст (выведи только следующие 2-3 слова продолжения, без приветствий, без повтора фразы и без ответов на вопросы):\n\n\(context)"
-        } else {
-            return "Continue the following text (output only the next 2-3 words of continuation, no greetings, no repeating the prompt, and no answering questions):\n\n\(context)"
+        if context.hasPrefix("/no_think\n") {
+            return context
         }
+        return "/no_think\n" + context
     }
 
     nonisolated static func completionMessages(
@@ -615,13 +627,13 @@ final class AIInferenceEngine: ObservableObject {
                 ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
 
                 if let formatted = await AILocalEngine.shared.applyChatTemplate(messages: msgs, addAssistant: true) {
-                    nativePrompt = formatted
+                    nativePrompt = Self.appendingClosedThinkingBlock(to: formatted)
                 } else {
                     var chatPrompt = ""
                     for msg in msgs {
                         chatPrompt += "<|im_start|>\(msg.role)\n\(msg.content)<|im_end|>\n"
                     }
-                    nativePrompt = chatPrompt + "<|im_start|>assistant\n"
+                    nativePrompt = Self.appendingClosedThinkingBlock(to: chatPrompt + "<|im_start|>assistant\n")
                 }
             } else {
                 let basePrefix = Self.baseModelContextPrefix(
@@ -717,7 +729,7 @@ final class AIInferenceEngine: ObservableObject {
                 guard !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
                       let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let rendered = json["prompt"] as? String else { return nil }
-                prompt = rendered
+                prompt = Self.appendingClosedThinkingBlock(to: rendered)
             } catch {
                 if !Task.isCancelled {
                     NSLog("[LangSwitcher] AIInferenceEngine: template request failed (%@)", error.localizedDescription)

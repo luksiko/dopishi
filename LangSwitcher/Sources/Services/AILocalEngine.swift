@@ -286,6 +286,23 @@ public actor AILocalEngine {
         return String(decoding: bytes, as: UTF8.self)
     }
 
+    // MARK: - KV Cache Prefix Matching
+
+    /// Computes the longest common token prefix length between cached prompt tokens and current prompt tokens.
+    /// Leaves at least 1 token to decode so logits for the prompt tail are available for sampling.
+    public static func commonPrefixLength(cached: [llama_token], current: [llama_token]) -> Int {
+        var prefixLen = 0
+        while prefixLen < cached.count &&
+              prefixLen < current.count &&
+              cached[prefixLen] == current[prefixLen] {
+            prefixLen += 1
+        }
+        if prefixLen == current.count && prefixLen > 0 {
+            prefixLen -= 1
+        }
+        return prefixLen
+    }
+
     // MARK: - Generation
 
     /// Generates predictive continuation for the given prompt context.
@@ -333,21 +350,16 @@ public actor AILocalEngine {
             throw AILocalEngineError.contextInitFailed
         }
 
-        var prefixLen = 0
-        while prefixLen < cachedPromptTokens.count &&
-              prefixLen < promptTokens.count &&
-              cachedPromptTokens[prefixLen] == promptTokens[prefixLen] {
-            prefixLen += 1
-        }
-
-        // Leave at least 1 token to decode so logits for the prompt tail are available for sampling
-        if prefixLen == promptTokens.count && prefixLen > 0 {
-            prefixLen -= 1
-        }
+        var prefixLen = Self.commonPrefixLength(cached: cachedPromptTokens, current: promptTokens)
 
         if prefixLen > 0 {
-            prefixCacheHitCount += 1
-            _ = llama_memory_seq_rm(memory, 0, llama_pos(prefixLen), -1)
+            let removed = llama_memory_seq_rm(memory, 0, llama_pos(prefixLen), -1)
+            if removed {
+                prefixCacheHitCount += 1
+            } else {
+                prefixLen = 0
+                llama_memory_clear(memory, true)
+            }
         } else {
             llama_memory_clear(memory, true)
         }
@@ -409,7 +421,17 @@ public actor AILocalEngine {
             // Check stop sequences
             var shouldStop = false
             for stop in stopSequences {
-                if accumulatedText.contains(stop) {
+                if stop == "\n" || stop == "\r" {
+                    // Only treat newline as stop sequence after non-newline content has been generated.
+                    // This prevents reasoning models from terminating immediately into empty output
+                    // if they emit a leading newline after the pre-closed </think>\n block.
+                    let stripped = accumulatedText.drop(while: { $0.isNewline })
+                    if let range = stripped.range(of: stop) {
+                        accumulatedText = String(stripped[..<range.lowerBound])
+                        shouldStop = true
+                        break
+                    }
+                } else if accumulatedText.contains(stop) {
                     if let range = accumulatedText.range(of: stop) {
                         accumulatedText = String(accumulatedText[..<range.lowerBound])
                     }
@@ -448,6 +470,10 @@ public actor AILocalEngine {
 
         if accumulatedText.hasSuffix("\u{FFFD}") {
             accumulatedText = accumulatedText.replacingOccurrences(of: "\u{FFFD}", with: "")
+        }
+
+        while accumulatedText.hasPrefix("\n") || accumulatedText.hasPrefix("\r") {
+            accumulatedText = String(accumulatedText.dropFirst())
         }
 
         // Start stitch session for the generated result

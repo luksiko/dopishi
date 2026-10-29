@@ -1112,6 +1112,35 @@ extension GhostTextOverlayTests {
         }
     }
 
+    func testGhostTextViewBaselineAndRoundedBackground() {
+        let view = GhostTextView()
+        view.fontSize = 14.0
+        XCTAssertEqual(view.baselineOffsetFromTop, view.activeFont.ascender)
+
+        // RoundedBackgroundLayoutManager fillBackgroundRectArray
+        let lm = RoundedBackgroundLayoutManager()
+        var rect = NSRect(x: 0, y: 0, width: 20, height: 14)
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 20,
+            pixelsHigh: 14,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )
+        if let rep = rep {
+            NSGraphicsContext.saveGraphicsState()
+            let ctx = NSGraphicsContext(bitmapImageRep: rep)
+            NSGraphicsContext.current = ctx
+            lm.fillBackgroundRectArray(&rect, count: 1, forCharacterRange: NSRange(location: 0, length: 1), color: .systemBlue)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
+
     func testGhostTextOverlayFieldRectClipping() {
         let controller = GhostTextOverlayController()
         defer { controller.hide() }

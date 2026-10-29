@@ -110,7 +110,19 @@ final class GhostTextOverlayController: NSObject {
         let fittingSize = tv.idealSize()
 
         // Position directly at the right edge of caret with zero margin
-        var origin = CGPoint(x: caret.maxX, y: caret.minY + (caret.height - fittingSize.height) / 2)
+        // Typographic baseline alignment:
+        // In Cocoa screen coordinates (origin at bottom-left, y increasing upwards),
+        // the caret spans the line height. With symmetric leading, the caret baseline is:
+        // caretBaseline = caret.midY - (tv.activeFont.ascender + tv.activeFont.descender) / 2
+        // Inside the flipped ghost text view, the glyph baseline is at tv.baselineOffsetFromTop from top.
+        // Therefore, for the ghost text baseline to match caretBaseline:
+        // origin.y + fittingSize.height - tv.baselineOffsetFromTop = caretBaseline
+        let fontCenter = (tv.activeFont.ascender + tv.activeFont.descender) / 2
+        let caretBaseline = caret.midY - fontCenter
+        var origin = CGPoint(
+            x: caret.maxX,
+            y: round(caretBaseline - (fittingSize.height - tv.baselineOffsetFromTop))
+        )
 
         // Ensure within screen visible frame
         let screen = NSScreen.screens.first { s in
@@ -330,26 +342,53 @@ final class GhostTextOverlayController: NSObject {
     }
 }
 
+// MARK: - Rounded Background Layout Manager
+// Dedicated layout manager matching Cotypist's architecture for single completion overlays.
+// Handles line fragment padding, exact baseline alignment, and background/glyph rendering.
+final class RoundedBackgroundLayoutManager: NSLayoutManager {
+    override func fillBackgroundRectArray(
+        _ rectArray: UnsafePointer<NSRect>,
+        count rectCount: Int,
+        forCharacterRange charRange: NSRange,
+        color: NSColor
+    ) {
+        guard rectCount > 0 else { return }
+        color.setFill()
+        for i in 0..<rectCount {
+            let rect = rectArray[i]
+            let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+            path.fill()
+        }
+    }
+}
+
 // MARK: - Native AppKit Ghost Text View
 // Ultra-lightweight native view: 0 SwiftUI constraints, 0 recursion, zero overhead.
-// Renders delicate inline completion ghost text matching native editor styling with universal contrast.
+// Uses NSTextContainer + NSLayoutManager (RoundedBackgroundLayoutManager) for exact typography,
+// baseline alignment, line fragment padding suppression, and clean boundary clipping.
 final class GhostTextView: NSView {
+    override var isFlipped: Bool { true }
+
+    private let textStorage = NSTextStorage()
+    private let layoutManager = RoundedBackgroundLayoutManager()
+    private let textContainer = NSTextContainer()
+
     var text: String = "" {
         didSet {
-            needsDisplay = true
+            updateTextStorage()
         }
     }
 
     var customFont: NSFont? {
         didSet {
-            needsDisplay = true
+            updateTextStorage()
         }
     }
 
     var fontSize: CGFloat = 13.5 {
         didSet {
             font = NSFont.systemFont(ofSize: fontSize, weight: .regular)
-            needsDisplay = true
+            updateTextStorage()
         }
     }
 
@@ -358,7 +397,32 @@ final class GhostTextView: NSView {
         customFont ?? font
     }
 
-    private func textAttributes() -> [NSAttributedString.Key: Any] {
+    var baselineOffsetFromTop: CGFloat {
+        activeFont.ascender
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupTextSystem()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupTextSystem()
+    }
+
+    private func setupTextSystem() {
+        textContainer.lineFragmentPadding = 0
+        textContainer.lineBreakMode = .byClipping
+        textContainer.maximumNumberOfLines = 1
+        textContainer.widthTracksTextView = false
+        textContainer.heightTracksTextView = false
+
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+    }
+
+    func textAttributes() -> [NSAttributedString.Key: Any] {
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
         shadow.shadowOffset = NSSize(width: 0, height: -0.5)
@@ -375,26 +439,34 @@ final class GhostTextView: NSView {
         ]
     }
 
+    private func updateTextStorage() {
+        if text.isEmpty {
+            textStorage.setAttributedString(NSAttributedString())
+        } else {
+            let attrString = NSAttributedString(string: text, attributes: textAttributes())
+            textStorage.setAttributedString(attrString)
+        }
+        needsDisplay = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard !text.isEmpty, bounds.width > 0, bounds.height > 0 else { return }
 
-        let attrs = textAttributes()
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let textRect = NSRect(
-            x: 0,
-            y: (bounds.height - textSize.height) / 2,
-            width: bounds.width,
-            height: textSize.height
-        )
-        (text as NSString).draw(in: textRect, withAttributes: attrs)
+        textContainer.size = bounds.size
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        guard glyphRange.length > 0 else { return }
+
+        layoutManager.drawBackground(forGlyphRange: glyphRange, at: .zero)
+        layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: .zero)
     }
 
     func idealSize() -> CGSize {
         guard !text.isEmpty else { return .zero }
-        let attrs = textAttributes()
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        return CGSize(width: ceil(textSize.width) + 4, height: max(16, ceil(textSize.height)))
+        textContainer.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        _ = layoutManager.glyphRange(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        return CGSize(width: ceil(usedRect.width) + 4, height: max(16, ceil(usedRect.height)))
     }
 }
 
