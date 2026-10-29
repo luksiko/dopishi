@@ -81,7 +81,18 @@ enum Strings_ru {
         "apps.remove":                   "Удалить правила",
         "apps.badge.layoutOff":          "Раскладка выкл",
         "apps.badge.aiOff":              "AI выкл",
+        "apps.badge.manualOnly":         "По хоткею",
         "apps.badge.customPrompt":       "Свой промпт",
+        "apps.completionMode":           "Режим подсказок ИИ:",
+        "apps.mode.automatic":           "Автоматически",
+        "apps.mode.automatic.desc":      "Подсказки появляются автоматически во время набора",
+        "apps.mode.manualOnly":          "Только по хоткею",
+        "apps.mode.manualOnly.desc":     "Подсказка вызывается строго по горячей клавише",
+        "apps.mode.disabled":            "Отключено",
+        "apps.mode.disabled.desc":       "Полное отключение подсказок и фонового ИИ",
+        "apps.presets.title":            "Шаблоны",
+        "apps.presets.ide":              "IDE (по хоткею)",
+        "apps.presets.games":            "Игра / Полный экран (отключено)",
 
         // ── Статус разрешений ──────────────────────────────────────
         "permissions.active":            "Универсальный доступ активен",

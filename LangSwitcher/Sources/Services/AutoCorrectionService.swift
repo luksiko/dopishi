@@ -1248,6 +1248,11 @@ final class AutoCorrectionService {
         }
         let focus = accessibilityService.focusedFieldRole()
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard AppOverridesManager.shared.completionMode(for: frontmostBundleID) != .disabled else {
+            fieldAnchorController.hide()
+            stopFieldAnchorPoll()
+            return
+        }
         guard AutoCorrectionGate.allowsCompletions(
             role: focus?.role,
             subrole: focus?.subrole,
@@ -1298,7 +1303,8 @@ final class AutoCorrectionService {
         let captureRevision = physicalInputRevision
         let activeLayoutID = KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US"
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        guard settingsManager.isAIEnabled(for: frontmostBundleID) else { return }
+        guard settingsManager.isAIEnabled(for: frontmostBundleID),
+              AppOverridesManager.shared.isAllowed(for: frontmostBundleID, isManualTrigger: force) else { return }
         let instructions = settingsManager.aiInstructions(for: frontmostBundleID)
         let maxWords = settingsManager.aiMaxContinuationWords
 
@@ -1317,7 +1323,8 @@ final class AutoCorrectionService {
             guard AutoCorrectionGate.allowsCompletions(role: focus?.role, subrole: focus?.subrole,
                 bundleID: currentBundleID,
                 excludedBundleIDs: Set(self.settingsManager.excludedAppBundleIDs)) else { return }
-            guard self.settingsManager.isAIEnabled(for: currentBundleID) else { return }
+            guard self.settingsManager.isAIEnabled(for: currentBundleID),
+                  AppOverridesManager.shared.isAllowed(for: currentBundleID, isManualTrigger: force) else { return }
 
             let requestId = UUID()
             self.currentAIRequestId = requestId
@@ -1678,7 +1685,9 @@ final class AutoCorrectionService {
     }
 
     func updateAutocompletion(force: Bool = false) {
-        guard completionsEnabledForCurrentApp else {
+        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard completionsEnabledForCurrentApp,
+              AppOverridesManager.shared.isAllowed(for: frontmostBundleID, isManualTrigger: force) else {
             dismissSuggestionsOnly()
             return
         }

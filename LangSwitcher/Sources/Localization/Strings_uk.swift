@@ -81,7 +81,18 @@ enum Strings_uk {
         "apps.remove":                   "Вилучити програму",
         "apps.badge.layoutOff":          "Розкладка вимкнена",
         "apps.badge.aiOff":              "ШІ вимкнено",
+        "apps.badge.manualOnly":         "За хоткеєм",
         "apps.badge.customPrompt":       "Власний промпт",
+        "apps.completionMode":           "Режим підказок ШІ:",
+        "apps.mode.automatic":           "Автоматично",
+        "apps.mode.automatic.desc":      "Підказки з'являються автоматично під час набору",
+        "apps.mode.manualOnly":          "Тільки за хоткеєм",
+        "apps.mode.manualOnly.desc":     "Підказка викликається виключно гарячою клавішею",
+        "apps.mode.disabled":            "Вимкнено",
+        "apps.mode.disabled.desc":       "Повне вимкнення підказок та фонового ШІ",
+        "apps.presets.title":            "Шаблони",
+        "apps.presets.ide":              "IDE (за хоткеєм)",
+        "apps.presets.games":            "Ігри / Повний екран (вимкнено)",
 
         // ── Статус дозволів ─────────────────────────────────────────
         "permissions.active":            "Доступність активна",

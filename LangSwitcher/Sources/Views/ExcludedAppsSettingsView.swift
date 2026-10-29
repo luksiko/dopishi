@@ -58,6 +58,34 @@ struct AppsSettingsTab: View {
                     Text(l10n.t("apps.title"))
                     Spacer()
 
+                    // Presets Menu
+                    Menu {
+                        Section(l10n.t("apps.presets.title")) {
+                            ForEach(Array(AppOverridesManager.knownDevelopmentApps.keys.sorted()), id: \.self) { devBid in
+                                if !configuredBundleIDs.contains(devBid) {
+                                    Button {
+                                        addApp(bundleID: devBid, name: AppOverridesManager.knownDevelopmentApps[devBid] ?? devBid, mode: .manualOnly)
+                                    } label: {
+                                        Text("\(AppOverridesManager.knownDevelopmentApps[devBid] ?? devBid) (\(l10n.t("apps.badge.manualOnly")))")
+                                    }
+                                }
+                            }
+                            ForEach(Array(AppOverridesManager.knownGamingAndVirtualizationApps.keys.sorted()), id: \.self) { gameBid in
+                                if !configuredBundleIDs.contains(gameBid) {
+                                    Button {
+                                        addApp(bundleID: gameBid, name: AppOverridesManager.knownGamingAndVirtualizationApps[gameBid] ?? gameBid, mode: .disabled)
+                                    } label: {
+                                        Text("\(AppOverridesManager.knownGamingAndVirtualizationApps[gameBid] ?? gameBid) (\(l10n.t("apps.badge.aiOff")))")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(l10n.t("apps.presets.title"), systemImage: "wand.and.stars")
+                    }
+                    .menuStyle(.borderedButton)
+                    .controlSize(.small)
+
                     // Add from Running Apps Menu
                     Menu {
                         ForEach(runningApps, id: \.processIdentifier) { app in
@@ -106,7 +134,9 @@ struct AppsSettingsTab: View {
         let isExpanded = expandedBundleID == bundleID
         let isLayoutExcluded = settingsManager.isAppExcluded(bundleID: bundleID)
         let aiSetting = settingsManager.perAppAISettings[bundleID]
-        let isAIOff = aiSetting != nil && !aiSetting!.isAIEnabled
+        let currentMode = aiSetting?.completionMode ?? .automatic
+        let isAIOff = currentMode == .disabled
+        let isManualOnly = currentMode == .manualOnly
         let hasCustomPrompt = aiSetting != nil && (!aiSetting!.customInstructions.isEmpty || !aiSetting!.customVocabulary.isEmpty)
 
         VStack(alignment: .leading, spacing: 8) {
@@ -159,6 +189,14 @@ struct AppsSettingsTab: View {
                             .background(Color.red.opacity(0.18))
                             .foregroundStyle(.red)
                             .clipShape(Capsule())
+                    } else if isManualOnly {
+                        Text(l10n.t("apps.badge.manualOnly"))
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.18))
+                            .foregroundStyle(.purple)
+                            .clipShape(Capsule())
                     }
 
                     if hasCustomPrompt {
@@ -200,21 +238,34 @@ struct AppsSettingsTab: View {
                         )
                     )
 
-                    // AI completion toggle
-                    Toggle(
-                        l10n.t("apps.enableAI"),
-                        isOn: Binding(
-                            get: { settingsManager.perAppAISettings[bundleID]?.isAIEnabled ?? true },
-                            set: { enabled in
+                    // AI completion mode selector
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(l10n.t("apps.completionMode"))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+
+                        Picker("", selection: Binding(
+                            get: { settingsManager.perAppAISettings[bundleID]?.completionMode ?? .automatic },
+                            set: { newMode in
                                 var setting = settingsManager.perAppAISettings[bundleID] ?? AppAISettings(bundleID: bundleID, appName: meta.name)
-                                setting.isAIEnabled = enabled
+                                setting.completionMode = newMode
                                 settingsManager.setAppAISettings(setting)
                             }
-                        )
-                    )
+                        )) {
+                            Text(l10n.t("apps.mode.automatic")).tag(AppCompletionMode.automatic)
+                            Text(l10n.t("apps.mode.manualOnly")).tag(AppCompletionMode.manualOnly)
+                            Text(l10n.t("apps.mode.disabled")).tag(AppCompletionMode.disabled)
+                        }
+                        .pickerStyle(.segmented)
 
-                    // AI Details if enabled
-                    if settingsManager.perAppAISettings[bundleID]?.isAIEnabled ?? true {
+                        Text(modeDescription(settingsManager.perAppAISettings[bundleID]?.completionMode ?? .automatic))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // AI Details if not disabled
+                    if (settingsManager.perAppAISettings[bundleID]?.completionMode ?? .automatic) != .disabled {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(l10n.t("apps.customInstructions"))
@@ -288,8 +339,19 @@ struct AppsSettingsTab: View {
 
     // MARK: - Actions
 
-    private func addApp(bundleID: String, name: String) {
-        let setting = AppAISettings(bundleID: bundleID, appName: name)
+    private func modeDescription(_ mode: AppCompletionMode) -> String {
+        switch mode {
+        case .automatic:
+            return l10n.t("apps.mode.automatic.desc")
+        case .manualOnly:
+            return l10n.t("apps.mode.manualOnly.desc")
+        case .disabled:
+            return l10n.t("apps.mode.disabled.desc")
+        }
+    }
+
+    private func addApp(bundleID: String, name: String, mode: AppCompletionMode = .automatic) {
+        let setting = AppAISettings(bundleID: bundleID, appName: name, completionMode: mode)
         settingsManager.setAppAISettings(setting)
         expandedBundleID = bundleID
     }

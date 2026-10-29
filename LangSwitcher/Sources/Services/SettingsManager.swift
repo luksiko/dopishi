@@ -746,10 +746,11 @@ final class SettingsManager: ObservableObject {
     
     func isAIEnabled(for bundleID: String?) -> Bool {
         guard isAIAllowed else { return false }
-        if let bid = bundleID, let appSetting = perAppAISettings[bid], !appSetting.isAIEnabled {
-            return false
-        }
-        return true
+        return AppOverridesManager.shared.completionMode(for: bundleID) != .disabled
+    }
+    
+    func completionMode(for bundleID: String?) -> AppCompletionMode {
+        AppOverridesManager.shared.completionMode(for: bundleID)
     }
     
     func setAppAISettings(_ settings: AppAISettings) {

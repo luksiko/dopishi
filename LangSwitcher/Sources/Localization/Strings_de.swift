@@ -82,7 +82,18 @@ enum Strings_de {
         "apps.remove": "Regeln entfernen",
         "apps.badge.layoutOff": "Belegung aus",
         "apps.badge.aiOff": "KI aus",
+        "apps.badge.manualOnly": "Nur Kurzbefehl",
         "apps.badge.customPrompt": "Eigener Prompt",
+        "apps.completionMode": "KI-Vervollständigungsmodus:",
+        "apps.mode.automatic": "Automatisch",
+        "apps.mode.automatic.desc": "Vorschläge erscheinen automatisch beim Tippen",
+        "apps.mode.manualOnly": "Nur Kurzbefehl",
+        "apps.mode.manualOnly.desc": "Wird nur durch Drücken des Tastaturkurzbefehls ausgelöst",
+        "apps.mode.disabled": "Deaktiviert",
+        "apps.mode.disabled.desc": "Keine Vorschläge oder Hintergrund-KI-Inferenz",
+        "apps.presets.title": "Vorlagen",
+        "apps.presets.ide": "Entwicklungs-IDE (Nur Kurzbefehl)",
+        "apps.presets.games": "Spiel / Vollbild (Deaktiviert)",
 
         // ── Permissions Integration ────────────────────────────────
         "permissions.active": "Bedienungshilfen aktiv",

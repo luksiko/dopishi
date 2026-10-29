@@ -82,7 +82,18 @@ enum Strings_en {
         "apps.remove":                   "Remove Rules",
         "apps.badge.layoutOff":          "Layout Off",
         "apps.badge.aiOff":              "AI Off",
+        "apps.badge.manualOnly":         "Shortcut Only",
         "apps.badge.customPrompt":       "Custom Prompt",
+        "apps.completionMode":           "AI completion mode:",
+        "apps.mode.automatic":           "Automatic",
+        "apps.mode.automatic.desc":      "Suggestions appear automatically while typing",
+        "apps.mode.manualOnly":          "Shortcut only",
+        "apps.mode.manualOnly.desc":     "Only triggered when pressing the completion shortcut",
+        "apps.mode.disabled":            "Disabled",
+        "apps.mode.disabled.desc":       "No suggestions or background AI inference",
+        "apps.presets.title":            "Presets",
+        "apps.presets.ide":              "IDE (Shortcut only)",
+        "apps.presets.games":            "Game / Fullscreen (Disabled)",
 
         // ── Permissions Integration ────────────────────────────────
         "permissions.active":            "Accessibility Active",

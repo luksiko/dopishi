@@ -80,7 +80,18 @@ enum Strings_fr {
         "apps.remove":                           "Supprimer les règles",
         "apps.badge.layoutOff":                  "Disposition désactivée",
         "apps.badge.aiOff":                      "IA désactivée",
+        "apps.badge.manualOnly":                 "Raccourci uniquement",
         "apps.badge.customPrompt":               "Prompt personnalisé",
+        "apps.completionMode":                   "Mode de complétion IA :",
+        "apps.mode.automatic":                   "Automatique",
+        "apps.mode.automatic.desc":              "Les suggestions apparaissent pendant la saisie",
+        "apps.mode.manualOnly":                  "Raccourci uniquement",
+        "apps.mode.manualOnly.desc":             "Déclenché uniquement en appuyant sur le raccourci",
+        "apps.mode.disabled":                    "Désactivé",
+        "apps.mode.disabled.desc":               "Aucune suggestion ni inférence en arrière-plan",
+        "apps.presets.title":                    "Modèles",
+        "apps.presets.ide":                      "IDE de développement (Raccourci seul)",
+        "apps.presets.games":                    "Jeu / Plein écran (Désactivé)",
 
         // ── Permissions Integration ────────────────────────────────
         "permissions.active":                    "Accessibilité active",

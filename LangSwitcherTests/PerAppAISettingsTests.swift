@@ -21,7 +21,51 @@ final class PerAppAISettingsTests: XCTestCase {
         XCTAssertEqual(decoded.customInstructions, "Use Swift terms and stay concise")
         XCTAssertEqual(decoded.customVocabulary, ["struct", "enum", "MainActor"])
         XCTAssertTrue(decoded.isAIEnabled)
+        XCTAssertEqual(decoded.completionMode, .automatic)
         XCTAssertEqual(original, decoded)
+    }
+
+    func testAppAISettingsManualOnlyEncodingAndDecoding() throws {
+        let original = AppAISettings(
+            bundleID: "com.microsoft.VSCode",
+            appName: "VS Code",
+            completionMode: .manualOnly
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AppAISettings.self, from: data)
+
+        XCTAssertEqual(decoded.bundleID, "com.microsoft.VSCode")
+        XCTAssertEqual(decoded.completionMode, .manualOnly)
+        XCTAssertTrue(decoded.isAIEnabled) // isAIEnabled is true unless explicitly disabled
+        XCTAssertEqual(original, decoded)
+    }
+
+    func testLegacyJsonDecodingSupportsIsAIEnabledField() throws {
+        let legacyJson = """
+        {
+            "bundleID": "com.legacy.app",
+            "appName": "LegacyApp",
+            "customInstructions": "",
+            "customVocabulary": [],
+            "isAIEnabled": false
+        }
+        """
+        let data = legacyJson.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppAISettings.self, from: data)
+        XCTAssertEqual(decoded.completionMode, .disabled)
+        XCTAssertFalse(decoded.isAIEnabled)
+
+        let legacyEnabledJson = """
+        {
+            "bundleID": "com.legacy.enabled",
+            "appName": "LegacyEnabled",
+            "isAIEnabled": true
+        }
+        """
+        let decodedEnabled = try JSONDecoder().decode(AppAISettings.self, from: legacyEnabledJson.data(using: .utf8)!)
+        XCTAssertEqual(decodedEnabled.completionMode, .automatic)
+        XCTAssertTrue(decodedEnabled.isAIEnabled)
     }
     
     func testSettingsManagerCombinesGlobalAndAppInstructions() {

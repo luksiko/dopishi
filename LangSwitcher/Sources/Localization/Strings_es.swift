@@ -83,7 +83,18 @@ enum Strings_es {
         "apps.remove":                    "Eliminar reglas",
         "apps.badge.layoutOff":           "Disposición desc.",
         "apps.badge.aiOff":               "IA desc.",
+        "apps.badge.manualOnly":          "Solo atajo",
         "apps.badge.customPrompt":        "Aviso personalizado",
+        "apps.completionMode":            "Modo de sugerencias de IA:",
+        "apps.mode.automatic":            "Automático",
+        "apps.mode.automatic.desc":       "Las sugerencias aparecen automáticamente al escribir",
+        "apps.mode.manualOnly":           "Solo con atajo",
+        "apps.mode.manualOnly.desc":      "Se activa solo al presionar el atajo de teclado",
+        "apps.mode.disabled":             "Desactivado",
+        "apps.mode.disabled.desc":        "Sin sugerencias ni inferencia de IA en segundo plano",
+        "apps.presets.title":             "Plantillas",
+        "apps.presets.ide":               "IDE de desarrollo (Solo atajo)",
+        "apps.presets.games":             "Juego / Pantalla completa (Desactivado)",
 
 
         // ── Permissions Integration ────────────────────────────────
