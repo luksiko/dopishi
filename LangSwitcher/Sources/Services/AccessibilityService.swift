@@ -23,6 +23,7 @@ struct CaretContext: Equatable {
 // Handles getting and replacing selected text via macOS Accessibility API & pasteboard
 
 final class AccessibilityService {
+    let extractionCache = ExtractionCacheManager()
     private let electronPIDLock = NSLock()
     private var preparedElectronPIDs = Set<pid_t>()
 
@@ -35,6 +36,14 @@ final class AccessibilityService {
     private var pendingSelection: PasteConfirmation?
     private var workspaceObserver: NSObjectProtocol?
 
+    func recordKeystroke(_ characters: String, time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        extractionCache.advance(characters: characters, time: time)
+    }
+
+    func invalidateExtractionCache(reason: CursorRetryPlan.InvalidationReason) {
+        extractionCache.invalidate(reason: reason)
+    }
+
     init() {
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -45,6 +54,7 @@ final class AccessibilityService {
                 ?? NSWorkspace.shared.frontmostApplication
             guard let app else { return }
             self?.prepareBrowserAccessibilityAsync(for: app)
+            self?.extractionCache.invalidate(reason: .focusChanged)
         }
         if let frontmost = NSWorkspace.shared.frontmostApplication {
             prepareBrowserAccessibilityAsync(for: frontmost)
@@ -859,14 +869,42 @@ final class AccessibilityService {
     }
 
     /// Captures the surrounding text before/after caret and identifies the focused field.
-    func captureCaretContext(maxSurroundingLength: Int = 200) -> CaretContext? {
+    /// When `preferCache` is true and valid typing prediction is cached, returns it with 0 AX IPC latency.
+    func captureCaretContext(maxSurroundingLength: Int = 200, preferCache: Bool = false) -> CaretContext? {
+        let uptime = ProcessInfo.processInfo.systemUptime
+        if preferCache, let cached = extractionCache.getCachedContext(currentTime: uptime), !cached.textBeforeCaret.isEmpty {
+            return cached
+        }
+
         guard let element = focusedTextElement(),
-              let app = NSWorkspace.shared.frontmostApplication else { return nil }
+              let app = NSWorkspace.shared.frontmostApplication else {
+            extractionCache.recordFailure()
+            return nil
+        }
 
         let bundleID = app.bundleIdentifier ?? "unknown"
         let pid = app.processIdentifier
         let elementHash = CFHash(element)
         let fieldID = "\(bundleID):\(pid):\(elementHash)"
+
+        // Terminal support: com.apple.Terminal (terminalLastPage) and xtermScreen (iTerm2, Ghostty, Alacritty, Warp)
+        if AutoCorrectionGate.isTerminalApp(bundleID: bundleID) {
+            let approach: TextExtractionApproach = (bundleID == "com.apple.Terminal") ? .terminalLastPage : .xtermScreen
+            if let (termCtx, parsed) = captureTerminalCaretContext(element: element, bundleID: bundleID, approach: approach, maxSurroundingLength: maxSurroundingLength) {
+                let bounds = resolveTerminalCaretBounds(element: element, bundleID: bundleID, approach: approach, promptText: termCtx.textBeforeCaret, parsedResult: parsed)
+                extractionCache.update(
+                    context: termCtx,
+                    bundleID: bundleID,
+                    elementHash: elementHash,
+                    approach: approach,
+                    caretRect: bounds?.caret,
+                    fieldRect: bounds?.fieldRect,
+                    estimatedCharWidth: 8.5,
+                    time: uptime
+                )
+                return termCtx
+            }
+        }
 
         var rangeRef: CFTypeRef?
         var selectedRange = CFRange(location: 0, length: 0)
@@ -887,9 +925,20 @@ final class AccessibilityService {
                 // Do not silently clamp a stale AX caret into a newer, shorter value.
                 guard selectedRange.location <= (fullText as NSString).length,
                       selectedRange.length <= (fullText as NSString).length - selectedRange.location else { return nil }
-                return Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
+                let ctx = Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
                                              selection: selectedRange, selectedText: selectedText,
                                              maxSurroundingLength: maxSurroundingLength)
+                extractionCache.update(
+                    context: ctx,
+                    bundleID: bundleID,
+                    elementHash: elementHash,
+                    approach: .standardAX,
+                    caretRect: nil,
+                    fieldRect: nil,
+                    estimatedCharWidth: 8.5,
+                    time: uptime
+                )
+                return ctx
             }
 
             // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
@@ -913,7 +962,7 @@ final class AccessibilityService {
                             ? (chunk as NSString).substring(with: NSRange(location: caretOffsetInChunk, length: selLengthInChunk))
                             : selectedText
 
-                        return CaretContext(
+                        let ctx = CaretContext(
                             fieldIdentifier: fieldID,
                             textBeforeCaret: textBefore,
                             textAfterCaret: textAfter,
@@ -921,11 +970,22 @@ final class AccessibilityService {
                             caretLocation: selectedRange.location,
                             fullTextLength: max(selectedRange.location + (chunk as NSString).length - caretOffsetInChunk, (chunk as NSString).length)
                         )
+                        extractionCache.update(
+                            context: ctx,
+                            bundleID: bundleID,
+                            elementHash: elementHash,
+                            approach: .standardAX,
+                            caretRect: nil,
+                            fieldRect: nil,
+                            estimatedCharWidth: 8.5,
+                            time: uptime
+                        )
+                        return ctx
                     }
                 }
             }
 
-            return CaretContext(
+            let ctx = CaretContext(
                 fieldIdentifier: fieldID,
                 textBeforeCaret: "",
                 textAfterCaret: "",
@@ -933,13 +993,35 @@ final class AccessibilityService {
                 caretLocation: selectedRange.location,
                 fullTextLength: 0
             )
+            extractionCache.update(
+                context: ctx,
+                bundleID: bundleID,
+                elementHash: elementHash,
+                approach: .standardAX,
+                caretRect: nil,
+                fieldRect: nil,
+                estimatedCharWidth: 8.5,
+                time: uptime
+            )
+            return ctx
         }
 
         // WebKit / Safari / Apple Mail / Google Docs AXTextMarker fallback
         if let markerContext = captureWebKitMarkerCaretContext(element: element, fieldIdentifier: fieldID, maxSurroundingLength: maxSurroundingLength) {
+            extractionCache.update(
+                context: markerContext,
+                bundleID: bundleID,
+                elementHash: elementHash,
+                approach: .webKitMarker,
+                caretRect: nil,
+                fieldRect: nil,
+                estimatedCharWidth: 8.5,
+                time: uptime
+            )
             return markerContext
         }
 
+        extractionCache.recordFailure()
         return nil
     }
 
@@ -971,8 +1053,41 @@ final class AccessibilityService {
 
     /// Retrieves both the measured caret insertion rect and the enclosing input field bounds
     /// converted to Cocoa screen coordinates (`primaryScreenMaxY - pt.y - sz.height`).
-    func caretAndFieldBounds() -> (caret: CGRect, fieldRect: CGRect?)? {
-        guard let element = focusedTextElement(), let primaryScreen = NSScreen.screens.first else { return nil }
+    func caretAndFieldBounds(preferCache: Bool = false) -> (caret: CGRect, fieldRect: CGRect?)? {
+        let uptime = ProcessInfo.processInfo.systemUptime
+        if preferCache, let cached = extractionCache.getCachedCaretBounds(currentTime: uptime) {
+            return cached
+        }
+
+        guard let element = focusedTextElement(), let primaryScreen = NSScreen.screens.first else {
+            extractionCache.recordFailure()
+            return nil
+        }
+        let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+
+        // Terminal cursor resolution fallback
+        if let frontmostID, AutoCorrectionGate.isTerminalApp(bundleID: frontmostID) {
+            let approach: TextExtractionApproach = (frontmostID == "com.apple.Terminal") ? .terminalLastPage : .xtermScreen
+            let promptText = extractionCache.currentRecord?.textBeforeCaret
+            if let bounds = resolveTerminalCaretBounds(element: element, bundleID: frontmostID, approach: approach, promptText: promptText) {
+                if var rec = extractionCache.currentRecord {
+                    rec.caretRect = bounds.caret
+                    rec.fieldRect = bounds.fieldRect
+                    extractionCache.update(
+                        context: rec.toCaretContext(),
+                        bundleID: frontmostID,
+                        elementHash: rec.elementHash,
+                        approach: approach,
+                        caretRect: bounds.caret,
+                        fieldRect: bounds.fieldRect,
+                        estimatedCharWidth: rec.estimatedCharWidth,
+                        time: uptime
+                    )
+                }
+                return bounds
+            }
+        }
+
         var selectedValue: CFTypeRef?
         var selectedRange: CFRange?
         if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString,
@@ -990,8 +1105,10 @@ final class AccessibilityService {
                 return self.parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String,
                                               parameter: value)
             }, markerBounds: { self.selectedMarkerCaretBounds(element) })
-        guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else { return nil }
-        let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else {
+            extractionCache.recordFailure()
+            return nil
+        }
         let adjustedCaret = Self.adjustCaretForApp(caret: caret, bundleID: frontmostID)
 
         var fieldRect: CGRect?
@@ -1012,13 +1129,212 @@ final class AccessibilityService {
             }
         }
 
+        if var rec = extractionCache.currentRecord, let frontmostID {
+            extractionCache.update(
+                context: rec.toCaretContext(),
+                bundleID: frontmostID,
+                elementHash: rec.elementHash,
+                approach: rec.approach,
+                caretRect: adjustedCaret,
+                fieldRect: fieldRect,
+                estimatedCharWidth: rec.estimatedCharWidth,
+                time: uptime
+            )
+        }
+
         return (caret: adjustedCaret, fieldRect: fieldRect)
     }
 
     /// Only return measured insertion bounds. Field bounds and mouse location
     /// are not cursor positions and must never anchor inline suggestions.
-    func caretScreenRect() -> CGRect? {
-        caretAndFieldBounds()?.caret
+    func caretScreenRect(preferCache: Bool = false) -> CGRect? {
+        caretAndFieldBounds(preferCache: preferCache)?.caret
+    }
+
+    // MARK: - Terminal Text & Caret Extraction
+    
+    /// Extracts the terminal screen text or command prompt from Apple Terminal or xterm-based emulators.
+    func captureTerminalCaretContext(
+        element: AXUIElement,
+        bundleID: String,
+        approach: TextExtractionApproach,
+        maxSurroundingLength: Int = 200
+    ) -> (context: CaretContext, parsed: TerminalPromptExtractor.TerminalExtractionResult)? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let pid = app.processIdentifier
+        let elementHash = CFHash(element)
+        let fieldID = "terminal:\(bundleID):\(pid):\(elementHash)"
+        
+        guard let screenText = extractTerminalScreenText(element: element) else { return nil }
+        let parsed = TerminalPromptExtractor.parseTerminalBuffer(screenText)
+        
+        let command = parsed.currentCommand ?? ""
+        let textBefore = String(command.suffix(maxSurroundingLength))
+        let context = CaretContext(
+            fieldIdentifier: fieldID,
+            textBeforeCaret: textBefore,
+            textAfterCaret: "",
+            selectedText: "",
+            caretLocation: textBefore.utf16.count,
+            fullTextLength: textBefore.utf16.count
+        )
+        return (context: context, parsed: parsed)
+    }
+    
+    /// Traverses terminal window and text view nodes to extract the visible terminal screen text.
+    func extractTerminalScreenText(element: AXUIElement) -> String? {
+        // 1. Direct value on element (e.g. Apple Terminal AXTextArea or iTerm2 view)
+        var valueRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success {
+            if let str = valueRef as? String, !str.isEmpty {
+                return str
+            } else if let attrStr = valueRef as? NSAttributedString, !attrStr.string.isEmpty {
+                return attrStr.string
+            }
+        }
+        
+        // 2. Visible character range parameterized string
+        var rangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXVisibleCharacterRangeAttribute as CFString, &rangeRef) == .success,
+           let rangeValue = rangeRef, CFGetTypeID(rangeValue) == AXValueGetTypeID() {
+            var cfRange = CFRange(location: 0, length: 0)
+            if AXValueGetValue(rangeValue as! AXValue, .cfRange, &cfRange), cfRange.length > 0 {
+                let boundedLength = min(cfRange.length, 4000)
+                var query = CFRange(location: cfRange.location, length: boundedLength)
+                if let val = AXValueCreate(.cfRange, &query) {
+                    var strRef: CFTypeRef?
+                    if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, val, &strRef) == .success {
+                        if let s = strRef as? String, !s.isEmpty { return s }
+                        if let attr = strRef as? NSAttributedString, !attr.string.isEmpty { return attr.string }
+                    }
+                }
+            }
+        }
+        
+        // 3. Inspect children of the element (e.g. AXScrollArea -> AXTextArea or AXGroup)
+        var childrenRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+           let children = childrenRef as? [AXUIElement] {
+            for child in children {
+                var childVal: CFTypeRef?
+                if AXUIElementCopyAttributeValue(child, kAXValueAttribute as CFString, &childVal) == .success {
+                    if let s = childVal as? String, !s.isEmpty { return s }
+                    if let attr = childVal as? NSAttributedString, !attr.string.isEmpty { return attr.string }
+                }
+            }
+        }
+        
+        // 4. Description attribute fallback (used by some xterm emulators)
+        var descRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef) == .success,
+           let str = descRef as? String, !str.isEmpty {
+            return str
+        }
+        
+        return nil
+    }
+
+    /// Resolves caret bounds and viewport rect for terminal emulators.
+    func resolveTerminalCaretBounds(
+        element: AXUIElement,
+        bundleID: String,
+        approach: TextExtractionApproach,
+        promptText: String?,
+        parsedResult: TerminalPromptExtractor.TerminalExtractionResult? = nil
+    ) -> (caret: CGRect, fieldRect: CGRect?)? {
+        guard let primaryScreen = NSScreen.screens.first else { return nil }
+        let primaryScreenMaxY = primaryScreen.frame.maxY
+        
+        // 1. Determine element frame
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        var pt = CGPoint.zero
+        var sz = CGSize.zero
+        
+        if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+           AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+           let p = positionValue, let s = sizeValue,
+           CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() {
+            _ = AXValueGetValue(p as! AXValue, .cgPoint, &pt)
+            _ = AXValueGetValue(s as! AXValue, .cgSize, &sz)
+        }
+        
+        if sz.width <= 0 || sz.height <= 0 {
+            // Try window level if element size is unpopulated
+            var windowRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &windowRef) == .success,
+               let win = windowRef, CFGetTypeID(win) == AXUIElementGetTypeID() {
+                var wPos: CFTypeRef?
+                var wSize: CFTypeRef?
+                if AXUIElementCopyAttributeValue(win as! AXUIElement, kAXPositionAttribute as CFString, &wPos) == .success,
+                   AXUIElementCopyAttributeValue(win as! AXUIElement, kAXSizeAttribute as CFString, &wSize) == .success,
+                   let wp = wPos, let ws = wSize {
+                    _ = AXValueGetValue(wp as! AXValue, .cgPoint, &pt)
+                    _ = AXValueGetValue(ws as! AXValue, .cgSize, &sz)
+                }
+            }
+        }
+        
+        guard sz.width > 20, sz.height > 20 else { return nil }
+        let fieldRect = CGRect(x: pt.x, y: primaryScreenMaxY - pt.y - sz.height, width: sz.width, height: sz.height)
+        
+        // 2. Try native parameterized range bounds if terminal supports it
+        var query = CFRange(location: (promptText?.utf16.count ?? 0), length: 0)
+        if let queryVal = AXValueCreate(.cfRange, &query),
+           let rect = parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String, parameter: queryVal),
+           fieldRect.contains(CGPoint(x: rect.midX, y: rect.midY)) {
+            return (caret: rect, fieldRect: fieldRect)
+        }
+        
+        // 3. Monospace font cell prediction
+        let font: NSFont = {
+            if Thread.isMainThread {
+                return MainActor.assumeIsolated {
+                    EditorFontCustomizer.shared.font(for: bundleID, caretHeight: nil)
+                        ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+                }
+            } else {
+                return NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+            }
+        }()
+        
+        let cellWidth: CGFloat = ("M" as NSString).size(withAttributes: [.font: font]).width
+        let cellHeight: CGFloat = max(14, font.ascender - font.descender + font.leading)
+        
+        // Padding defaults: Apple Terminal ~10pt left / 6pt bottom, iTerm2 ~8pt left / 5pt bottom
+        let paddingLeft: CGFloat = (bundleID == "com.apple.Terminal") ? 10.0 : 8.0
+        let paddingBottom: CGFloat = (bundleID == "com.apple.Terminal") ? 6.0 : 5.0
+        let paddingTop: CGFloat = (bundleID == "com.apple.Terminal") ? 6.0 : 4.0
+        
+        let parsed = parsedResult ?? {
+            if let screenText = extractTerminalScreenText(element: element) {
+                return TerminalPromptExtractor.parseTerminalBuffer(screenText)
+            }
+            return nil
+        }()
+        
+        let column: Int
+        if let parsed, parsed.cursorColumn > 0 {
+            column = parsed.cursorColumn
+        } else {
+            let commandLen = promptText?.count ?? 0
+            let promptPrefixLen = 2 // typical prompt marker "$ " or "❯ "
+            column = promptPrefixLen + commandLen
+        }
+        
+        let caretX = min(fieldRect.minX + paddingLeft + CGFloat(column) * cellWidth, fieldRect.maxX - 4)
+        
+        let caretY: CGFloat
+        if let parsed, let lineIdx = parsed.promptLineIndex {
+            let computedY = fieldRect.maxY - paddingTop - CGFloat(lineIdx + 1) * cellHeight
+            caretY = max(fieldRect.minY + paddingBottom, min(computedY, fieldRect.maxY - paddingTop - cellHeight))
+        } else {
+            caretY = fieldRect.minY + paddingBottom
+        }
+        
+        let caretRect = CGRect(x: caretX, y: caretY, width: 2, height: cellHeight)
+        
+        return (caret: caretRect, fieldRect: fieldRect)
     }
 
     /// App-specific coordinate corrections for applications with uncompensated container insets.
@@ -1075,7 +1391,7 @@ final class AccessibilityService {
         let root = value as! AXUIElement
         AXUIElementSetMessagingTimeout(root, 0.05)
         let deadline = ProcessInfo.processInfo.systemUptime + 0.04
-        return Self.resolveFocusedTextNode(root: root, attributes: { element in
+        let resolved = Self.resolveFocusedTextNode(root: root, attributes: { element in
             AXUIElementSetMessagingTimeout(element, 0.05)
             var role: CFTypeRef?
             var subrole: CFTypeRef?
@@ -1096,6 +1412,12 @@ final class AccessibilityService {
             AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
             return children as? [AXUIElement] ?? []
         }, shouldContinue: { ProcessInfo.processInfo.systemUptime < deadline })
+
+        if resolved == nil, let app = NSWorkspace.shared.frontmostApplication,
+           AutoCorrectionGate.isTerminalApp(bundleID: app.bundleIdentifier) {
+            return root
+        }
+        return resolved
     }
 
     /// Follow confirmed focus, including nested web editors, never a merely
@@ -1444,6 +1766,9 @@ final class AccessibilityService {
             return false
         }
         let receipt = PasteConfirmation(applied: {
+            if AutoCorrectionGate.isTerminalApp(bundleID: appBundleID) {
+                return true
+            }
             if let origCaret = originalCaret {
                 return Self.continuationWasApplied(original: original, observed: value(),
                     caretBefore: origCaret, caretAfter: caret(), inserted: text)
@@ -1491,6 +1816,15 @@ final class AccessibilityService {
         pendingSelection?.cancel()
         pendingPaste?.check(final: true)
         guard isCurrentReplacementTarget(target) else { completion(false); return }
+        let appBundleID = NSRunningApplication(processIdentifier: target.processID)?.bundleIdentifier
+            ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        if let appBundleID, AutoCorrectionGate.isTerminalApp(bundleID: appBundleID) {
+            replaceWithBackspaces(count: expected.utf16.count, replacement: replacement) { applied in
+                completion(applied)
+                onApplied?(applied)
+            }
+            return
+        }
         let element = target.element
         var value: CFTypeRef?
         var selectionValue: CFTypeRef?

@@ -17,6 +17,25 @@ struct TerminalPromptExtractor {
         let currentCommand: String?
         let recentCommands: [String]
         let cleanedLines: [String]
+        let promptLineIndex: Int?
+        let totalLines: Int
+        let cursorColumn: Int
+
+        init(
+            currentCommand: String?,
+            recentCommands: [String],
+            cleanedLines: [String],
+            promptLineIndex: Int? = nil,
+            totalLines: Int = 0,
+            cursorColumn: Int = 0
+        ) {
+            self.currentCommand = currentCommand
+            self.recentCommands = recentCommands
+            self.cleanedLines = cleanedLines
+            self.promptLineIndex = promptLineIndex
+            self.totalLines = totalLines
+            self.cursorColumn = cursorColumn
+        }
     }
     
     // Common prompt markers
@@ -107,15 +126,28 @@ struct TerminalPromptExtractor {
             }
         }
         
+        var cursorColumn: Int = 0
+        if let idx = bottomPromptIndex {
+            let promptLine = slice(line: rawLines[idx], range: paneRange)
+            cursorColumn = promptLine.trimmingCharacters(in: .whitespacesAndNewlines).count
+        }
+
         // Fallback: If no prompt marker was detected, but the last line is a single non-empty command
         if currentCommand == nil, let last = cleanedLines.last, last.count <= 120 {
             currentCommand = last
+            if bottomPromptIndex == nil {
+                bottomPromptIndex = rawLines.indices.last
+                cursorColumn = last.count
+            }
         }
         
         return TerminalExtractionResult(
             currentCommand: currentCommand,
             recentCommands: recentCommands,
-            cleanedLines: cleanedLines
+            cleanedLines: cleanedLines,
+            promptLineIndex: bottomPromptIndex,
+            totalLines: rawLines.count,
+            cursorColumn: cursorColumn
         )
     }
     

@@ -93,6 +93,9 @@
 		E10000010000000000000145 /* Strings_fr.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000145 /* Strings_fr.swift */; };
 		E10000010000000000000146 /* Strings_es.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000146 /* Strings_es.swift */; };
 		E10000010000000000000147 /* LocalizationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000147 /* LocalizationManagerTests.swift */; };
+		E1000001000000000000006B /* ExtractionCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000006B /* ExtractionCache.swift */; };
+		E10000010000000000000148 /* ExtractionCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000148 /* ExtractionCacheTests.swift */; };
+		E10000010000000000000149 /* TerminalExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000149 /* TerminalExtractionTests.swift */; };
 		E10000010000000000000059 /* CompletionStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000059 /* CompletionStatsTracker.swift */; };
 		E1000001000000000000005A /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005A /* KeyboardView.swift */; };
 		E1000001000000000000005B /* CompletionDemoTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000002000000000000005B /* CompletionDemoTextField.swift */; };
@@ -274,6 +277,9 @@
 		E10000020000000000000147 /* LocalizationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000130 /* BatteryPowerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPowerManagerTests.swift; sourceTree = "<group>"; };
 		E10000020000000000000131 /* CompletionStatsTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionStatsTrackerTests.swift; sourceTree = "<group>"; };
+		E1000002000000000000006B /* ExtractionCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractionCache.swift; sourceTree = "<group>"; };
+		E10000020000000000000148 /* ExtractionCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractionCacheTests.swift; sourceTree = "<group>"; };
+		E10000020000000000000149 /* TerminalExtractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalExtractionTests.swift; sourceTree = "<group>"; };
 		E10000030000000000000001 /* Dopishi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dopishi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E10000030000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E10000030000000000000003 /* LangSwitcher.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LangSwitcher.entitlements; sourceTree = "<group>"; };
@@ -421,6 +427,7 @@
 				E1000002000000000000006A /* TypoCorrectionEngine.swift */,
 				E10000020000000000000059 /* CompletionStatsTracker.swift */,
 				E10000020000000000000140 /* DictionaryDownloadManager.swift */,
+				E1000002000000000000006B /* ExtractionCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -513,6 +520,8 @@
 				E10000020000000000000131 /* CompletionStatsTrackerTests.swift */,
 				E10000020000000000000141 /* DictionaryDownloadManagerTests.swift */,
 				E10000020000000000000147 /* LocalizationManagerTests.swift */,
+				E10000020000000000000148 /* ExtractionCacheTests.swift */,
+				E10000020000000000000149 /* TerminalExtractionTests.swift */,
 			);
 			path = LangSwitcherTests;
 			sourceTree = "<group>";
@@ -713,6 +722,7 @@
 				E10000010000000000000144 /* Strings_de.swift in Sources */,
 				E10000010000000000000145 /* Strings_fr.swift in Sources */,
 				E10000010000000000000146 /* Strings_es.swift in Sources */,
+				E1000001000000000000006B /* ExtractionCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -759,6 +769,8 @@
 				E10000010000000000000131 /* CompletionStatsTrackerTests.swift in Sources */,
 				E10000010000000000000141 /* DictionaryDownloadManagerTests.swift in Sources */,
 				E10000010000000000000147 /* LocalizationManagerTests.swift in Sources */,
+				E10000010000000000000148 /* ExtractionCacheTests.swift in Sources */,
+				E10000010000000000000149 /* TerminalExtractionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -374,6 +374,7 @@ final class AutoCorrectionService {
         }
         accessibilityService.confirmPendingPasteBeforeInput()
         physicalInputRevision &+= 1
+        accessibilityService.invalidateExtractionCache(reason: .mouseClick)
         if overlayController.isVisible && overlayController.containsPoint(NSEvent.mouseLocation) {
             return
         }
@@ -948,6 +949,7 @@ final class AutoCorrectionService {
 
         // Ignore events with Command or Control modifier (⌘C, ⌘V, ⌃Space layout switch, etc.)
         if flags.contains(.maskCommand) || flags.contains(.maskControl) {
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: keyCode))
             wordBuffer = ""
             overlayController.hide()
             ghostTextController.hide()
@@ -987,6 +989,7 @@ final class AutoCorrectionService {
         // Handle special keys
         switch keyCode {
         case 0x33: // Backspace
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: 0x33))
             if flags.contains(.maskAlternate) {
                 wordBuffer = ""
                 recentTextBuffer = ""
@@ -1000,6 +1003,7 @@ final class AutoCorrectionService {
             return
 
         case 0x7B, 0x7C, 0x7D, 0x7E: // Arrow keys (left, right, down, up)
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: keyCode))
             wordBuffer = ""
             recentTextBuffer = ""
             previousWord = nil
@@ -1008,6 +1012,7 @@ final class AutoCorrectionService {
             return
 
         case 0x35: // Escape
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: 0x35))
             wordBuffer = ""
             recentTextBuffer = ""
             previousWord = nil
@@ -1020,6 +1025,7 @@ final class AutoCorrectionService {
             return
 
         case 0x30: // Tab
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: 0x30))
             wordBuffer = ""
             recentTextBuffer = ""
             dismissSuggestionsOnly()
@@ -1027,6 +1033,7 @@ final class AutoCorrectionService {
             return
 
         case 0x24, 0x4C: // Return/Enter or Keypad Enter
+            accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: keyCode))
             recordHistorySnippetIfEligible()
             if !wordBuffer.isEmpty {
                 previousWord = wordBuffer.lowercased()
@@ -1041,7 +1048,7 @@ final class AutoCorrectionService {
         case 0x31: // Space
             dismissSuggestionsOnly()
             if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionEmojiShortcodes {
-                let context = (accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer) + " "
+                let context = (accessibilityService.captureCaretContext(preferCache: true)?.textBeforeCaret ?? recentTextBuffer) + " "
                 if let emojiMatch = EmojiShortcodeEngine.findSpaceReplacement(in: context) {
                     performCheckedReplacement(expected: emojiMatch.expected, replacement: emojiMatch.replacement) { [weak self] _ in
                         guard let self else { return }
@@ -1075,6 +1082,7 @@ final class AutoCorrectionService {
         // Get the typed character
         guard let chars = characters, !chars.isEmpty else { return }
 
+        accessibilityService.recordKeystroke(chars, time: lastPhysicalKeyTime)
         let char = chars.first!
 
         // If an active ghost completion is visible, check if typing this character advances it
@@ -1087,7 +1095,7 @@ final class AutoCorrectionService {
 
         // Check for emoji shortcode closed with colon (e.g. ":fire:" or ":огонь:" -> 🔥)
         if char == ":" && settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionEmojiShortcodes {
-            let context = (accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer) + ":"
+            let context = (accessibilityService.captureCaretContext(preferCache: true)?.textBeforeCaret ?? recentTextBuffer) + ":"
             if let emojiMatch = EmojiShortcodeEngine.findColonReplacement(in: context) {
                 performCheckedReplacement(expected: emojiMatch.expected, replacement: emojiMatch.replacement) { [weak self] _ in
                     guard let self else { return }
@@ -1103,7 +1111,7 @@ final class AutoCorrectionService {
 
         // Check for typographic smart dashes & ellipsis
         if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionSmartDashesAndEllipsis {
-            let context = accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer
+            let context = accessibilityService.captureCaretContext(preferCache: true)?.textBeforeCaret ?? recentTextBuffer
             if let typo = SmartPunctuationEngine.smartDashesAndEllipsis(char: char, precedingText: context) {
                 performCheckedReplacement(expected: typo.expected, replacement: typo.replacement) { [weak self] _ in
                     guard let self else { return }
@@ -1118,7 +1126,7 @@ final class AutoCorrectionService {
 
         // Check for accidental space before punctuation (e.g. "слово ," -> "слово,")
         if settingsManager.autoCorrectionEnabled && settingsManager.autoCorrectionRemoveSpaceBeforePunctuation {
-            let context = accessibilityService.captureCaretContext()?.textBeforeCaret ?? recentTextBuffer
+            let context = accessibilityService.captureCaretContext(preferCache: true)?.textBeforeCaret ?? recentTextBuffer
             if let fix = SmartPunctuationEngine.fixSpaceBeforePunctuation(char: char, precedingText: context) {
                 performCheckedReplacement(expected: fix.expected, replacement: fix.replacement) { [weak self] _ in
                     guard let self else { return }
@@ -1240,7 +1248,7 @@ final class AutoCorrectionService {
         }
         let focus = accessibilityService.focusedFieldRole()
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        guard AutoCorrectionGate.allowsAutoCorrection(
+        guard AutoCorrectionGate.allowsCompletions(
             role: focus?.role,
             subrole: focus?.subrole,
             bundleID: frontmostBundleID,
@@ -1264,7 +1272,7 @@ final class AutoCorrectionService {
         guard !NSApp.isActive else { return }
         let focus = accessibilityService.focusedFieldRole()
         let currentBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
-        guard AutoCorrectionGate.allowsAutoCorrection(
+        guard AutoCorrectionGate.allowsCompletions(
             role: focus?.role,
             subrole: focus?.subrole,
             bundleID: currentBundleID,
@@ -1306,7 +1314,7 @@ final class AutoCorrectionService {
                   caretContext.hasUsablePredictionContext else { return }
             let focus = self.accessibilityService.focusedFieldRole()
             let currentBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            guard AutoCorrectionGate.allowsAutoCorrection(role: focus?.role, subrole: focus?.subrole,
+            guard AutoCorrectionGate.allowsCompletions(role: focus?.role, subrole: focus?.subrole,
                 bundleID: currentBundleID,
                 excludedBundleIDs: Set(self.settingsManager.excludedAppBundleIDs)) else { return }
             guard self.settingsManager.isAIEnabled(for: currentBundleID) else { return }
@@ -1520,7 +1528,7 @@ final class AutoCorrectionService {
         // Check focus & gate if focused element is present
         if let role = accessibilityService.focusedFieldRole()?.role {
             let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            guard AutoCorrectionGate.allowsAutoCorrection(
+            guard AutoCorrectionGate.allowsCompletions(
                 role: role,
                 subrole: accessibilityService.focusedFieldRole()?.subrole,
                 bundleID: frontmostBundleID,
@@ -1531,7 +1539,7 @@ final class AutoCorrectionService {
         // Determine whether the caret currently has preceding whitespace.
         // If typing directly against a word boundary (e.g. "Как|"), the suggestion
         // must include a leading space so it does not glue to the caret or word.
-        let ctx = self.accessibilityService.captureCaretContext(maxSurroundingLength: 256) ?? self.lastCaretContext
+        let ctx = self.accessibilityService.captureCaretContext(maxSurroundingLength: 256, preferCache: true) ?? self.lastCaretContext
         let textBefore = ctx?.textBeforeCaret ?? ""
         let hasPrecedingSpace = textBefore.isEmpty || textBefore.last?.isWhitespace == true
 
@@ -1608,7 +1616,7 @@ final class AutoCorrectionService {
 
         let effectiveFieldID = fieldIdentifier ?? accessibilityService.focusedFieldIdentifier() ?? ""
         let target = accessibilityService.captureReplacementTarget()
-        let bounds = accessibilityService.caretAndFieldBounds()
+        let bounds = accessibilityService.caretAndFieldBounds(preferCache: true)
         let liveCaret = bounds?.caret ?? caretRect ?? .zero
 
         let state = ActiveGhostState(
@@ -1625,9 +1633,9 @@ final class AutoCorrectionService {
         self.currentAIRequestId = effectiveRequestId
         self.suggestionTarget = target
         if isFinal {
-            self.lastCaretContext = accessibilityService.captureCaretContext()
+            self.lastCaretContext = accessibilityService.captureCaretContext(preferCache: true)
         } else {
-            self.lastCaretContext = self.lastCaretContext ?? accessibilityService.captureCaretContext()
+            self.lastCaretContext = self.lastCaretContext ?? accessibilityService.captureCaretContext(preferCache: true)
         }
 
         let aiCandidate = AutocompletionCandidate(
@@ -1644,7 +1652,7 @@ final class AutoCorrectionService {
                 suffix: effectiveRemainingSuffix,
                 caretRect: liveCaret,
                 fieldRect: bounds?.fieldRect,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
             )
         }
 
@@ -1675,7 +1683,7 @@ final class AutoCorrectionService {
             return
         }
 
-        let currentContext = accessibilityService.captureCaretContext()
+        let currentContext = accessibilityService.captureCaretContext(preferCache: true)
         if !force, let snooze = snoozeUntil {
             if let currentField = currentContext?.fieldIdentifier, currentField != snoozeFieldIdentifier {
                 snoozeUntil = nil
@@ -1696,7 +1704,7 @@ final class AutoCorrectionService {
         if !wordBuffer.isEmpty {
             let focus = accessibilityService.focusedFieldRole()
             let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            guard AutoCorrectionGate.allowsAutoCorrection(
+            guard AutoCorrectionGate.allowsCompletions(
                 role: focus?.role,
                 subrole: focus?.subrole,
                 bundleID: frontmostBundleID,
@@ -1753,9 +1761,9 @@ final class AutoCorrectionService {
 
         if !settingsManager.isAIAllowed || activeGhostState == nil {
             suggestionTarget = accessibilityService.captureReplacementTarget()
-            lastCaretContext = currentContext ?? accessibilityService.captureCaretContext()
+            lastCaretContext = currentContext ?? accessibilityService.captureCaretContext(preferCache: true)
         }
-        let bounds = accessibilityService.caretAndFieldBounds()
+        let bounds = accessibilityService.caretAndFieldBounds(preferCache: true)
         let caretRect = bounds?.caret
         let displayMode = settingsManager.autoCompletionDisplayMode
 
@@ -1774,7 +1782,7 @@ final class AutoCorrectionService {
                     suffix: suffix,
                     caretRect: caretRect,
                     fieldRect: bounds?.fieldRect,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
                 )
             } else {
                 ghostTextController.hide()
@@ -1795,7 +1803,7 @@ final class AutoCorrectionService {
                 candidates: candidates,
                 caretRect: caretRect ?? accessibilityService.focusedFieldScreenRect(),
                 acceptKeyHint: hint,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
@@ -1910,7 +1918,7 @@ final class AutoCorrectionService {
             let continuationRequestId = UUID()
             self.currentAIRequestId = continuationRequestId
             let fieldID = currentCtx?.fieldIdentifier ?? self.activeGhostState?.fieldIdentifier ?? self.accessibilityService.focusedFieldIdentifier() ?? ""
-            let anchorCaret = self.accessibilityService.caretScreenRect() ?? self.activeGhostState?.caretRect
+            let anchorCaret = self.accessibilityService.caretScreenRect(preferCache: true) ?? self.activeGhostState?.caretRect
             let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             let estimatedCaret: CGRect? = {
                 guard let anchor = anchorCaret, GhostTextOverlayController.isValidCaretRect(anchor) else { return nil }
@@ -1942,7 +1950,7 @@ final class AutoCorrectionService {
                     staleAnchor: anchorCaret,
                     estimatedCaret: estimatedCaret,
                     bundleID: frontmostBundleID,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
                     isCurrent: { [weak self] in
                         guard let self, self.phraseContinuationAnchor == insertionText else { return false }
                         return self.accessibilityService.isCurrentReplacementTarget(validTarget)
@@ -1961,7 +1969,7 @@ final class AutoCorrectionService {
                     staleAnchor: anchorCaret,
                     estimatedCaret: estimatedCaret,
                     acceptKeyHint: hint,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
                     isCurrent: { [weak self] in
                         guard let self, self.phraseContinuationAnchor == insertionText else { return false }
                         return self.accessibilityService.isCurrentReplacementTarget(validTarget)
@@ -1993,9 +2001,9 @@ final class AutoCorrectionService {
 
                 if let remaining = remainingPhrase, !remaining.isEmpty, self.phraseContinuationAnchor == insertionText {
                     self.suggestionTarget = self.accessibilityService.captureReplacementTarget() ?? validTarget
-                    self.lastCaretContext = self.accessibilityService.captureCaretContext() ?? self.lastCaretContext
+                    self.lastCaretContext = self.accessibilityService.captureCaretContext(preferCache: true) ?? self.lastCaretContext
                     let anchorCaret = self.activeGhostState?.caretRect
-                    if let bounds = self.accessibilityService.caretAndFieldBounds(),
+                    if let bounds = self.accessibilityService.caretAndFieldBounds(preferCache: true),
                        GhostTextOverlayController.hasCaretAdvanced(from: anchorCaret, to: bounds.caret) {
                         let liveCaret = bounds.caret
                         self.activeGhostState?.caretRect = liveCaret
@@ -2006,7 +2014,7 @@ final class AutoCorrectionService {
                                 suffix: remaining,
                                 caretRect: liveCaret,
                                 fieldRect: bounds.fieldRect,
-                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
                             )
                         }
                         if (displayMode == .popup || displayMode == .both) {
@@ -2025,7 +2033,7 @@ final class AutoCorrectionService {
                                 candidates: self.overlayController.candidates.isEmpty ? [remainingCand] : self.overlayController.candidates,
                                 caretRect: liveCaret,
                                 acceptKeyHint: hint,
-                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
                                 onSelect: { [weak self] cand in
                                     self?.acceptCandidate(cand, appendSpace: false, entirePhrase: true)
                                 }
@@ -2553,6 +2561,7 @@ final class AutoCorrectionService {
         guard let operation = replacementSession.begin() else { return false }
         startReplacementWatchdog(operation: operation)
         completionRefresh.cancel()
+        accessibilityService.invalidateExtractionCache(reason: .replacementApplied)
 
         guard let target = existingTarget ?? accessibilityService.captureReplacementTarget() else {
             // Target app does not expose accessible text node (e.g. Electron / Chromium web view).

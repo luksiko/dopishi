@@ -37,6 +37,34 @@ enum AutoCorrectionGate {
         "com.apple.keychainaccess"
     ]
     
+    /// Dedicated password managers and credential vaults that must never receive suggestions or text inspection.
+    static let passwordManagerBundleIDs: Set<String> = [
+        "com.agilebits.onepassword7",
+        "com.1password.1password",
+        "com.bitwarden.desktop",
+        "org.keepassxc.keepassxc",
+        "com.apple.keychainaccess"
+    ]
+    
+    /// Terminal and console applications.
+    static let terminalBundleIDs: Set<String> = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+        "dev.warp.Warp-Main",
+        "dev.warp.Warp-Stable",
+        "dev.warp.Warp-GDK",
+        "io.alacritty",
+        "net.kovidgoyal.kitty",
+        "co.zeit.hyper",
+        "com.github.wez.wezterm"
+    ]
+    
+    static func isTerminalApp(bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        return terminalBundleIDs.contains(bundleID)
+    }
+    
     // MARK: - Secret Sanitizer Patterns (Cotypist-grade Privacy Protection)
     
     private static let privateKeyRegex = try? NSRegularExpression(
@@ -161,6 +189,35 @@ enum AutoCorrectionGate {
         if let bundleID, excludedBundleIDs.contains(bundleID) { return false }
         // Sensitive text contents (passwords, tokens, API keys) fail closed
         if let text, containsSensitiveInformation(text) { return false }
+        return true
+    }
+    
+    /// Combined rule for inline autocompletion and ghost text suggestions.
+    /// Suggestions and ghost text are supported in terminal emulators, while
+    /// password managers and secure inputs remain strictly blocked.
+    static func allowsCompletions(
+        role: String?,
+        subrole: String?,
+        bundleID: String?,
+        text: String? = nil,
+        excludedBundleIDs: Set<String> = defaultExcludedBundleIDs
+    ) -> Bool {
+        // Password fields fail closed
+        guard !isSecureField(role: role, subrole: subrole) else { return false }
+        // Password managers always fail closed
+        if let bundleID, passwordManagerBundleIDs.contains(bundleID) { return false }
+        // Sensitive text contents fail closed
+        if let text, containsSensitiveInformation(text) { return false }
+        
+        // Terminal apps support inline suggestions & ghost text
+        if let bundleID, isTerminalApp(bundleID: bundleID) {
+            let userCustomExclusions = excludedBundleIDs.subtracting(defaultExcludedBundleIDs)
+            if userCustomExclusions.contains(bundleID) { return false }
+            return true
+        }
+        
+        guard let role, textInputRoles.contains(role) else { return false }
+        if let bundleID, excludedBundleIDs.contains(bundleID) { return false }
         return true
     }
 }
