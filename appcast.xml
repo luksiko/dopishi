@@ -6,29 +6,29 @@
     <description>Most recent updates for Dopishi</description>
     <language>en</language>
     <item>
-      <title>Dopishi 1.5.14 (Apple Silicon)</title>
-      <pubDate>Thu, 29 Oct 2026 23:22:09 +0500</pubDate>
+      <title>Dopishi 1.5.15 (Apple Silicon)</title>
+      <pubDate>Fri, 30 Oct 2026 17:38:37 +0500</pubDate>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
       <enclosure
-        url="https://github.com/luksiko/dopishi/releases/download/v1.5.14/Dopishi-1.5.14-arm64.zip"
-        sparkle:version="21"
-        sparkle:shortVersionString="1.5.14"
-        length="28704712"
+        url="https://github.com/luksiko/dopishi/releases/download/v1.5.15/Dopishi-1.5.15-arm64.zip"
+        sparkle:version="22"
+        sparkle:shortVersionString="1.5.15"
+        length="28714826"
         type="application/octet-stream"
-        sparkle:edSignature="/uhVAyNxF5FbgA+T5kffModDmZlmzxDtSd70N7MuJHRV0d9U2L+4nPvulZuXGC/23d7Zr+BffyOC0UZD0bZFAw==" />
+        sparkle:edSignature="tA3LHHxHeAnCCjQF/KkzSL3IwFgBGH8nXowprg16t/LZNyM4WAppMtFO/DbUWP/IozOCR0iG/uGpkxV4QGxaDg==" />
     </item>
     <item>
-      <title>Dopishi 1.5.14</title>
-      <pubDate>Thu, 29 Oct 2026 23:22:09 +0500</pubDate>
+      <title>Dopishi 1.5.15</title>
+      <pubDate>Fri, 30 Oct 2026 17:38:37 +0500</pubDate>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/luksiko/dopishi/releases/download/v1.5.14/Dopishi-1.5.14-universal.zip"
-        sparkle:version="21"
-        sparkle:shortVersionString="1.5.14"
-        length="34513719"
+        url="https://github.com/luksiko/dopishi/releases/download/v1.5.15/Dopishi-1.5.15-universal.zip"
+        sparkle:version="22"
+        sparkle:shortVersionString="1.5.15"
+        length="34537306"
         type="application/octet-stream"
-        sparkle:edSignature="GRC9KITCv7mV4uO/G74w0F3ZpHbxfFzcKXyt2TTzVY9Ld84m0pWNq9JRUIvNM75y3OTTNAidhYL/tq0ORJiMBQ==" />
+        sparkle:edSignature="0eqGB69p8zISABxoam7ihmm0afHNf8ZI2zi2toLjIWs6CRjCQ7jcsVV/rVNGz6NaE6zD+VTZpQMpR9w/tE6RBA==" />
     </item>
   </channel>
 </rss>
