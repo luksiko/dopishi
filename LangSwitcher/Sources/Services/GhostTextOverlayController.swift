@@ -251,7 +251,8 @@ final class GhostTextOverlayController: NSObject {
     }
 
     /// Retain a known continuation while AX catches up with the insertion.
-    /// Keep the panel hidden until real caret coordinates have advanced past the insertion point.
+    /// Immediately positions at estimated coordinates if available to avoid visual stutter,
+    /// then refines position once real AX caret advances past the insertion point.
     func showContinuation(
         candidate: AutocompletionCandidate,
         suffix: String,
@@ -268,9 +269,18 @@ final class GhostTextOverlayController: NSObject {
         }
 
         presentationRevision &+= 1
-        panel?.orderOut(nil)
         currentCandidate = candidate
         currentSuffix = suffix
+
+        // If estimatedCaret is provided, display IMMEDIATELY at the estimated position
+        // so that the next word is seamlessly visible at the new cursor location.
+        if let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
+            self.pendingCaretAnchor = estimated
+            self.lastCaretRect = estimated
+            self.positionAndDisplay(caret: estimated, suffix: suffix, bundleID: bundleID)
+        } else {
+            panel?.orderOut(nil)
+        }
 
         // Probe caretProvider synchronously once
         if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret) {
@@ -305,12 +315,12 @@ final class GhostTextOverlayController: NSObject {
                 }
 
                 if Date() >= deadline {
-                    if let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
+                    if self.panel?.isVisible != true, let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
                         self.cancelPendingCaretPoll()
                         self.pendingCaretAnchor = estimated
                         self.lastCaretRect = estimated
                         self.positionAndDisplay(caret: estimated, suffix: suffix, bundleID: bundleID)
-                    } else {
+                    } else if self.panel?.isVisible != true {
                         self.hide()
                     }
                     return

@@ -484,15 +484,14 @@ final class AccessibilityService {
         let appendTrailingSpace: Bool
     }
 
-    /// Prepares replacement text for clipboard paste. Modern macOS apps (browsers, Electron, Qt,
-    /// messaging apps) strip trailing ASCII whitespace on pasteboard import, causing concatenated
-    /// words ("семейныйдоступ") when replacing words triggered by space. Additionally, Microsoft Office
-    /// ("Smart Cut and Paste") strips both leading and trailing boundary spaces.
-    /// Trailing space is always typed via synthetic space keystrokes; leading space is stripped and typed for smart-paste apps.
+    /// Prepares replacement text for clipboard paste.
+    /// Only Microsoft Office apps (which strip spaces around words due to "Smart Cut and Paste")
+    /// require typing boundary spaces via synthetic keystrokes. Standard macOS applications
+    /// (browsers, Electron, chat apps, TextEdit) preserve clipboard spaces natively.
     static func prepareClipboardReplacement(for replacement: String, bundleID: String?) -> PreparedReplacement {
         let isSmartPasteApp = Self.isSmartPasteApp(bundleID: bundleID)
         let hasLeadingSpace = isSmartPasteApp && replacement.hasPrefix(" ")
-        let hasTrailingSpace = replacement.hasSuffix(" ")
+        let hasTrailingSpace = isSmartPasteApp && replacement.hasSuffix(" ")
 
         var clipboardReplacement = replacement
         if hasLeadingSpace { clipboardReplacement = String(clipboardReplacement.dropFirst()) }

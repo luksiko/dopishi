@@ -890,7 +890,7 @@ final class SettingsManager: ObservableObject {
         self.autoCorrectionRemoveSpaceBeforePunctuation = defaults.object(forKey: Keys.autoCorrectionRemoveSpaceBeforePunctuation) as? Bool ?? true // Default: ON
         self.autoCorrectionSmartDashesAndEllipsis = defaults.object(forKey: Keys.autoCorrectionSmartDashesAndEllipsis) as? Bool ?? true // Default: ON
         self.autoCorrectionFixCapsLockErrors = defaults.object(forKey: Keys.autoCorrectionFixCapsLockErrors) as? Bool ?? true // Default: ON
-        self.autoCorrectionFixTypos = defaults.object(forKey: Keys.autoCorrectionFixTypos) as? Bool ?? true // Default: ON
+        self.autoCorrectionFixTypos = defaults.object(forKey: Keys.autoCorrectionFixTypos) as? Bool ?? false // Default: OFF (reduces false positive auto-replacements)
         self.autoCorrectionEmojiShortcodes = defaults.object(forKey: Keys.autoCorrectionEmojiShortcodes) as? Bool ?? true // Default: ON
         self.autoCorrectionRevertOnBackspace = defaults.object(forKey: Keys.autoCorrectionRevertOnBackspace) as? Bool ?? true // Default: ON
         

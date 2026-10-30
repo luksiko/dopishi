@@ -1688,13 +1688,13 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
 
     func testPrepareClipboardReplacementTrailingSpacePreservation() {
         // Case 1: Standard application (Telegram, Chrome, Notes, etc.) with trailing space
-        // Space must be stripped from clipboard and marked for synthetic typing to avoid being eaten by the app
+        // Space is retained directly in clipboard text without synthetic key event
         let nonSmartResult = AccessibilityService.prepareClipboardReplacement(
             for: "семейный ",
             bundleID: "ru.keepcoder.Telegram"
         )
-        XCTAssertEqual(nonSmartResult.text, "семейный", "Must drop trailing space from pasteboard text")
-        XCTAssertTrue(nonSmartResult.appendTrailingSpace, "Must mark trailing space for synthetic key event")
+        XCTAssertEqual(nonSmartResult.text, "семейный ", "Must keep trailing space in pasteboard text for standard apps")
+        XCTAssertFalse(nonSmartResult.appendTrailingSpace, "Standard app must not type synthetic trailing space")
         XCTAssertFalse(nonSmartResult.prependLeadingSpace, "Non-smart app must not prepend leading space")
 
         // Case 2: Word without trailing space
@@ -1720,8 +1720,76 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
             for: "привет ",
             bundleID: nil
         )
-        XCTAssertEqual(fallbackResult.text, "привет")
-        XCTAssertTrue(fallbackResult.appendTrailingSpace)
+        XCTAssertEqual(fallbackResult.text, "привет ")
+        XCTAssertFalse(fallbackResult.appendTrailingSpace)
         XCTAssertFalse(fallbackResult.prependLeadingSpace)
+    }
+
+    func testCompoundWordsAndHyphensAreNotSplitInHalf() {
+        // Hyphen with spaces: "что - то" should be kept together as "что-то"
+        let hyphenWithSpaces = CompletionAcceptanceText(
+            candidate: "что - то интересное",
+            typedPrefix: "",
+            entirePhrase: false,
+            appendSpace: true,
+            includePunctuation: true
+        )
+        XCTAssertEqual(hyphenWithSpaces.insertion, "что-то ")
+        XCTAssertEqual(hyphenWithSpaces.remaining, "интересное")
+
+        // Spaced particle: "как будто" vs hyphen particles "где-то", "по-моему"
+        let poMoemu = CompletionAcceptanceText(
+            candidate: "по моему мнению",
+            typedPrefix: "",
+            entirePhrase: false,
+            appendSpace: true,
+            includePunctuation: true
+        )
+        XCTAssertEqual(poMoemu.insertion, "по-моему ")
+        XCTAssertEqual(poMoemu.remaining, "мнению")
+
+        // Suffix particle: "кто то" -> "кто-то"
+        let ktoTo = CompletionAcceptanceText(
+            candidate: "кто то пришел",
+            typedPrefix: "",
+            entirePhrase: false,
+            appendSpace: true,
+            includePunctuation: true
+        )
+        XCTAssertEqual(ktoTo.insertion, "кто-то ")
+        XCTAssertEqual(ktoTo.remaining, "пришел")
+
+        // Compound prefix: "онлайн магазин" -> "онлайн-магазин"
+        let onlineShop = CompletionAcceptanceText(
+            candidate: "онлайн магазин одежды",
+            typedPrefix: "",
+            entirePhrase: false,
+            appendSpace: true,
+            includePunctuation: true
+        )
+        XCTAssertEqual(onlineShop.insertion, "онлайн-магазин ")
+        XCTAssertEqual(onlineShop.remaining, "одежды")
+    }
+
+    func testContinuationImmediatelyDisplaysAtEstimatedCaretWithoutStall() {
+        let ghost = GhostTextOverlayController()
+        let staleCaret = CGRect(x: 100, y: 200, width: 2, height: 16)
+        let estimatedCaret = CGRect(x: 160, y: 200, width: 2, height: 16)
+        let candidate = AutocompletionCandidate(word: "следующее", targetLayoutID: "com.apple.keylayout.US")
+
+        ghost.showContinuation(
+            candidate: candidate,
+            suffix: "следующее",
+            staleAnchor: staleCaret,
+            estimatedCaret: estimatedCaret,
+            bundleID: "com.apple.dt.Xcode",
+            caretProvider: { staleCaret }, // Stale AX provider that hasn't advanced yet
+            isCurrent: { true }
+        )
+
+        // Overlay should be visible IMMEDIATELY at the estimated caret position without waiting 350ms
+        XCTAssertTrue(ghost.isVisible)
+        XCTAssertEqual(ghost.lastCaretRect?.origin.x, estimatedCaret.origin.x)
+        ghost.hide()
     }
 }

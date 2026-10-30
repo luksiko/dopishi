@@ -96,7 +96,8 @@ final class AutocompletionOverlayController: NSObject {
     }
 
     /// Retain a known continuation candidate popup while AX catches up with the insertion.
-    /// Keep the popup hidden until real caret coordinates have advanced past the insertion point.
+    /// Immediately positions at estimated coordinates if available to prevent disappearance,
+    /// then re-anchors once real caret coordinates have advanced past the insertion point.
     func showContinuation(
         candidates: [AutocompletionCandidate],
         staleAnchor: CGRect? = nil,
@@ -116,9 +117,15 @@ final class AutocompletionOverlayController: NSObject {
         self.selectedIndex = 0
         self.currentAcceptKeyHint = acceptKeyHint
         self.onSelectCallback = onSelect
-
-        panel?.orderOut(nil)
         updateContent()
+
+        if let estimated = estimatedCaret, Self.isValidCaretRect(estimated), !Self.isFieldRect(estimated) {
+            self.pendingCaretAnchor = estimated
+            self.positionPanel(caretRect: estimated)
+            self.getOrCreatePanel().orderFrontRegardless()
+        } else {
+            panel?.orderOut(nil)
+        }
 
         // Probe caretProvider synchronously once
         if let currentCaret = caretProvider(), Self.isValidCaretRect(currentCaret), !Self.isFieldRect(currentCaret) {
@@ -151,12 +158,12 @@ final class AutocompletionOverlayController: NSObject {
                 }
 
                 if Date() >= deadline {
-                    if let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
+                    if self.panel?.isVisible != true, let estimated = estimatedCaret, Self.isValidCaretRect(estimated) {
                         self.cancelPendingCaretPoll()
                         self.pendingCaretAnchor = estimated
                         self.positionPanel(caretRect: estimated)
                         self.getOrCreatePanel().orderFrontRegardless()
-                    } else {
+                    } else if self.panel?.isVisible != true {
                         self.hide()
                     }
                     return

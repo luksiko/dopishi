@@ -602,7 +602,17 @@ final class AIInferenceEngine: ObservableObject {
         let healsWord = !wordBuffer.isEmpty && context.hasSuffix(wordBuffer)
         let generationContext = context
         guard !generationContext.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        let rawPrompt = Self.continuationPrefix(generationContext)
+        // Preserve a trailing space in context so chat templates and base models see
+        // an explicit word boundary and predict subsequent words rather than completing
+        // the word preceding the space.
+        let rawPrompt: String
+        if !wordBuffer.isEmpty {
+            rawPrompt = Self.continuationPrefix(generationContext)
+        } else if generationContext.hasSuffix(" ") {
+            rawPrompt = Self.continuationPrefix(generationContext) + " "
+        } else {
+            rawPrompt = Self.continuationPrefix(generationContext)
+        }
         var prompt = rawPrompt
 
         // Native Metal direct execution
@@ -1052,6 +1062,32 @@ final class AIInferenceEngine: ObservableObject {
         if !afterCaret.isEmpty, let overlap = text.range(of: afterCaret), overlap.lowerBound != text.startIndex {
             text = String(text[..<overlap.lowerBound])
         } else if !afterCaret.isEmpty && text.hasPrefix(afterCaret) { return nil }
+
+        // If user just typed space (wordBuffer is empty and context ends with space),
+        // reject completions that attempt to attach as an inflectional suffix to the word preceding space.
+        // e.g. "исправляе " + "мую ошибку" -> lastWord="исправляе" is not a complete word,
+        // but "исправляе" + "мую" = "исправляемую" (valid word form), meaning the model ignored the space
+        // and finished the previous word instead of continuing the sentence.
+        if wordBuffer.isEmpty && context.hasSuffix(" ") && !text.hasPrefix(" ") {
+            if let firstToken = text.split(whereSeparator: { $0.isWhitespace }).first {
+                let firstTokenStr = String(firstToken)
+                let lastWordInContext = context.trimmingCharacters(in: .whitespaces).split(whereSeparator: { $0.isWhitespace }).last.map(String.init) ?? ""
+                if !lastWordInContext.isEmpty && !firstTokenStr.allSatisfy({ $0.isPunctuation }) {
+                    let isLikelyWordSuffix = firstTokenStr.count <= 4 && !firstTokenStr.contains(where: { $0.isUppercase })
+                    // Check if lastWordInContext was incomplete and firstToken completes it
+                    let lastWordValid = SpellCheckService.shared.isValidWord(lastWordInContext, language: "ru") ||
+                                        SpellCheckService.shared.isValidWord(lastWordInContext, language: "en")
+                    if !lastWordValid && isLikelyWordSuffix {
+                        let combined = lastWordInContext + firstTokenStr
+                        let isCombinedValidWord = SpellCheckService.shared.isValidWord(combined, language: "ru") ||
+                                                  SpellCheckService.shared.isValidWord(combined, language: "en")
+                        if isCombinedValidWord {
+                            return nil
+                        }
+                    }
+                }
+            }
+        }
 
         // Tokenize into words, respecting whether the first token has a leading space
         let hasLeadingSpace = text.hasPrefix(" ")

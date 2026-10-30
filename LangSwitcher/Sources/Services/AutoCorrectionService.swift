@@ -820,7 +820,7 @@ final class AutoCorrectionService {
         )
 
         let isOverlayDisplayed = ghostTextController.isVisible
-        let bounds = isOverlayDisplayed ? nil : accessibilityService.caretAndFieldBounds()
+        let bounds = isOverlayDisplayed ? nil : accessibilityService.caretAndFieldBounds(preferCache: true)
         let currentCaret = bounds?.caret ?? ghostTextController.lastCaretRect ?? state.caretRect
         state.caretRect = currentCaret
         self.activeGhostState = state
@@ -832,7 +832,7 @@ final class AutoCorrectionService {
                 suffix: state.remainingSuffix,
                 caretRect: currentCaret,
                 fieldRect: bounds?.fieldRect ?? ghostTextController.lastFieldRect,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() }
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
             )
         }
 
@@ -845,7 +845,7 @@ final class AutoCorrectionService {
                 candidates: [updatedCandidate],
                 caretRect: currentCaret,
                 acceptKeyHint: hint,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect() },
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
@@ -1913,6 +1913,7 @@ final class AutoCorrectionService {
         self.previousWord = acceptedWord.lowercased()
 
         let displayMode = self.settingsManager.autoCompletionDisplayMode
+        let anchorCaret = self.activeGhostState?.caretRect ?? self.accessibilityService.caretScreenRect(preferCache: true)
         if let remaining = remainingPhrase, !remaining.isEmpty {
             self.phraseContinuationAnchor = insertionText
             let remainingCandidate = AutocompletionCandidate(
@@ -1927,7 +1928,6 @@ final class AutoCorrectionService {
             let continuationRequestId = UUID()
             self.currentAIRequestId = continuationRequestId
             let fieldID = currentCtx?.fieldIdentifier ?? self.activeGhostState?.fieldIdentifier ?? self.accessibilityService.focusedFieldIdentifier() ?? ""
-            let anchorCaret = self.accessibilityService.caretScreenRect(preferCache: true) ?? self.activeGhostState?.caretRect
             let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             let estimatedCaret: CGRect? = {
                 guard let anchor = anchorCaret, GhostTextOverlayController.isValidCaretRect(anchor) else { return nil }
@@ -1959,7 +1959,7 @@ final class AutoCorrectionService {
                     staleAnchor: anchorCaret,
                     estimatedCaret: estimatedCaret,
                     bundleID: frontmostBundleID,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
                     isCurrent: { [weak self] in
                         guard let self, self.phraseContinuationAnchor == insertionText else { return false }
                         return self.accessibilityService.isCurrentReplacementTarget(validTarget)
@@ -1978,7 +1978,7 @@ final class AutoCorrectionService {
                     staleAnchor: anchorCaret,
                     estimatedCaret: estimatedCaret,
                     acceptKeyHint: hint,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
                     isCurrent: { [weak self] in
                         guard let self, self.phraseContinuationAnchor == insertionText else { return false }
                         return self.accessibilityService.isCurrentReplacementTarget(validTarget)
@@ -1994,6 +1994,7 @@ final class AutoCorrectionService {
             self.dismissAutocompletion()
         }
 
+        let staleAnchor = anchorCaret
         let appliedReceipt: (Bool) -> Void = { [weak self] applied in
                 guard let self, self.replacementSession.isCurrent(operation) else { return }
                 self.finishReplacementSession(operation)
@@ -2010,10 +2011,9 @@ final class AutoCorrectionService {
 
                 if let remaining = remainingPhrase, !remaining.isEmpty, self.phraseContinuationAnchor == insertionText {
                     self.suggestionTarget = self.accessibilityService.captureReplacementTarget() ?? validTarget
-                    self.lastCaretContext = self.accessibilityService.captureCaretContext(preferCache: true) ?? self.lastCaretContext
-                    let anchorCaret = self.activeGhostState?.caretRect
-                    if let bounds = self.accessibilityService.caretAndFieldBounds(preferCache: true),
-                       GhostTextOverlayController.hasCaretAdvanced(from: anchorCaret, to: bounds.caret) {
+                    self.lastCaretContext = self.accessibilityService.captureCaretContext(preferCache: false) ?? self.lastCaretContext
+                    if let bounds = self.accessibilityService.caretAndFieldBounds(preferCache: false),
+                       GhostTextOverlayController.hasCaretAdvanced(from: staleAnchor, to: bounds.caret) {
                         let liveCaret = bounds.caret
                         self.activeGhostState?.caretRect = liveCaret
                         if displayMode == .ghostText || displayMode == .both,
@@ -2023,7 +2023,7 @@ final class AutoCorrectionService {
                                 suffix: remaining,
                                 caretRect: liveCaret,
                                 fieldRect: bounds.fieldRect,
-                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
+                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) }
                             )
                         }
                         if (displayMode == .popup || displayMode == .both) {
@@ -2042,7 +2042,7 @@ final class AutoCorrectionService {
                                 candidates: self.overlayController.candidates.isEmpty ? [remainingCand] : self.overlayController.candidates,
                                 caretRect: liveCaret,
                                 acceptKeyHint: hint,
-                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
+                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
                                 onSelect: { [weak self] cand in
                                     self?.acceptCandidate(cand, appendSpace: false, entirePhrase: true)
                                 }
@@ -2052,6 +2052,7 @@ final class AutoCorrectionService {
                 }
         }
         if suffix != nil {
+            self.accessibilityService.recordKeystroke(insertionText)
             let dispatched = accessibility.pasteContinuationAtCaret(replacement, target: validTarget,
                                                                    onApplied: appliedReceipt)
             if !dispatched {
@@ -2060,6 +2061,7 @@ final class AutoCorrectionService {
                 dismissAutocompletion()
             }
         } else {
+            self.accessibilityService.recordKeystroke(acceptance.replacement)
             accessibility.pasteVerifiedSuffix(expected, with: replacement, target: validTarget,
                 completion: { [weak self] dispatched in
                     guard !dispatched, let self else { return }
@@ -2129,9 +2131,19 @@ final class AutoCorrectionService {
 
         if let lastChar = textBeforeWord.last, lastChar.isLetter || lastChar.isNumber {
             let missingPrefix = String(textBeforeWord.reversed().prefix(while: { $0.isLetter || $0.isNumber }).reversed())
-            textBeforeWord = String(textBeforeWord.dropLast(missingPrefix.count))
-            bufferedWord = missingPrefix + bufferedWord
-            NSLog("[LangSwitcher] AutoCorrection: reconciled truncated buffer '\(initialWord)' with prefix '\(missingPrefix)' -> '\(bufferedWord)'")
+            let prefixHasLatin = missingPrefix.unicodeScalars.contains { CharacterSet.letters.contains($0) && $0.value < 0x80 }
+            let prefixHasCyrillic = missingPrefix.unicodeScalars.contains { ("\u{0400}"..."\u{04FF}").contains(UnicodeScalar($0.value)!) }
+            let bufferHasLatin = bufferedWord.unicodeScalars.contains { CharacterSet.letters.contains($0) && $0.value < 0x80 }
+            let bufferHasCyrillic = bufferedWord.unicodeScalars.contains { ("\u{0400}"..."\u{04FF}").contains(UnicodeScalar($0.value)!) }
+
+            let scriptMismatch = (prefixHasLatin && bufferHasCyrillic) || (prefixHasCyrillic && bufferHasLatin)
+            if !scriptMismatch {
+                textBeforeWord = String(textBeforeWord.dropLast(missingPrefix.count))
+                bufferedWord = missingPrefix + bufferedWord
+                NSLog("[LangSwitcher] AutoCorrection: reconciled truncated buffer '\(initialWord)' with prefix '\(missingPrefix)' -> '\(bufferedWord)'")
+            } else {
+                NSLog("[LangSwitcher] AutoCorrection: skipping cross-script prefix reconciliation: prefix='\(missingPrefix)', buffer='\(bufferedWord)'")
+            }
         }
 
         let token: CorrectionToken.Parts
@@ -2410,6 +2422,16 @@ final class AutoCorrectionService {
             }
             recentTextBuffer.append(fullReplacement)
         }
+
+        if settingsManager.loggingEnabled {
+            ConversionLogStore.shared.log(
+                inputText: originalWord,
+                outputText: replacedWord,
+                sourceLayout: switchedFromLayoutID ?? KeyboardLayoutDetector.getCurrentLayout()?.id ?? "unknown",
+                targetLayout: switchedToLayoutID ?? "unknown",
+                conversionMode: "autoCorrect"
+            )
+        }
     }
 
     @discardableResult
@@ -2520,7 +2542,8 @@ final class AutoCorrectionService {
     }
 
     /// Handles keyboard events when a replacement is currently in flight.
-    /// Returns true if the event was consumed (e.g. buffered), false if it should be passed through.
+    /// In accordance with Cotypist's non-blocking input architecture, physical typing events
+    /// are NEVER intercepted or held in a synthetic event buffer.
     func handleEventDuringActiveCorrection(_ event: CGEvent) -> Bool {
         guard isProcessingCorrection else { return false }
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
@@ -2548,10 +2571,10 @@ final class AutoCorrectionService {
             return false // not consumed, let through
         }
 
-        // 4. Normal typing keys (characters, space, punctuation):
-        // Buffer this key so it does not interleave with backspaces or paste!
-        bufferEventDuringCorrection(event)
-        return true // consumed / intercepted
+        // 4. Any subsequent user typing cancels in-flight replacement to prevent race conditions,
+        // and passes straight through to the host editor without any synthetic lag.
+        cancelActiveCorrectionAndFlush()
+        return false // pass through directly, 0ms latency
     }
 
     private func startReplacementWatchdog(operation: Int) {
@@ -2991,6 +3014,28 @@ struct CompletionAcceptanceText {
     let insertion: String
     let remaining: String?
 
+    private static let clausePunctuation: Set<Character> = [
+        ".", ",", "!", "?", ";", ":", "…", "»", "\"", "”", "’", ")", "]", "}"
+    ]
+
+    private static let hyphenConnectedPrefixes: Set<String> = [
+        "из", "кое", "по", "онлайн", "веб", "интернет", "бизнес", "пресс", "топ", "экс", "мини", "микро"
+    ]
+
+    private static let hyphenConnectedSuffixes: Set<String> = [
+        "то", "либо", "нибудь", "таки", "ка", "де"
+    ]
+
+    private static let hyphenPrefixAllowedSecondWords: [String: Set<String>] = [
+        "из": ["за", "под"],
+        "по": ["моему", "твоему", "нашему", "вашему", "русски", "английски", "новому", "старому", "прежнему", "видимому", "любому", "другому"],
+        "кое": ["кто", "что", "как", "где", "куда", "кого", "кому", "чем"]
+    ]
+
+    private static let hyphenSuffixAllowedFirstWords: Set<String> = [
+        "кто", "что", "как", "где", "когда", "почему", "зачем", "куда", "откуда", "какой", "какая", "какое", "какие", "чей", "чья", "чье", "чьи", "все"
+    ]
+
     init(candidate: String, typedPrefix: String, entirePhrase: Bool,
          appendSpace: Bool, includePunctuation: Bool) {
         guard !entirePhrase else {
@@ -2999,22 +3044,64 @@ struct CompletionAcceptanceText {
             return
         }
         let hasLeadingSpace = candidate.hasPrefix(" ")
-        var words = candidate.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        var words = candidate.split(whereSeparator: { $0.isWhitespace }).map(String.init)
         guard !words.isEmpty else { insertion = ""; remaining = nil; return }
         var first = words.removeFirst()
+
+        // 1. Reconnect hyphen-separated tokens (e.g. "что - то", "онлайн - магазин", "по - моему")
+        while !words.isEmpty {
+            if first.hasSuffix("-") || first.hasSuffix("–") {
+                first += words.removeFirst()
+            } else if words.first == "-" || words.first == "–" {
+                first += words.removeFirst()
+                if !words.isEmpty {
+                    first += words.removeFirst()
+                }
+            } else if let next = words.first, next.hasPrefix("-") || next.hasPrefix("–") {
+                first += words.removeFirst()
+            } else {
+                break
+            }
+        }
+
+        // 2. Reconnect Russian compound words/particles emitted by LLM with spaces instead of hyphens
+        if !words.isEmpty {
+            let lowerFirst = first.lowercased()
+            let lowerNext = words.first!.lowercased()
+            let cleanNext = lowerNext.trimmingCharacters(in: CharacterSet(charactersIn: "-–.,!?;:"))
+
+            var shouldJoinWithHyphen = false
+            if let allowed = Self.hyphenPrefixAllowedSecondWords[lowerFirst], allowed.contains(cleanNext) {
+                shouldJoinWithHyphen = true
+            } else if Self.hyphenConnectedSuffixes.contains(cleanNext) && Self.hyphenSuffixAllowedFirstWords.contains(lowerFirst) {
+                shouldJoinWithHyphen = true
+            } else if ["онлайн", "веб", "интернет", "бизнес", "пресс", "топ", "экс", "мини", "микро"].contains(lowerFirst) && cleanNext.count >= 2 {
+                shouldJoinWithHyphen = true
+            }
+
+            if shouldJoinWithHyphen {
+                let nextWord = words.removeFirst()
+                first += "-" + nextWord
+            }
+        }
+
+        // 3. If typedPrefix matches first word, advance to the next token
         if !typedPrefix.isEmpty, first.lowercased() == typedPrefix.lowercased(), !words.isEmpty {
             let next = words.removeFirst()
-            first += (next.allSatisfy({ $0.isPunctuation }) ? "" : " ") + next
+            first += (next.allSatisfy({ Self.clausePunctuation.contains($0) }) ? "" : " ") + next
         }
+
+        // 4. Handle trailing punctuation (preserving attached hyphens)
         var deferred = ""
         if !includePunctuation, first.contains(where: { $0.isLetter || $0.isNumber }) {
-            while let last = first.last, last.isPunctuation {
+            while let last = first.last, Self.clausePunctuation.contains(last) {
                 deferred.insert(first.removeLast(), at: deferred.startIndex)
             }
         } else if includePunctuation, let next = words.first,
-                  next.allSatisfy({ $0.isPunctuation }) {
+                  next.allSatisfy({ Self.clausePunctuation.contains($0) }) {
             first += words.removeFirst()
         }
+
         if !deferred.isEmpty, !typedPrefix.isEmpty, first.lowercased() == typedPrefix.lowercased() {
             // The word is already complete. Accept the missing punctuation as
             // its own step instead of attempting an empty append and passing Tab.
@@ -3022,7 +3109,8 @@ struct CompletionAcceptanceText {
             deferred = ""
         }
         if !deferred.isEmpty { words.insert(deferred, at: 0) }
-        let punctuationPending = !includePunctuation && words.first?.first?.isPunctuation == true
+
+        let punctuationPending = !includePunctuation && words.first?.first.map({ Self.clausePunctuation.contains($0) }) == true
         let leading = (hasLeadingSpace && !first.hasPrefix(" ")) ? " " : ""
         let trailing = (appendSpace && !punctuationPending) ? " " : ""
         insertion = leading + first + trailing
