@@ -34,15 +34,21 @@ build_dir="$project_root/build/release-dist"
 rm -rf "$build_dir"
 mkdir -p "$build_dir"
 
+# Reuse cached packages if available to avoid redownloading over network
+if [[ -d "$project_root/build/tests/SourcePackages" ]]; then
+    echo "==> Reusing SPM package cache from build/tests..."
+    cp -R "$project_root/build/tests/SourcePackages" "$build_dir/"
+fi
+
 echo "==> Building Release Universal bundle..."
 xcodebuild -project "$project_root/LangSwitcher.xcodeproj" \
     -scheme LangSwitcher \
     -configuration Release \
     -derivedDataPath "$build_dir" \
     ONLY_ACTIVE_ARCH=NO \
-    CODE_SIGN_STYLE=Manual \
-    CODE_SIGN_IDENTITY="$identity" \
-    DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-VSU327SFT6}" \
+    CODE_SIGN_IDENTITY="-" \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGNING_ALLOWED=YES \
     build
 
 built_app="$build_dir/Build/Products/Release/Dopishi.app"
