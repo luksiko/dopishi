@@ -561,6 +561,11 @@ struct ShortcutsSettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Toggle(l10n.t("autocompletion.includeTrailingPunctuation"), isOn: $settingsManager.autoCompletionIncludeTrailingPunctuation)
+                Text(l10n.t("autocompletion.includeTrailingPunctuationDesc"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 HStack {
                     Text(l10n.t("autocompletion.triggerFullCompletion"))
                     Spacer()

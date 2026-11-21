@@ -61,8 +61,8 @@ final class AutoCorrectionService {
 
     // MARK: - State
 
-    internal(set) var activeGhostState: ActiveGhostState?
-    internal(set) var currentAIRequestId: UUID?
+    var activeGhostState: ActiveGhostState?
+    var currentAIRequestId: UUID?
     private var cancelledRequestIds: Set<UUID> = []
     private var typeAheadHandledCount: Int = 0
     private var wordBuffer: String = ""
@@ -444,6 +444,7 @@ final class AutoCorrectionService {
 
         let isAcceptanceKey = settingsManager.isAutocompletionAcceptKey(keyCode: key, flags: event.flags)
             || settingsManager.isAutocompletionAcceptAllKey(keyCode: key, flags: event.flags)
+            || settingsManager.isAutocompletionAcceptNextWordKey(keyCode: key, flags: event.flags)
         let consumed = interceptKeyIfOverlayVisible(event: event)
             || checkGlobalAutocompletionShortcuts(event: event)
         if consumed && isAcceptanceKey { consumedAcceptanceKeys.insert(key) }
@@ -611,7 +612,8 @@ final class AutoCorrectionService {
         guard isOverlayActive else {
             let key = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             if settingsManager.isAutocompletionAcceptKey(keyCode: key, flags: event.flags)
-                || settingsManager.isAutocompletionAcceptAllKey(keyCode: key, flags: event.flags) {
+                || settingsManager.isAutocompletionAcceptAllKey(keyCode: key, flags: event.flags)
+                || settingsManager.isAutocompletionAcceptNextWordKey(keyCode: key, flags: event.flags) {
                 NSLog("[LangSwitcher] Completion shortcut: no active suggestion")
             }
             return false
@@ -621,11 +623,12 @@ final class AutoCorrectionService {
         let flags = event.flags
         let isAcceptShortcut = settingsManager.isAutocompletionAcceptKey(keyCode: keyCode, flags: flags)
             || settingsManager.isAutocompletionAcceptAllKey(keyCode: keyCode, flags: flags)
+            || settingsManager.isAutocompletionAcceptNextWordKey(keyCode: keyCode, flags: flags)
         let isNumberShortcut: Bool = {
             guard settingsManager.autoCompletionUseNumberShortcuts
                 && (overlayController.isVisible || (phraseContinuationAnchor != nil && !overlayController.candidates.isEmpty)) else { return false }
-            let noMods = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]).isEmpty
-            guard noMods else { return false }
+            let hasCommandOnly = flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]) == .maskCommand
+            guard hasCommandOnly else { return false }
             return [0x12, 0x13, 0x14, 0x15, 0x17].contains(keyCode)
         }()
 
@@ -665,8 +668,8 @@ final class AutoCorrectionService {
             return true
         }
         
-        // 4. Number shortcuts 1-5 (if enabled, requiring no Shift/Cmd/Opt/Ctrl so !@#$% are not caught)
-        if settingsManager.autoCompletionUseNumberShortcuts && noModifierFlags.isEmpty && overlayController.isVisible {
+        // 4. Number shortcuts ⌘1–⌘5 (matching UI label; plain digits 1–5 pass through to the editor)
+        if isNumberShortcut && overlayController.isVisible {
             let numberKeyCodes: [UInt16: Int] = [
                 0x12: 0, // 1
                 0x13: 1, // 2
@@ -677,6 +680,25 @@ final class AutoCorrectionService {
             if let index = numberKeyCodes[keyCode], index < overlayController.candidates.count {
                 let candidate = overlayController.candidates[index]
                 return submitCandidate(candidate, appendSpace: false, entirePhrase: true, failureEvent: event)
+            }
+        }
+
+        // 4.5. Standard / Configured Accept Next Word Key: ⌥→ (Option + Right Arrow)
+        if settingsManager.isAutocompletionAcceptNextWordKey(keyCode: keyCode, flags: flags) {
+            let candidate = overlayController.selectedCandidate
+                ?? overlayController.candidates.first
+                ?? ghostTextController.currentCandidate
+                ?? (activeGhostState.map { state in
+                    AutocompletionCandidate(
+                        word: wordBuffer.isEmpty ? state.remainingSuffix : (wordBuffer + state.remainingSuffix),
+                        targetLayoutID: KeyboardLayoutDetector.getCurrentLayout()?.id ?? "com.apple.keylayout.US",
+                        isCrossLayout: false,
+                        score: 1500
+                    )
+                })
+            if let candidate = candidate {
+                let appendSpace = settingsManager.autoCompletionIncludeTrailingSpace
+                return submitCandidate(candidate, appendSpace: appendSpace, entirePhrase: false, failureEvent: event)
             }
         }
         
@@ -819,8 +841,7 @@ final class AutoCorrectionService {
             hasScreenContext: ghostTextController.currentCandidate?.hasScreenContext ?? false
         )
 
-        let isOverlayDisplayed = ghostTextController.isVisible
-        let bounds = isOverlayDisplayed ? nil : accessibilityService.caretAndFieldBounds(preferCache: true)
+        let bounds = accessibilityService.caretAndFieldBounds(preferCache: false)
         let currentCaret = bounds?.caret ?? ghostTextController.lastCaretRect ?? state.caretRect
         state.caretRect = currentCaret
         self.activeGhostState = state
@@ -832,7 +853,8 @@ final class AutoCorrectionService {
                 suffix: state.remainingSuffix,
                 caretRect: currentCaret,
                 fieldRect: bounds?.fieldRect ?? ghostTextController.lastFieldRect,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
+                lineSpacing: accessibilityService.focusedLineSpacing()
             )
         }
 
@@ -1036,9 +1058,13 @@ final class AutoCorrectionService {
             accessibilityService.invalidateExtractionCache(reason: .navigationKey(keyCode: keyCode))
             recordHistorySnippetIfEligible()
             if !wordBuffer.isEmpty {
-                previousWord = wordBuffer.lowercased()
+                if settingsManager.autoCorrectionEnabled {
+                    triggerCheckAndCorrect(triggerChar: "\n")
+                } else {
+                    previousWord = wordBuffer.lowercased()
+                    wordBuffer = ""
+                }
             }
-            wordBuffer = ""
             recentTextBuffer.append("\n")
             if recentTextBuffer.count > 250 { recentTextBuffer.removeFirst(recentTextBuffer.count - 250) }
             dismissSuggestionsOnly()
@@ -1115,6 +1141,12 @@ final class AutoCorrectionService {
             if let typo = SmartPunctuationEngine.smartDashesAndEllipsis(char: char, precedingText: context) {
                 performCheckedReplacement(expected: typo.expected, replacement: typo.replacement) { [weak self] _ in
                     guard let self else { return }
+                    self.recordAppliedCorrection(
+                        originalWord: typo.expected,
+                        replacedWord: typo.replacement,
+                        fullExpected: typo.expected,
+                        fullReplacement: typo.replacement
+                    )
                     self.playCorrectionFeedback()
                     self.settingsManager.recordAutoCorrection(charCount: typo.expected.count)
                 }
@@ -1130,6 +1162,12 @@ final class AutoCorrectionService {
             if let fix = SmartPunctuationEngine.fixSpaceBeforePunctuation(char: char, precedingText: context) {
                 performCheckedReplacement(expected: fix.expected, replacement: fix.replacement) { [weak self] _ in
                     guard let self else { return }
+                    self.recordAppliedCorrection(
+                        originalWord: fix.expected,
+                        replacedWord: fix.replacement,
+                        fullExpected: fix.expected,
+                        fullReplacement: fix.replacement
+                    )
                     self.playCorrectionFeedback()
                     self.settingsManager.recordAutoCorrection(charCount: 1)
                 }
@@ -1291,7 +1329,15 @@ final class AutoCorrectionService {
         let text = caretContext.textBeforeCaret
         let lastLine = text.components(separatedBy: .newlines).last ?? text
         guard !AutoCorrectionGate.containsSensitiveInformation(lastLine) else { return }
-        UserTextHistoryStore.shared.recordSnippet(text: lastLine, bundleID: currentBundleID)
+        let windowInfo = accessibilityService.activeWindowContext()
+        UserTextHistoryStore.shared.recordSnippet(
+            text: lastLine,
+            bundleID: currentBundleID,
+            role: focus?.role,
+            subrole: focus?.subrole,
+            windowTitle: windowInfo.windowTitle,
+            windowElement: windowInfo.windowElement
+        )
     }
 
     private func scheduleAIDebounce(force: Bool = false) {
@@ -1380,11 +1426,12 @@ final class AutoCorrectionService {
             let windowTitle = windowInfo.windowTitle
 
             let allowProfanity = self.settingsManager.autoCompletionSuggestProfanity
+            let afterCaretText = self.settingsManager.proFimEnabled ? String(caretContext.textAfterCaret.prefix(512)) : ""
 
             if self.settingsManager.aiStreamingEnabled {
                 let streamResult = await AIInferenceEngine.shared.predictContinuationStream(
                     context: liveContext,
-                    afterCaret: String(caretContext.textAfterCaret.prefix(512)),
+                    afterCaret: afterCaretText,
                     wordBuffer: self.wordBuffer,
                     maxWords: effectiveMaxWords,
                     customInstructions: currentInstructions,
@@ -1462,9 +1509,10 @@ final class AutoCorrectionService {
                     }
                 }
             } else {
+                let afterCaretText = self.settingsManager.proFimEnabled ? String(caretContext.textAfterCaret.prefix(512)) : ""
                 guard let suffix = await AIInferenceEngine.shared.predictContinuation(
                     context: liveContext,
-                    afterCaret: String(caretContext.textAfterCaret.prefix(512)),
+                    afterCaret: afterCaretText,
                     wordBuffer: self.wordBuffer,
                     maxWords: effectiveMaxWords,
                     customInstructions: currentInstructions,
@@ -1546,9 +1594,14 @@ final class AutoCorrectionService {
         // Determine whether the caret currently has preceding whitespace.
         // If typing directly against a word boundary (e.g. "Как|"), the suggestion
         // must include a leading space so it does not glue to the caret or word.
-        let ctx = self.accessibilityService.captureCaretContext(maxSurroundingLength: 256, preferCache: true) ?? self.lastCaretContext
+        let ctx = self.accessibilityService.captureCaretContext(maxSurroundingLength: 256, preferCache: false) ?? self.lastCaretContext
         let textBefore = ctx?.textBeforeCaret ?? ""
-        let hasPrecedingSpace = textBefore.isEmpty || textBefore.last?.isWhitespace == true
+        let hasPrecedingSpace: Bool = {
+            if let lastRecent = recentTextBuffer.last {
+                return lastRecent.isWhitespace || lastRecent.isNewline
+            }
+            return textBefore.isEmpty || textBefore.last?.isWhitespace == true
+        }()
 
         var displaySuffix: String
         let trimmedLeading = suffix.trimmingCharacters(in: .whitespaces)
@@ -1659,7 +1712,8 @@ final class AutoCorrectionService {
                 suffix: effectiveRemainingSuffix,
                 caretRect: liveCaret,
                 fieldRect: bounds?.fieldRect,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
+                lineSpacing: accessibilityService.focusedLineSpacing()
             )
         }
 
@@ -1791,7 +1845,8 @@ final class AutoCorrectionService {
                     suffix: suffix,
                     caretRect: caretRect,
                     fieldRect: bounds?.fieldRect,
-                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) }
+                    caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
+                    lineSpacing: accessibilityService.focusedLineSpacing()
                 )
             } else {
                 ghostTextController.hide()
@@ -1812,7 +1867,7 @@ final class AutoCorrectionService {
                 candidates: candidates,
                 caretRect: caretRect ?? accessibilityService.focusedFieldScreenRect(),
                 acceptKeyHint: hint,
-                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: true) },
+                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
                 onSelect: { [weak self] candidate in
                     self?.acceptCandidate(candidate, appendSpace: false, entirePhrase: true)
                 }
@@ -1929,10 +1984,15 @@ final class AutoCorrectionService {
             self.currentAIRequestId = continuationRequestId
             let fieldID = currentCtx?.fieldIdentifier ?? self.activeGhostState?.fieldIdentifier ?? self.accessibilityService.focusedFieldIdentifier() ?? ""
             let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            let liveCaret = self.accessibilityService.caretScreenRect(preferCache: false)
             let estimatedCaret: CGRect? = {
+                if let live = liveCaret, GhostTextOverlayController.hasCaretAdvanced(from: anchorCaret, to: live) {
+                    return live
+                }
                 guard let anchor = anchorCaret, GhostTextOverlayController.isValidCaretRect(anchor) else { return nil }
+                let fallbackSize: CGFloat = (anchor.height > 8 && anchor.height < 120) ? max(11.0, min(64.0, round(anchor.height * 0.76))) : 13.5
                 let font = EditorFontCustomizer.shared.font(for: frontmostBundleID, caretHeight: anchor.height)
-                    ?? NSFont.systemFont(ofSize: anchor.height > 10 ? max(12.0, min(16.0, anchor.height - 3)) : 13.5)
+                    ?? NSFont.systemFont(ofSize: fallbackSize)
                 let advance = (insertionText as NSString).size(withAttributes: [.font: font]).width
                 return CGRect(
                     x: anchor.origin.x + advance,
@@ -1963,7 +2023,8 @@ final class AutoCorrectionService {
                     isCurrent: { [weak self] in
                         guard let self, self.phraseContinuationAnchor == insertionText else { return false }
                         return self.accessibilityService.isCurrentReplacementTarget(validTarget)
-                    }
+                    },
+                    lineSpacing: self.accessibilityService.focusedLineSpacing()
                 )
             } else {
                 self.ghostTextController.hide()
@@ -2009,6 +2070,26 @@ final class AutoCorrectionService {
                 self.settingsManager.recordSavedText(inserted: acceptance.replacement.count, typed: acceptance.expected.count)
                 CompletionStatsTracker.shared.recordAcceptedCompletion(insertedText: acceptance.replacement, typedPrefix: acceptance.expected)
 
+                // Record accepted writing sample for local style personalization
+                let targetBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+                let windowInfo = self.accessibilityService.activeWindowContext()
+                let focusInfo = self.accessibilityService.focusedFieldRole()
+                let fullAcceptedText: String = {
+                    if let ctx = currentCtx, !ctx.textBeforeCaret.isEmpty {
+                        let line = ctx.textBeforeCaret.components(separatedBy: .newlines).last ?? ctx.textBeforeCaret
+                        return line + acceptance.replacement
+                    }
+                    return acceptance.expected + acceptance.replacement
+                }()
+                UserTextHistoryStore.shared.recordAcceptedSample(
+                    text: fullAcceptedText,
+                    bundleID: targetBundleID,
+                    role: focusInfo?.role,
+                    subrole: focusInfo?.subrole,
+                    windowTitle: windowInfo.windowTitle,
+                    windowElement: windowInfo.windowElement
+                )
+
                 if let remaining = remainingPhrase, !remaining.isEmpty, self.phraseContinuationAnchor == insertionText {
                     self.suggestionTarget = self.accessibilityService.captureReplacementTarget() ?? validTarget
                     self.lastCaretContext = self.accessibilityService.captureCaretContext(preferCache: false) ?? self.lastCaretContext
@@ -2023,7 +2104,8 @@ final class AutoCorrectionService {
                                 suffix: remaining,
                                 caretRect: liveCaret,
                                 fieldRect: bounds.fieldRect,
-                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) }
+                                caretProvider: { [weak self] in self?.accessibilityService.caretScreenRect(preferCache: false) },
+                                lineSpacing: self.accessibilityService.focusedLineSpacing()
                             )
                         }
                         if (displayMode == .popup || displayMode == .both) {
@@ -2169,10 +2251,18 @@ final class AutoCorrectionService {
         if settingsManager.autoCorrectionCommaBeforeConjunctions && triggerChar == " " {
             if SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: word, precedingText: textBeforeWord) {
                 NSLog("[LangSwitcher] AutoCorrection: inserting comma before conjunction '\(word)'")
-                performCheckedReplacement(expected: " " + bufferedWord + " ",
-                                          replacement: ", " + bufferedWord + " ") { [weak self] _ in
+                let expectedText = " " + bufferedWord + " "
+                let replacementText = ", " + bufferedWord + " "
+                performCheckedReplacement(expected: expectedText,
+                                          replacement: replacementText) { [weak self] _ in
                     guard let self else { return }
                     self.previousWord = word.lowercased()
+                    self.recordAppliedCorrection(
+                        originalWord: " " + bufferedWord,
+                        replacedWord: ", " + bufferedWord,
+                        fullExpected: expectedText,
+                        fullReplacement: replacementText
+                    )
                     self.playCorrectionFeedback()
                     self.settingsManager.recordAutoCorrection(charCount: 2)
                 }
@@ -2222,8 +2312,20 @@ final class AutoCorrectionService {
 
                 let sourceLangs = layouts.map(\.languageCode)
                 if spellCheckService.isValidWordInAnyLanguage(word, languages: sourceLangs) {
-                    NSLog("[LangSwitcher] AutoCorrection: '\(word)' is valid in source language, skipping layout conversion")
-                    isLayoutConversionValid = false
+                    let srcCode = KeyboardLayoutDetector.getCurrentLayout()?.languageCode
+                    let isTargetDominant = LanguageWordlists.isTargetDominant(
+                        convertedWord: convertedWord,
+                        over: word,
+                        sourceLanguageCode: srcCode,
+                        targetLanguageCode: targetLang
+                    )
+
+                    if !isTargetDominant {
+                        NSLog("[LangSwitcher] AutoCorrection: '\(word)' is valid in source language, skipping layout conversion")
+                        isLayoutConversionValid = false
+                    } else {
+                        NSLog("[LangSwitcher] AutoCorrection: '\(word)' valid in source language but '\(convertedWord)' is dominant, allowing conversion")
+                    }
                 }
             }
 
@@ -2442,9 +2544,14 @@ final class AutoCorrectionService {
 
         NSLog("[LangSwitcher] AutoCorrection: reverting '\(pending.replacedWord)' → '\(pending.originalWord)'")
 
-        // 1. Immediately teach user dictionary so this word is never modified again
-        let learned = UserDictionary.shared.learn(pending.originalWord)
-        NSLog("[LangSwitcher] AutoCorrection: learned '\(pending.originalWord)' to UserDictionary: \(learned)")
+        // 1. Immediately teach user dictionary so this word is never modified again (skip pure case/capitalization or punctuation reverts)
+        let isWordCorrection = pending.originalWord.contains(where: \.isLetter)
+            && !pending.originalWord.contains(where: \.isWhitespace)
+            && pending.originalWord.lowercased() != pending.replacedWord.lowercased()
+        if isWordCorrection {
+            let learned = UserDictionary.shared.learn(pending.originalWord)
+            NSLog("[LangSwitcher] AutoCorrection: learned '\(pending.originalWord)' to UserDictionary: \(learned)")
+        }
 
         // 2. Revert layout switch if one occurred
         if let from = pending.switchedFromLayoutID, pending.switchedToLayoutID != nil {
@@ -2475,7 +2582,8 @@ final class AutoCorrectionService {
     func checkAndLearnRetypedWord(_ word: String) -> Bool {
         guard let last = lastAutoCorrection,
               Date().timeIntervalSince(last.timestamp) < 60.0,
-              last.originalWord.lowercased() == word.lowercased() else {
+              last.originalWord.lowercased() == word.lowercased(),
+              last.originalWord.lowercased() != last.replacedWord.lowercased() else {
             return false
         }
         NSLog("[LangSwitcher] AutoCorrection: user re-typed '\(word)' (previously corrected to '\(last.replacedWord)'). Learning to UserDictionary and abstaining.")
@@ -2789,6 +2897,7 @@ enum ServiceRecovery {
 enum CorrectionToken {
     static func isAlternativeLetter(_ char: Character, source: String, targets: [String]) -> Bool {
         guard !char.isWhitespace, !char.isLetter, !char.isNumber else { return false }
+        if char == "§" || char == "±" { return true }
         return targets.contains { target in
             guard target != source,
                   let mapped = LayoutMapper.convert(text: String(char), from: source, to: target) else { return false }
@@ -3039,7 +3148,19 @@ struct CompletionAcceptanceText {
     init(candidate: String, typedPrefix: String, entirePhrase: Bool,
          appendSpace: Bool, includePunctuation: Bool) {
         guard !entirePhrase else {
-            insertion = candidate + (appendSpace ? " " : "")
+            var text = candidate
+            if !includePunctuation {
+                let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                var stripped = trimmed
+                while let last = stripped.last, Self.clausePunctuation.contains(last) {
+                    stripped.removeLast()
+                }
+                stripped = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !stripped.isEmpty {
+                    text = stripped
+                }
+            }
+            insertion = text + (appendSpace ? " " : "")
             remaining = nil
             return
         }

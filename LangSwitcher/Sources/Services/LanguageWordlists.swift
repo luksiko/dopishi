@@ -68,6 +68,50 @@ enum LanguageWordlists {
         return nil
     }
 
+    /// Returns the 0-based frequency rank of `word` in a specific language wordlist if available.
+    static func rank(of word: String, in language: Language) -> Int? {
+        let lower = word.lowercased()
+        switch language {
+        case .russian: return russianRanks[lower]
+        case .english: return englishRanks[lower]
+        default: return nil
+        }
+    }
+
+    /// Maps an ISO/system language code to a supported `Language`.
+    static func language(forCode code: String?) -> Language? {
+        switch code?.lowercased() {
+        case "ru": return .russian
+        case "en": return .english
+        case "uk", "ua": return .ukrainian
+        case "pl": return .polish
+        default: return nil
+        }
+    }
+
+    /// Returns true if `convertedWord` in `targetLanguageCode` is vastly more common than `sourceWord`
+    /// in `sourceLanguageCode` (e.g. "еще" rank 60 vs "tot" rank 14352).
+    /// Only compares when both languages have frequency rank tables, so valid words in languages
+    /// without rank tables (e.g. Ukrainian/Polish) are never falsely overridden.
+    static func isTargetDominant(
+        convertedWord: String,
+        over sourceWord: String,
+        sourceLanguageCode: String?,
+        targetLanguageCode: String?
+    ) -> Bool {
+        guard let tLang = language(forCode: targetLanguageCode),
+              let tRank = rank(of: convertedWord, in: tLang),
+              let sLang = language(forCode: sourceLanguageCode),
+              sLang == .russian || sLang == .english else {
+            return false
+        }
+        if let sRank = rank(of: sourceWord, in: sLang) {
+            return tRank < 1000 && tRank * 5 < sRank
+        }
+        // Source word is not in the top frequency list at all while target is top-2000
+        return tRank < 2000
+    }
+
     // MARK: - Public API
 
     /// Coverage = share of the text's alphabetic tokens found in `list`.

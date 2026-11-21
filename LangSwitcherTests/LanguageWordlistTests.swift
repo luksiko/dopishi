@@ -199,4 +199,36 @@ final class LanguageWordlistTests: XCTestCase {
         XCTAssertEqual(converter.convertSelectedText("cześć"), "сяуіс")
         XCTAssertEqual(converter.convertSelectedText("привіт"), "ghbdsn")
     }
+
+    func testIsTargetDominant_RussianOverObscureEnglish() {
+        XCTAssertTrue(
+            LanguageWordlists.isTargetDominant(
+                convertedWord: "еще",
+                over: "tot",
+                sourceLanguageCode: "en",
+                targetLanguageCode: "ru"
+            )
+        )
+    }
+
+    func testIsTargetDominant_DoesNotOverrideLanguagesWithoutRankTables() {
+        // Ukrainian and Polish lack frequency rank tables; valid words in those
+        // languages must never be treated as absent/obscure relative to Russian/English.
+        XCTAssertFalse(
+            LanguageWordlists.isTargetDominant(
+                convertedWord: "еще",
+                over: "ще",
+                sourceLanguageCode: "uk",
+                targetLanguageCode: "ru"
+            )
+        )
+        XCTAssertFalse(
+            LanguageWordlists.isTargetDominant(
+                convertedWord: "hello",
+                over: "cześć",
+                sourceLanguageCode: "pl",
+                targetLanguageCode: "en"
+            )
+        )
+    }
 }

@@ -382,7 +382,7 @@ final class AutocompletionRefreshTests: XCTestCase {
 
         for (keyCode, flags) in [(UInt16(0x30), CGEventFlags()),
                                  (UInt16(0x30), CGEventFlags.maskShift),
-                                 (UInt16(0x12), CGEventFlags())] {
+                                 (UInt16(0x12), CGEventFlags.maskCommand)] {
             let popup = AutocompletionOverlayController()
             let ghost = GhostTextOverlayController()
             let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh())
@@ -407,6 +407,27 @@ final class AutocompletionRefreshTests: XCTestCase {
         let tab = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x30, keyDown: true))
         tab.flags = []
         XCTAssertFalse(service.interceptKeyIfOverlayVisible(event: tab))
+    }
+
+    func testPlainDigitPassesThroughWhenCompletionOverlayVisible() throws {
+        let settings = SettingsManager.shared
+        let savedNumberShortcuts = settings.autoCompletionUseNumberShortcuts
+        defer { settings.autoCompletionUseNumberShortcuts = savedNumberShortcuts }
+        settings.autoCompletionUseNumberShortcuts = true
+
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh())
+        defer { service.stop() }
+        showSuggestions(popup, ghost)
+
+        let digitOne = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x12, keyDown: true))
+        digitOne.flags = []
+        XCTAssertFalse(service.interceptKeyIfOverlayVisible(event: digitOne),
+                       "Plain digit '1' without Command must pass through to editor")
+        XCTAssertFalse(popup.isVisible,
+                       "Passing through a normal digit dismisses the stale completion overlay without accepting a candidate")
+        XCTAssertNil(popup.selectedCandidate)
     }
 
     func testEscapeCancelsPendingRefresh() async throws {
@@ -1095,6 +1116,26 @@ extension AutocompletionRefreshTests {
         full.flags = .maskShift
         XCTAssertTrue(service.interceptKeyIfOverlayVisible(event: full))
         XCTAssertEqual(received.last?.1, true)
+    }
+
+    func testOptionRightArrowAcceptsNextWordOnly() throws {
+        let popup = AutocompletionOverlayController()
+        let ghost = GhostTextOverlayController()
+        var received: [(Bool, Bool, UInt16?)] = []
+        let service = makeService(popup: popup, ghost: ghost, refresh: AutocompletionRefresh(),
+            acceptanceHandler: { _, space, entire, failureEvent in
+                let key = failureEvent.map { UInt16($0.getIntegerValueField(.keyboardEventKeycode)) }
+                received.append((space, entire, key))
+                return true
+            })
+        defer { service.stop() }
+
+        showSuggestions(popup, ghost)
+        let optRight = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x7C, keyDown: true))
+        optRight.flags = .maskAlternate
+        XCTAssertTrue(service.interceptKeyIfOverlayVisible(event: optRight))
+        XCTAssertEqual(received.last?.1, false, "Option + Right arrow must accept next word only (entirePhrase == false)")
+        XCTAssertEqual(received.last?.2, 0x7C)
     }
 }
 
@@ -1791,5 +1832,71 @@ final class AuxiliaryHUDInterceptionTests: XCTestCase {
         XCTAssertTrue(ghost.isVisible)
         XCTAssertEqual(ghost.lastCaretRect?.origin.x, estimatedCaret.origin.x)
         ghost.hide()
+    }
+
+    func testOptionRightArrowKeyRecognition() throws {
+        let settings = SettingsManager.shared
+        // Option + Right Arrow (0x7C)
+        let optRight = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x7C, keyDown: true))
+        optRight.flags = .maskAlternate
+        XCTAssertTrue(settings.isAutocompletionAcceptNextWordKey(keyCode: 0x7C, flags: optRight.flags))
+
+        // Right arrow without Option should not match accept next word
+        let plainRight = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x7C, keyDown: true))
+        plainRight.flags = []
+        XCTAssertFalse(settings.isAutocompletionAcceptNextWordKey(keyCode: 0x7C, flags: plainRight.flags))
+
+        // Option + Command + Right arrow should not match
+        let cmdOptRight = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x7C, keyDown: true))
+        cmdOptRight.flags = [.maskAlternate, .maskCommand]
+        XCTAssertFalse(settings.isAutocompletionAcceptNextWordKey(keyCode: 0x7C, flags: cmdOptRight.flags))
+
+        // Option + Shift + Right arrow (macOS word selection) must NOT match accept next word
+        let optShiftRight = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 0x7C, keyDown: true))
+        optShiftRight.flags = [.maskAlternate, .maskShift]
+        XCTAssertFalse(settings.isAutocompletionAcceptNextWordKey(keyCode: 0x7C, flags: optShiftRight.flags),
+                       "Option + Shift + Right arrow is text selection and must not trigger autocompletion acceptance")
+    }
+
+    func testTrailingPunctuationStrippedWhenDisabledForEntirePhrase() {
+        let planWithPunctuation = CompletionAcceptanceText(
+            candidate: "done, next.",
+            typedPrefix: "",
+            entirePhrase: true,
+            appendSpace: false,
+            includePunctuation: true
+        )
+        XCTAssertEqual(planWithPunctuation.insertion, "done, next.")
+
+        let planWithoutPunctuation = CompletionAcceptanceText(
+            candidate: "done, next.",
+            typedPrefix: "",
+            entirePhrase: true,
+            appendSpace: false,
+            includePunctuation: false
+        )
+        XCTAssertEqual(planWithoutPunctuation.insertion, "done, next")
+
+        // Candidate with trailing space and punctuation
+        let planWithTrailingSpace = CompletionAcceptanceText(
+            candidate: "done, next. ",
+            typedPrefix: "",
+            entirePhrase: true,
+            appendSpace: false,
+            includePunctuation: false
+        )
+        XCTAssertEqual(planWithTrailingSpace.insertion, "done, next",
+                       "Trailing punctuation must be stripped even when followed by whitespace")
+
+        // Candidate that is only punctuation should not collapse into an empty insertion
+        let planOnlyPunctuation = CompletionAcceptanceText(
+            candidate: ".",
+            typedPrefix: "",
+            entirePhrase: true,
+            appendSpace: false,
+            includePunctuation: false
+        )
+        XCTAssertEqual(planOnlyPunctuation.insertion, ".",
+                       "Punctuation-only candidate must be preserved to avoid empty insertion")
     }
 }

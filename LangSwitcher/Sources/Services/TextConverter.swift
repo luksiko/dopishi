@@ -191,8 +191,14 @@ final class TextConverter {
 
         // Personal dictionary: words the user taught us by reverting a
         // Thought Recovery are intentional by definition.
-        if UserDictionary.shared.containsAny(in: trimmed) {
-            NSLog("[LangSwitcher] looksLikeWrongLayout: vetoed — user dictionary word")
+        let isSingleWord = !trimmed.contains { $0.isWhitespace }
+        if isSingleWord {
+            if UserDictionary.shared.contains(trimmed) {
+                NSLog("[LangSwitcher] looksLikeWrongLayout: vetoed — user dictionary word '\(trimmed)'")
+                return false
+            }
+        } else if UserDictionary.shared.containsAny(in: trimmed) {
+            NSLog("[LangSwitcher] looksLikeWrongLayout: vetoed — user dictionary word in phrase")
             return false
         }
         

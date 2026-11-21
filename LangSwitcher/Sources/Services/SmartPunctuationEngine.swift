@@ -11,6 +11,7 @@ public struct SmartPunctuationEngine {
     public static let commonAbbreviations: Set<String> = [
         // Russian
         "т.д.", "т.п.", "т.е.", "т.к.", "т.н.", "т.о.",
+        "т. д.", "т. п.", "т. е.", "т. к.", "т. н.", "т. о.",
         "г.", "ул.", "д.", "кв.", "руб.", "коп.", "стр.", "рис.", "табл.", "см.", "с.", "в.", "вв.",
         "др.", "проф.", "акад.", "доц.", "тов.", "млн.", "млрд.", "тыс.", "экз.",
         // English
@@ -58,12 +59,22 @@ public struct SmartPunctuationEngine {
             return nil
         }
 
-        // If it's a dot, make sure it's not part of an abbreviation
+        // If it's a dot, make sure it's not part of an abbreviation or ellipsis
         if lastChar == "." {
+            if trimmedPreceding.hasSuffix("..") {
+                return nil
+            }
             let lowerPreceding = trimmedPreceding.lowercased()
             for abbr in commonAbbreviations {
                 if lowerPreceding.hasSuffix(abbr) {
-                    return nil
+                    let prefixLen = lowerPreceding.count - abbr.count
+                    if prefixLen == 0 {
+                        return nil
+                    }
+                    let charBefore = lowerPreceding[lowerPreceding.index(lowerPreceding.startIndex, offsetBy: prefixLen - 1)]
+                    if !charBefore.isLetter && !charBefore.isNumber {
+                        return nil
+                    }
                 }
             }
             // Check if it's a number/decimal like "3."
@@ -85,6 +96,14 @@ public struct SmartPunctuationEngine {
     /// Spanish: "pero", "sino"
     private static let coordinatingConjunctions: Set<String> = [
         "а", "но", "але", "but", "aber", "sondern", "mais", "pero", "sino"
+    ]
+
+    /// Words that typically precede letter designation «а» (not a conjunction),
+    /// e.g. "пункт а", "вариант а", "витамин а", "от а до я".
+    private static let nonConjunctionPrecedingWordsForA: Set<String> = [
+        "пункт", "подпункт", "вариант", "план", "категория", "витамин",
+        "класс", "группа", "тип", "сектор", "форма", "литера", "серия",
+        "раздел", "часть", "глава", "буква", "схема", "таблица", "от", "ни"
     ]
 
     /// Evaluates whether a comma should be inserted before coordinating conjunctions (e.g. «а», «но», «але», "but", "aber", "mais", "pero").
@@ -111,6 +130,14 @@ public struct SmartPunctuationEngine {
         // Must be preceded by a word (letter or number), e.g. "хотел ", "быстро "
         guard lastChar.isLetter || lastChar.isNumber else {
             return false
+        }
+
+        // Avoid inserting comma before letter designation "а" (e.g. "пункт а", "витамин а")
+        if word == "а" {
+            let lastWord = String(trimmed.reversed().prefix(while: { $0.isLetter }).reversed()).lowercased()
+            if nonConjunctionPrecedingWordsForA.contains(lastWord) {
+                return false
+            }
         }
 
         return true

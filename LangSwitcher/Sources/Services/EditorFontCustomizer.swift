@@ -34,6 +34,13 @@ final class EditorFontCustomizer {
     static let appleTerminalBundleIDs: Set<String> = [
         "com.apple.Terminal"
     ]
+
+    static let warpBundleIDs: Set<String> = [
+        "dev.warp.Warp-Stable",
+        "dev.warp.Warp-Main",
+        "dev.warp.Warp-GDK",
+        "dev.warp.Warp"
+    ]
     
     static let otherCodingAppBundleIDs: Set<String> = [
         "com.apple.dt.Xcode",
@@ -47,7 +54,12 @@ final class EditorFontCustomizer {
         "com.jetbrains.goland",
         "com.jetbrains.CLion",
         "com.jetbrains.AppCode",
-        "com.jetbrains.rider"
+        "com.jetbrains.rider",
+        "com.google.android.studio",
+        "io.alacritty",
+        "net.kovidgoyal.kitty",
+        "dev.zed.Zed",
+        "org.vim.MacVim"
     ]
     
     // MARK: - Cache Structure
@@ -151,6 +163,12 @@ final class EditorFontCustomizer {
             }
             return (NSFont.monospacedSystemFont(ofSize: size, weight: .regular), "SF Mono", size)
         }
+
+        // 4b. Warp Terminal
+        if Self.warpBundleIDs.contains(bundleID) {
+            let size = fallbackSize
+            return (NSFont.monospacedSystemFont(ofSize: size, weight: .regular), "Monospaced", size)
+        }
         
         // 5. Other IDEs / Editors
         if Self.otherCodingAppBundleIDs.contains(bundleID) || bundleID.contains("jetbrains") || bundleID.contains("Xcode") {
@@ -159,6 +177,22 @@ final class EditorFontCustomizer {
         }
         
         return nil
+    }
+
+    /// Determines whether the target bundle ID represents a recognized code editor or terminal.
+    static func isCodeEditorOrTerminal(bundleID: String?) -> Bool {
+        guard let bundleID = bundleID else { return false }
+        return vscodeForkBundleIDs.keys.contains(bundleID)
+            || itermBundleIDs.contains(bundleID)
+            || appleTerminalBundleIDs.contains(bundleID)
+            || warpBundleIDs.contains(bundleID)
+            || ghosttyBundleIDs.contains(bundleID)
+            || otherCodingAppBundleIDs.contains(bundleID)
+            || bundleID.contains("jetbrains")
+            || bundleID.contains("Xcode")
+            || bundleID.contains("alacritty")
+            || bundleID.contains("kitty")
+            || bundleID.contains("Zed")
     }
     
     // MARK: - App Config Parsers

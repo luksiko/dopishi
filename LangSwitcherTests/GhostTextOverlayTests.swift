@@ -1262,5 +1262,115 @@ extension GhostTextOverlayTests {
             _ = service.isElectronOrChromiumApp(pid: pid)
         }
     }
+
+    func testGhostTextViewMultilineWordWrappingAndLineSpacing() {
+        let view = GhostTextView()
+        view.fontSize = 14.0
+        XCTAssertEqual(view.textContainer.lineBreakMode, .byWordWrapping)
+        XCTAssertEqual(view.textContainer.maximumNumberOfLines, 0)
+
+        view.text = "The quick brown fox jumps over the lazy dog and runs across the entire field without stopping."
+        let singleLineSize = view.idealSize(maxWidth: CGFloat.greatestFiniteMagnitude)
+        let wrappedSize = view.idealSize(maxWidth: 150)
+        XCTAssertLessThanOrEqual(wrappedSize.width, 154)
+        XCTAssertGreaterThan(wrappedSize.height, singleLineSize.height)
+
+        view.lineSpacing = 8.0
+        let attrs = view.textAttributes()
+        let paragraph = attrs[.paragraphStyle] as? NSParagraphStyle
+        XCTAssertEqual(paragraph?.lineBreakMode, .byWordWrapping)
+        XCTAssertEqual(paragraph?.lineSpacing, 8.0)
+    }
+
+    func testGhostTextViewTypographyAndNoHarshShadow() {
+        let view = GhostTextView()
+        view.text = "completion text"
+        let attrs = view.textAttributes()
+
+        // Harsh shadow removed
+        XCTAssertNil(attrs[.shadow], "Harsh shadow must be nil/removed")
+
+        // Foreground color bound to placeholderTextColor with light alpha
+        let color = attrs[.foregroundColor] as? NSColor
+        XCTAssertNotNil(color)
+        XCTAssertEqual(color?.alphaComponent ?? 0.0, 0.85, accuracy: 0.05)
+    }
+
+    func testGhostTextAdaptiveMonospaceForTerminalAndEditors() {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let cand = AutocompletionCandidate(word: "echo hello", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 100, y: 200, width: 2, height: 22)
+
+        // VS Code
+        ghost.positionAndDisplay(caret: caret, suffix: "cho hello", bundleID: "com.microsoft.VSCode")
+        XCTAssertTrue(ghost.isVisible)
+
+        // Warp Terminal
+        ghost.positionAndDisplay(caret: caret, suffix: "cho hello", bundleID: "dev.warp.Warp-Stable")
+        XCTAssertTrue(ghost.isVisible)
+
+        // Apple Terminal
+        ghost.positionAndDisplay(caret: caret, suffix: "cho hello", bundleID: "com.apple.Terminal")
+        XCTAssertTrue(ghost.isVisible)
+    }
+
+    func testGhostTextMultilineBaselineDoesNotShiftWhenTextWraps() {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let cand = AutocompletionCandidate(word: "short", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 100, y: 300, width: 2, height: 20)
+        let fieldRect = CGRect(x: 50, y: 100, width: 250, height: 400)
+
+        // 1. Show single line suffix
+        ghost.show(candidate: cand, suffix: "short", caretRect: caret, fieldRect: fieldRect)
+        XCTAssertTrue(ghost.isVisible)
+        guard let initialFrame = ghost.panelFrame else {
+            XCTFail("Panel frame should be non-nil")
+            return
+        }
+        let initialTop = initialFrame.origin.y + initialFrame.size.height
+
+        // 2. Update with long suffix that wraps to multiple lines while caret remains at same anchor
+        let longCand = AutocompletionCandidate(word: "short but wrapping across multiple lines into a paragraph", targetLayoutID: "com.apple.keylayout.US")
+        ghost.show(
+            candidate: longCand,
+            suffix: "short but wrapping across multiple lines into a paragraph of ghost text that must wrap nicely",
+            caretRect: caret,
+            fieldRect: fieldRect,
+            caretProvider: { caret }
+        )
+
+        guard let multilineFrame = ghost.panelFrame else {
+            XCTFail("Multiline panel frame should be non-nil")
+            return
+        }
+        let multilineTop = multilineFrame.origin.y + multilineFrame.size.height
+
+        // Height must have increased due to wrapping
+        XCTAssertGreaterThan(multilineFrame.size.height, initialFrame.size.height)
+        // Top edge of the panel (which anchors line 1 baseline) must remain identical
+        XCTAssertEqual(multilineTop, initialTop, accuracy: 1.0,
+                       "First line baseline / top edge must remain anchored when multiline text wraps")
+    }
+
+    func testGhostTextOverlayRetainsLineSpacingAcrossPendingCaretPoll() {
+        let ghost = GhostTextOverlayController()
+        defer { ghost.hide() }
+
+        let cand = AutocompletionCandidate(word: "multiline test", targetLayoutID: "com.apple.keylayout.US")
+        let caret = CGRect(x: 100, y: 200, width: 2, height: 20)
+
+        ghost.show(
+            candidate: cand,
+            suffix: "line 1\nline 2",
+            caretRect: caret,
+            lineSpacing: 9.5
+        )
+
+        XCTAssertEqual(ghost.lastLineSpacing, 9.5)
+    }
 }
 

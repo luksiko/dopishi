@@ -401,6 +401,7 @@ struct AIAssistantSettingsTab: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Picker(l10n.t("ai.predictive.wordCount"), selection: $settingsManager.aiMaxContinuationWords) {
+                        Text(l10n.t("ai.predictive.currentWordOnly")).tag(1)
                         Text(String(format: l10n.t("ai.predictive.words"), 2)).tag(2)
                         Text(String(format: l10n.t("ai.predictive.words"), 3)).tag(3)
                         Text(String(format: l10n.t("ai.predictive.words"), 4)).tag(4)

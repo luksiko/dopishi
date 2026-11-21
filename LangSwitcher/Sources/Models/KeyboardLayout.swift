@@ -28,7 +28,7 @@ enum LayoutCharacterMap {
     
     // Standard US QWERTY keyboard
     static let qwertyUS: [Character: Character] = {
-        let chars = "`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?"
+        let chars = "`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?§±"
         var map: [Character: Character] = [:]
         for (i, c) in chars.enumerated() {
             map[c] = c
@@ -38,8 +38,8 @@ enum LayoutCharacterMap {
     
     // Russian (standard) keyboard — mapped to same physical keys as US QWERTY
     static let russian: [Character: Character] = {
-        let qwerty = Array("`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?")
-        let russian = Array("ё1234567890-=йцукенгшщзхъ\\фывапролджэячсмитьбю.Ё!\"№;%:?*()_+ЙЦУКЕНГШЩЗХЪ/ФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,")
+        let qwerty = Array("`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?§±")
+        let russian = Array("ё1234567890-=йцукенгшщзхъ\\фывапролджэячсмитьбю.Ё!\"№;%:?*()_+ЙЦУКЕНГШЩЗХЪ/ФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,ёЁ")
         var map: [Character: Character] = [:]
         for i in 0..<min(qwerty.count, russian.count) {
             map[qwerty[i]] = russian[i]
@@ -71,8 +71,8 @@ enum LayoutCharacterMap {
     
     // Ukrainian
     static let ukrainian: [Character: Character] = {
-        let qwerty = Array("`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?")
-        let ukr    = Array("'1234567890-=йцукенгшщзхї\\фівапролджєячсмитьбю.₴!\"№;%:?*()_+ЙЦУКЕНГШЩЗХЇ/ФІВАПРОЛДЖЄЯЧСМИТЬБЮ,")
+        let qwerty = Array("`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?§±")
+        let ukr    = Array("'1234567890-=йцукенгшщзхї\\фівапролджєячсмитьбю.₴!\"№;%:?*()_+ЙЦУКЕНГШЩЗХЇ/ФІВАПРОЛДЖЄЯЧСМИТЬБЮ,'₴")
         var map: [Character: Character] = [:]
         for i in 0..<min(qwerty.count, ukr.count) {
             map[qwerty[i]] = ukr[i]
@@ -160,8 +160,9 @@ enum LayoutCharacterMap {
         dynamicCacheLock.unlock()
     }
 
-    /// Standard ANSI physical keycodes corresponding to standard QWERTY keys
+    /// Standard ANSI and ISO physical keycodes corresponding to standard QWERTY keys
     private static let physicalKeyCodes: [(code: UInt16, unshifted: Character, shifted: Character)] = [
+        (10, "§", "±"),
         (50, "`", "~"), (18, "1", "!"), (19, "2", "@"), (20, "3", "#"), (21, "4", "$"),
         (23, "5", "%"), (22, "6", "^"), (26, "7", "&"), (28, "8", "*"), (25, "9", "("),
         (29, "0", ")"), (27, "-", "_"), (24, "=", "+"),

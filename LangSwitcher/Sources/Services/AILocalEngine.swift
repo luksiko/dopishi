@@ -555,7 +555,8 @@ public actor AILocalEngine {
         prompt: String,
         maxTokens: Int = 16,
         temperature: Float = 0.2,
-        stopSequences: [String] = ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "<eos>", "\n"],
+        stopSequences: [String] = ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "<eos>", "<|eot_id|>", "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>", "\n"],
+        stopAtWordBoundary: Bool = false,
         onToken: (@Sendable (String) -> Void)? = nil
     ) throws -> String {
         guard isLoaded, let ctx = context, let v = vocab, var b = batch else {
@@ -658,11 +659,6 @@ public actor AILocalEngine {
                 recentTokens.removeFirst()
             }
 
-            let validText = accumulatedText.replacingOccurrences(of: "\u{FFFD}", with: "")
-            if !validText.isEmpty {
-                onToken?(validText)
-            }
-
             // Check stop sequences
             var shouldStop = false
             for stop in stopSequences {
@@ -684,6 +680,31 @@ public actor AILocalEngine {
                     break
                 }
             }
+
+            // Check word boundary stop condition ("Current word only" mode)
+            if !shouldStop && stopAtWordBoundary {
+                let trimmedLeading = accumulatedText.drop(while: { $0.isWhitespace })
+                if !trimmedLeading.isEmpty {
+                    if let firstWordCharIdx = trimmedLeading.firstIndex(where: { $0.isLetter || $0.isNumber }) {
+                        let afterFirstChar = trimmedLeading[firstWordCharIdx...]
+                        if let boundaryIdx = afterFirstChar.firstIndex(where: { $0.isWhitespace || $0.isPunctuation || $0.isSymbol }) {
+                            let prefixDistance = accumulatedText.distance(from: accumulatedText.startIndex, to: boundaryIdx)
+                            accumulatedText = String(accumulatedText.prefix(prefixDistance))
+                            shouldStop = true
+                        }
+                    } else if let boundaryIdx = trimmedLeading.firstIndex(where: { $0.isWhitespace }) {
+                        let prefixDistance = accumulatedText.distance(from: accumulatedText.startIndex, to: boundaryIdx)
+                        accumulatedText = String(accumulatedText.prefix(prefixDistance))
+                        shouldStop = true
+                    }
+                }
+            }
+
+            let validText = accumulatedText.replacingOccurrences(of: "\u{FFFD}", with: "")
+            if !validText.isEmpty {
+                onToken?(validText)
+            }
+
             if shouldStop {
                 break
             }

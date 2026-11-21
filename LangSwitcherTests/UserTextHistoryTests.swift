@@ -182,4 +182,82 @@ final class UserTextHistoryTests: XCTestCase {
         XCTAssertGreaterThan(store.frequencyScore(for: "integration"), 0)
         XCTAssertGreaterThan(store.bigramBonus(for: "integration", after: "continuous"), 0)
     }
+
+    // MARK: - Privacy Exclusions Tests
+
+    func testPrivacyExclusionsRejectSecureFields() {
+        XCTAssertEqual(store.totalSnippetCount, 0)
+        
+        // Secure password field via role
+        store.recordAcceptedSample(
+            text: "My secret master password phrase for login",
+            bundleID: "com.apple.Safari",
+            role: "AXSecureTextField"
+        )
+        XCTAssertEqual(store.totalSnippetCount, 0, "Must never record in AXSecureTextField role")
+
+        // Secure password field via subrole
+        store.recordAcceptedSample(
+            text: "My secret master password phrase for login",
+            bundleID: "com.google.Chrome",
+            role: "AXTextField",
+            subrole: "AXSecureTextField"
+        )
+        XCTAssertEqual(store.totalSnippetCount, 0, "Must never record in AXSecureTextField subrole")
+    }
+
+    func testPrivacyExclusionsRejectIncognitoWindowsAcrossAllBrowsers() {
+        let incognitoTestCases: [(bundleID: String, windowTitle: String)] = [
+            ("com.apple.Safari", "Private Browsing — Search"),
+            ("com.apple.Safari", "Частный доступ — Стартовая страница"),
+            ("com.google.Chrome", "Google (Incognito)"),
+            ("com.google.Chrome", "Новая вкладка (Вкладка инкогнито)"),
+            ("org.mozilla.firefox", "Mozilla Firefox — Private Browsing"),
+            ("org.mozilla.firefox", "Википедия — Приватный просмотр"),
+            ("com.brave.Browser", "New Private Tab - Brave"),
+            ("com.brave.Browser", "GitHub (Incognito)"),
+            ("com.brave.Browser", "Brave - Private"),
+            ("com.vivaldi.Vivaldi", "Vivaldi Private Window"),
+            ("com.permacomputing.comet", "Comet Browser - Incognito Session"),
+            ("org.comet.comet", "Page Title - Private Window"),
+            ("app.zen-browser.zen", "Zen Browser — Private Browsing"),
+            ("io.github.zen_browser.zen", "Zen Browser (Private)"),
+            ("com.microsoft.edgemac", "Search - InPrivate")
+        ]
+
+        for (idx, tc) in incognitoTestCases.enumerated() {
+            XCTAssertTrue(
+                AutoCorrectionGate.isPrivateOrIncognitoWindow(bundleID: tc.bundleID, windowTitle: tc.windowTitle),
+                "AutoCorrectionGate must detect incognito for \(tc.bundleID) with title '\(tc.windowTitle)'"
+            )
+            store.recordAcceptedSample(
+                text: "Пользовательский текст номер \(idx) который никогда не должен быть сохранен",
+                bundleID: tc.bundleID,
+                windowTitle: tc.windowTitle
+            )
+            XCTAssertEqual(store.totalSnippetCount, 0, "Must never record in incognito/private window for \(tc.bundleID) with title '\(tc.windowTitle)'")
+            store.clearHistory()
+        }
+    }
+
+    func testRecordAcceptedSampleStoresValidNonPrivateWriting() {
+        XCTAssertEqual(store.totalSnippetCount, 0)
+
+        // Normal Safari window
+        store.recordAcceptedSample(
+            text: "Мы успешно завершили реализацию архитектурного рефакторинга",
+            bundleID: "com.apple.Safari",
+            windowTitle: "Pull Request #42 — GitHub"
+        )
+        XCTAssertEqual(store.totalSnippetCount, 1)
+        XCTAssertEqual(store.fetchLatestSnippet(for: "com.apple.Safari")?.text, "Мы успешно завершили реализацию архитектурного рефакторинга")
+
+        // Normal Chrome window
+        store.recordAcceptedSample(
+            text: "Please find attached the latest specification and architecture document",
+            bundleID: "com.google.Chrome",
+            windowTitle: "Google Docs — Engineering Spec"
+        )
+        XCTAssertEqual(store.totalSnippetCount, 2)
+    }
 }

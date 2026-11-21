@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ApplicationServices
 
 // MARK: - User Text Snippet Model
 
@@ -113,12 +114,67 @@ final class UserTextHistoryStore: ObservableObject {
     
     // MARK: - Insert & Learning
     
-    func recordSnippet(text: String, bundleID: String) {
+    /// Records an accepted user writing sample for few-shot style personalization.
+    /// Strictly obeys privacy exclusions for secure fields and incognito browser windows.
+    func recordAcceptedSample(
+        text: String,
+        bundleID: String,
+        role: String? = nil,
+        subrole: String? = nil,
+        windowTitle: String? = nil,
+        windowElement: AXUIElement? = nil
+    ) {
+        recordSnippet(
+            text: text,
+            bundleID: bundleID,
+            role: role,
+            subrole: subrole,
+            windowTitle: windowTitle,
+            windowElement: windowElement
+        )
+    }
+
+    func recordSnippet(
+        text: String,
+        bundleID: String,
+        role: String? = nil,
+        subrole: String? = nil,
+        windowTitle: String? = nil,
+        windowElement: AXUIElement? = nil
+    ) {
+        // Enforce privacy exclusions:
+        // 1. Never record in password / secure fields
+        if AutoCorrectionGate.isSecureField(role: role, subrole: subrole) {
+            return
+        }
+
+        // 2. Never record in private/incognito browser windows (Safari, Chrome, Firefox, Brave, Vivaldi, Comet, Zen)
+        if AutoCorrectionGate.isPrivateOrIncognitoWindow(
+            bundleID: bundleID,
+            windowTitle: windowTitle,
+            windowElement: windowElement
+        ) {
+            return
+        }
+
         guard let sanitized = Self.sanitize(text: text) else { return }
         
         let words = sanitized.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         let isCyrillic = AIInferenceEngine.containsCyrillic(sanitized)
-        let language = isCyrillic ? "ru" : "en"
+        let currentLangCode = KeyboardLayoutDetector.getCurrentLayout()?.languageCode.lowercased()
+        let language: String = {
+            if isCyrillic {
+                if let code = currentLangCode, code == "uk" || code == "be" || code == "bg" || code == "kk" {
+                    return code
+                }
+                return "ru"
+            } else {
+                if let code = currentLangCode, code != "ru" && code != "uk" && !code.isEmpty {
+                    return code
+                }
+                return "en"
+            }
+        }()
         
         // Check if identical or prefix of the latest snippet for this app
         if let latest = fetchLatestSnippet(for: bundleID) {

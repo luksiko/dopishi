@@ -471,6 +471,7 @@ Vérifiez également : Confidentialité et sécurité → Surveillance de l’en
         "ai.predictive.enable":                  "Continuation prédictive de texte",
         "ai.predictive.desc":                    "Propose 2 à 4 mots après une courte pause de frappe (350 ms).",
         "ai.predictive.wordCount":               "Longueur de la continuation",
+        "ai.predictive.currentWordOnly":         "Mot actuel seulement",
         "ai.predictive.words":                   "%d mots",
         "ai.predictive.debounceDelay":           "Délai de prédiction :",
         "ai.predictive.debounceDesc":            "Pause de frappe avant que l’IA ne génère une continuation.",

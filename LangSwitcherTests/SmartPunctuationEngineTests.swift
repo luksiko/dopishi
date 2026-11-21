@@ -51,6 +51,23 @@ final class SmartPunctuationEngineTests: XCTestCase {
         XCTAssertNil(SmartPunctuationEngine.capitalizeAfterSentence(word: "привет", precedingText: "просто слово "))
     }
 
+    func testCapitalizeAfterWordsEndingInAbbreviationLetters() {
+        XCTAssertEqual(SmartPunctuationEngine.capitalizeAfterSentence(word: "привет", precedingText: "Мы приехали в город. "), "Привет")
+        XCTAssertEqual(SmartPunctuationEngine.capitalizeAfterSentence(word: "как", precedingText: "Это важный вопрос. "), "Как")
+        XCTAssertEqual(SmartPunctuationEngine.capitalizeAfterSentence(word: "столица", precedingText: "Киев. "), "Столица")
+        XCTAssertEqual(SmartPunctuationEngine.capitalizeAfterSentence(word: "test", precedingText: "It is normal. "), "Test")
+    }
+
+    func testDoNotCapitalizeAfterSpacedAbbreviations() {
+        XCTAssertNil(SmartPunctuationEngine.capitalizeAfterSentence(word: "далее", precedingText: "и т. д. "))
+        XCTAssertNil(SmartPunctuationEngine.capitalizeAfterSentence(word: "когда", precedingText: "т. е. "))
+    }
+
+    func testDoNotCapitalizeAfterEllipsis() {
+        XCTAssertNil(SmartPunctuationEngine.capitalizeAfterSentence(word: "как", precedingText: "Привет... "))
+        XCTAssertNil(SmartPunctuationEngine.capitalizeAfterSentence(word: "dir", precedingText: "cd .. "))
+    }
+
     // MARK: - Comma Before Conjunction Tests
 
     func testCommaBeforeRussianA() {
@@ -94,6 +111,13 @@ final class SmartPunctuationEngineTests: XCTestCase {
     func testDoNotInsertCommaAfterSentencePunctuation() {
         let shouldInsert = SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "конец. ")
         XCTAssertFalse(shouldInsert)
+    }
+
+    func testDoNotInsertCommaBeforeLetterDesignationA() {
+        XCTAssertFalse(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "пункт "))
+        XCTAssertFalse(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "вариант "))
+        XCTAssertFalse(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "витамин "))
+        XCTAssertFalse(SmartPunctuationEngine.shouldInsertCommaBeforeConjunction(word: "а", precedingText: "от "))
     }
 
     // MARK: - Space Before Punctuation Tests

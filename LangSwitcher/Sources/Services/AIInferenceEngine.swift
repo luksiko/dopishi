@@ -405,6 +405,42 @@ final class AIInferenceEngine: ObservableObject {
         return prefix
     }
 
+    /// Builds completion prompt using Fill-in-the-Middle (FIM) when suffix is present,
+    /// or raw text continuation when suffix is empty. Eliminates forced chat templates (<|im_start|>)
+    /// and conversational assistant greetings for completion tasks.
+    nonisolated static func buildCompletionPrompt(
+        context: String,
+        rawPrompt: String,
+        afterCaret: String,
+        instructions: String?,
+        screenContext: String?,
+        appName: String?,
+        windowTitle: String?,
+        webDomain: String?,
+        persona: String? = nil,
+        allowProfanity: Bool = false
+    ) -> String {
+        let basePrefix = baseModelContextPrefix(
+            context: context,
+            instructions: instructions,
+            screenContext: screenContext,
+            appName: appName,
+            windowTitle: windowTitle,
+            webDomain: webDomain,
+            persona: persona,
+            allowProfanity: allowProfanity
+        )
+        let prefix = basePrefix + rawPrompt
+        let trimmedAfter = afterCaret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedAfter.isEmpty {
+            // Fill-in-the-Middle (FIM) format
+            return "<|fim_prefix|>\(prefix)<|fim_suffix|>\(afterCaret)<|fim_middle|>"
+        } else {
+            // Raw text continuation
+            return prefix
+        }
+    }
+
     nonisolated static func continuationPrefix(_ context: String) -> String {
         // A standalone trailing-space token biases BPE models toward numbers.
         // Let the model generate its own leading word separator, then reconcile it.
@@ -418,7 +454,8 @@ final class AIInferenceEngine: ObservableObject {
     }
 
     nonisolated static func predictionTokenBudget(context: String, maxWords: Int) -> Int {
-        min(96, max(24, maxWords * 8))
+        if maxWords <= 1 { return 8 }
+        return min(96, max(24, maxWords * 8))
     }
 
     /// Read metadata, never the tensors. A base model without a chat template
@@ -588,11 +625,6 @@ final class AIInferenceEngine: ObservableObject {
         guard !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, maxWords > 0 else { return nil }
         if !isRunning { guard await ensureRunning() else { return nil } }
         guard !Task.isCancelled, let model = currentLoadedModelPath else { return nil }
-        guard let usesTemplate = await modelUsesChatTemplate(at: model),
-              !Task.isCancelled, currentLoadedModelPath == model else { return nil }
-        // Base checkpoints cannot condition on a suffix without a supported FIM
-        // format. Abstain in the middle of text rather than guess over it.
-        guard usesTemplate || afterCaret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         guard let url = URL(string: "http://127.0.0.1:\(serverPort)/completion") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -617,47 +649,20 @@ final class AIInferenceEngine: ObservableObject {
 
         // Native Metal direct execution
         if await AILocalEngine.shared.isLoaded {
-            var nativePrompt = rawPrompt
             let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
             let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
-            if usesTemplate {
-                let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
-
-                let msgs = Self.completionMessages(
-                    context: context,
-                    afterCaret: afterCaret,
-                    instructions: combinedInstructions.isEmpty ? nil : combinedInstructions,
-                    screenContext: screenContext,
-                    hasPendingQuestion: hasPendingQuestion,
-                    appName: appName,
-                    windowTitle: windowTitle,
-                    webDomain: webDomain,
-                    allowProfanity: allowProfanity,
-                    frameUserDirective: true
-                ).map { (role: $0["role"] ?? "user", content: $0["content"] ?? "") }
-
-                if let formatted = await AILocalEngine.shared.applyChatTemplate(messages: msgs, addAssistant: true) {
-                    nativePrompt = Self.appendingClosedThinkingBlock(to: formatted)
-                } else {
-                    var chatPrompt = ""
-                    for msg in msgs {
-                        chatPrompt += "<|im_start|>\(msg.role)\n\(msg.content)<|im_end|>\n"
-                    }
-                    nativePrompt = Self.appendingClosedThinkingBlock(to: chatPrompt + "<|im_start|>assistant\n")
-                }
-            } else {
-                let basePrefix = Self.baseModelContextPrefix(
-                    context: context,
-                    instructions: customInstructions,
-                    screenContext: screenContext,
-                    appName: appName,
-                    windowTitle: windowTitle,
-                    webDomain: webDomain,
-                    persona: persona,
-                    allowProfanity: allowProfanity
-                )
-                nativePrompt = basePrefix + rawPrompt
-            }
+            let nativePrompt = Self.buildCompletionPrompt(
+                context: context,
+                rawPrompt: rawPrompt,
+                afterCaret: afterCaret,
+                instructions: customInstructions,
+                screenContext: screenContext,
+                appName: appName,
+                windowTitle: windowTitle,
+                webDomain: webDomain,
+                persona: persona,
+                allowProfanity: allowProfanity
+            )
 
             let started = Date()
             let effectiveTemp = LoRAAdapterManager.shared.effectiveTemperature(base: 0.2)
@@ -665,7 +670,8 @@ final class AIInferenceEngine: ObservableObject {
                 let generated = try await AILocalEngine.shared.generateContinuation(
                     prompt: nativePrompt,
                     maxTokens: Self.predictionTokenBudget(context: context, maxWords: maxWords),
-                    temperature: effectiveTemp
+                    temperature: effectiveTemp,
+                    stopAtWordBoundary: maxWords == 1
                 ) { partial in
                     var currentRaw = partial
                     if healsWord, let healed = Self.healedContinuation(currentRaw, wordBuffer: wordBuffer) {
@@ -698,7 +704,8 @@ final class AIInferenceEngine: ObservableObject {
                     wordBuffer: healsWord ? "" : wordBuffer,
                     maxWords: maxWords,
                     afterCaret: afterCaret,
-                    screenContext: screenContext
+                    screenContext: screenContext,
+                    allowProfanity: allowProfanity
                 ) {
                     let formatted = context.last?.isWhitespace == true ? cleaned.trimmingCharacters(in: .whitespaces) : cleaned
                     NSLog("[LangSwitcher] In-process Metal AI inference completed in %.3fs", Date().timeIntervalSince(started))
@@ -715,51 +722,18 @@ final class AIInferenceEngine: ObservableObject {
 
         let isCyr = Self.containsCyrillic(Self.activeParagraph(in: context))
         let persona = LoRAAdapterManager.shared.personaPrompt(for: isCyr)
-        if usesTemplate {
-            let combinedInstructions = [customInstructions, persona].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
-
-            var templateRequest = URLRequest(url: URL(string: "http://127.0.0.1:\(serverPort)/apply-template")!)
-            templateRequest.httpMethod = "POST"
-            templateRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            templateRequest.httpBody = try? JSONSerialization.data(withJSONObject: [
-                "messages": Self.completionMessages(
-                    context: context,
-                    afterCaret: afterCaret,
-                    instructions: combinedInstructions.isEmpty ? nil : combinedInstructions,
-                    screenContext: screenContext,
-                    hasPendingQuestion: hasPendingQuestion,
-                    appName: appName,
-                    windowTitle: windowTitle,
-                    webDomain: webDomain,
-                    allowProfanity: allowProfanity,
-                    frameUserDirective: true
-                )])
-            do {
-                let (data, response) = try await session.data(for: templateRequest)
-                guard !Task.isCancelled, (response as? HTTPURLResponse)?.statusCode == 200,
-                      let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let rendered = json["prompt"] as? String else { return nil }
-                prompt = Self.appendingClosedThinkingBlock(to: rendered)
-            } catch {
-                if !Task.isCancelled {
-                    NSLog("[LangSwitcher] AIInferenceEngine: template request failed (%@)", error.localizedDescription)
-                    checkAndRecoverProcess(error: error)
-                }
-                return nil
-            }
-        } else {
-            let basePrefix = Self.baseModelContextPrefix(
-                context: context,
-                instructions: customInstructions,
-                screenContext: screenContext,
-                appName: appName,
-                windowTitle: windowTitle,
-                webDomain: webDomain,
-                persona: persona,
-                allowProfanity: allowProfanity
-            )
-            prompt = basePrefix + prompt
-        }
+        prompt = Self.buildCompletionPrompt(
+            context: context,
+            rawPrompt: rawPrompt,
+            afterCaret: afterCaret,
+            instructions: customInstructions,
+            screenContext: screenContext,
+            appName: appName,
+            windowTitle: windowTitle,
+            webDomain: webDomain,
+            persona: persona,
+            allowProfanity: allowProfanity
+        )
         let isStreaming = onToken != nil
         let payload: [String: Any] = [
             "temperature": Double(LoRAAdapterManager.shared.effectiveTemperature(base: 0.2)),
@@ -773,7 +747,8 @@ final class AIInferenceEngine: ObservableObject {
             "prompt": prompt,
             "n_predict": Self.predictionTokenBudget(context: context, maxWords: maxWords),
             "stop": [
-                "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
+                "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>", "<|eot_id|>",
+                "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>",
                 "[User", "[user", "[USER", "User:", "user:", "USER:", "User [", "user [", "User 0", "user 0",
                 "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
                 "[Model", "[model", "[MODEL", "Model:", "model:", "MODEL:", "Model [", "model [",
@@ -822,7 +797,12 @@ final class AIInferenceEngine: ObservableObject {
                             }
                             
                             let wordCount = cleaned.split(separator: " ").count
-                            if wordCount >= maxWords && (chunk.hasSuffix(" ") || chunk.hasSuffix("\n") || chunk.contains(".")) {
+                            if maxWords == 1 {
+                                if chunk.contains(" ") || chunk.contains("\n") || chunk.contains("\t") ||
+                                   (chunk.contains(where: { $0.isPunctuation || $0.isSymbol }) && !cleaned.isEmpty) {
+                                    break
+                                }
+                            } else if wordCount >= maxWords && (chunk.hasSuffix(" ") || chunk.hasSuffix("\n") || chunk.contains(".")) {
                                 break
                             }
                         }
@@ -912,7 +892,8 @@ final class AIInferenceEngine: ObservableObject {
 
         // Stop at ChatML control tags and dialogue role tokens occurring in generation
         let stopTags = [
-            "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>",
+            "<|im_end|>", "<|endoftext|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>", "<eos>", "<|eot_id|>",
+            "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>",
             "[User", "[user", "[USER", "User:", "user:", "USER:",
             "[Assistant", "[assistant", "[ASSISTANT", "Assistant:", "assistant:",
             "[Model", "[model", "[MODEL", "Model:", "model:", "MODEL:",
@@ -1094,7 +1075,20 @@ final class AIInferenceEngine: ObservableObject {
         let tokens = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         guard !tokens.isEmpty else { return nil }
         
-        let selected = Array(tokens.prefix(maxWords)).joined(separator: " ")
+        let selected: String
+        if maxWords == 1 {
+            // "Current word only" mode: finish only the current word up to the first delimiter/whitespace
+            let firstWord = tokens[0]
+            if let boundaryIdx = firstWord.firstIndex(where: { $0.isPunctuation || $0.isSymbol }) {
+                let prefixDist = firstWord.distance(from: firstWord.startIndex, to: boundaryIdx)
+                let sub = String(firstWord.prefix(prefixDist))
+                selected = sub.isEmpty ? firstWord : sub
+            } else {
+                selected = firstWord
+            }
+        } else {
+            selected = Array(tokens.prefix(maxWords)).joined(separator: " ")
+        }
         
         // Reject an apparent translated sentence, while allowing terms like null,
         // Swift or API at the start of an otherwise Russian continuation.

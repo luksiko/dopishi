@@ -556,7 +556,13 @@ final class AccessibilityService {
               let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { return false }
         var selection = CFRange()
         guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection) else { return false }
-        return Self.isTailOfLargerWord(text: text, selection: selection, expected: expected)
+        let sharedRange = copySharedCharacterRange(element: target.element)
+        let effectiveSelection = Self.mapToEffectiveRange(
+            selectedRange: selection,
+            sharedRange: sharedRange,
+            fullTextLength: (text as NSString).length
+        )
+        return Self.isTailOfLargerWord(text: text, selection: effectiveSelection, expected: expected)
     }
 
     static func isTailOfLargerWord(text: String, selection: CFRange, expected: String) -> Bool {
@@ -613,7 +619,13 @@ final class AccessibilityService {
         }
         var selection = CFRange()
         guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection) else { return expected.count }
-        return Self.effectiveBackspaceCount(text: text, selection: selection, expected: expected)
+        let sharedRange = copySharedCharacterRange(element: target.element)
+        let effectiveSelection = Self.mapToEffectiveRange(
+            selectedRange: selection,
+            sharedRange: sharedRange,
+            fullTextLength: (text as NSString).length
+        )
+        return Self.effectiveBackspaceCount(text: text, selection: effectiveSelection, expected: expected)
     }
 
     static func effectiveBackspaceCount(text: String, selection: CFRange, expected: String) -> Int? {
@@ -843,20 +855,23 @@ final class AccessibilityService {
         return "\(bundleID):\(pid):\(elementHash)"
     }
 
-    /// Returns the frontmost app name, bundle identifier, and focused window title.
-    /// Fast query (<0.1ms) used to ground AI completion prompts in application context.
-    func activeWindowContext() -> (appName: String?, bundleID: String?, windowTitle: String?) {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return (nil, nil, nil) }
+    /// Returns the frontmost app name, bundle identifier, focused window title, and window AX element.
+    /// Fast query (<0.1ms) used to ground AI completion prompts and enforce privacy gates.
+    func activeWindowContext() -> (appName: String?, bundleID: String?, windowTitle: String?, windowElement: AXUIElement?) {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return (nil, nil, nil, nil) }
         let appName = app.localizedName
         let bundleID = app.bundleIdentifier
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var windowRef: CFTypeRef?
         var windowTitle: String?
+        var windowElement: AXUIElement?
         if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
            let window = windowRef, CFGetTypeID(window) == AXUIElementGetTypeID() {
+            let winEl = window as! AXUIElement
+            windowElement = winEl
             var titleRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &titleRef) == .success,
+            if AXUIElementCopyAttributeValue(winEl, kAXTitleAttribute as CFString, &titleRef) == .success,
                let str = titleRef as? String {
                 let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty && !AutoCorrectionGate.containsSensitiveInformation(trimmed) {
@@ -864,7 +879,20 @@ final class AccessibilityService {
                 }
             }
         }
-        return (appName, bundleID, windowTitle)
+        return (appName, bundleID, windowTitle, windowElement)
+    }
+
+    /// Reads kAXSharedCharacterRangeAttribute from an element if present (e.g. Word tables, multi-container editors).
+    private func copySharedCharacterRange(element: AXUIElement) -> CFRange? {
+        var sharedRangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSharedCharacterRangeAttribute as CFString, &sharedRangeRef) == .success,
+           let val = sharedRangeRef, CFGetTypeID(val) == AXValueGetTypeID() {
+            var range = CFRange()
+            if AXValueGetValue(val as! AXValue, .cfRange, &range), range.location >= 0, range.length >= 0 {
+                return range
+            }
+        }
+        return nil
     }
 
     /// Captures the surrounding text before/after caret and identifies the focused field.
@@ -918,14 +946,23 @@ final class AccessibilityService {
                 selectedText = str
             }
 
+            let sharedRange = copySharedCharacterRange(element: element)
+
             var valueRef: CFTypeRef?
             if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
                let fullText = (valueRef as? String) ?? (valueRef as? NSAttributedString)?.string {
+                let fullTextLength = (fullText as NSString).length
+                let effectiveSelection = Self.mapToEffectiveRange(
+                    selectedRange: selectedRange,
+                    sharedRange: sharedRange,
+                    fullTextLength: fullTextLength
+                )
+
                 // Do not silently clamp a stale AX caret into a newer, shorter value.
-                guard selectedRange.location <= (fullText as NSString).length,
-                      selectedRange.length <= (fullText as NSString).length - selectedRange.location else { return nil }
+                guard effectiveSelection.location <= fullTextLength,
+                      effectiveSelection.length <= fullTextLength - effectiveSelection.location else { return nil }
                 let ctx = Self.makeCaretContext(fieldIdentifier: fieldID, text: fullText,
-                                             selection: selectedRange, selectedText: selectedText,
+                                             selection: effectiveSelection, selectedText: selectedText,
                                              maxSurroundingLength: maxSurroundingLength)
                 extractionCache.update(
                     context: ctx,
@@ -942,15 +979,21 @@ final class AccessibilityService {
 
             // Fallback: If kAXValueAttribute is unavailable (common in AppKit NSTextView, Xcode, etc.),
             // use parameterized attribute kAXStringForRangeParameterizedAttribute around the caret.
-            let queryStart = max(0, selectedRange.location - maxSurroundingLength)
-            let queryLength = (selectedRange.location - queryStart) + selectedRange.length + maxSurroundingLength
+            let effectiveLocation: Int
+            if let shared = sharedRange, selectedRange.location < shared.location {
+                effectiveLocation = selectedRange.location + shared.location
+            } else {
+                effectiveLocation = selectedRange.location
+            }
+            let queryStart = max(0, effectiveLocation - maxSurroundingLength)
+            let queryLength = (effectiveLocation - queryStart) + selectedRange.length + maxSurroundingLength
             var queryRange = CFRange(location: queryStart, length: queryLength)
             if let rangeValue = AXValueCreate(.cfRange, &queryRange) {
                 var strRef: CFTypeRef?
                 if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, rangeValue, &strRef) == .success {
                     let chunk = (strRef as? String) ?? (strRef as? NSAttributedString)?.string
                     if let chunk = chunk, !chunk.isEmpty {
-                        let caretOffsetInChunk = min(selectedRange.location - queryStart, (chunk as NSString).length)
+                        let caretOffsetInChunk = min(effectiveLocation - queryStart, (chunk as NSString).length)
                         let textBefore = (chunk as NSString).substring(to: caretOffsetInChunk)
                         let selLengthInChunk = min(selectedRange.length, (chunk as NSString).length - caretOffsetInChunk)
                         let textAfterStart = caretOffsetInChunk + selLengthInChunk
@@ -1095,14 +1138,33 @@ final class AccessibilityService {
             var range = CFRange()
             if AXValueGetValue(value as! AXValue, .cfRange, &range) { selectedRange = range }
         }
+        let sharedRange = copySharedCharacterRange(element: element)
         let primaryScreenMaxY = primaryScreen.frame.maxY
         let caret = Self.resolveCaretBounds(selectedRange: selectedRange,
             primaryScreenMaxY: primaryScreenMaxY,
             rangeBounds: { query in
-                var query = query
-                guard let value = AXValueCreate(.cfRange, &query) else { return nil }
-                return self.parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String,
-                                              parameter: value)
+                var q = query
+                guard let value = AXValueCreate(.cfRange, &q) else { return nil }
+                if let rect = self.parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String,
+                                                     parameter: value) {
+                    return rect
+                }
+                // Handle Word table & complex element shared character range mapping:
+                if let shared = sharedRange {
+                    let altRange: CFRange
+                    if q.location >= shared.location {
+                        altRange = CFRange(location: q.location - shared.location, length: q.length)
+                    } else {
+                        altRange = CFRange(location: q.location + shared.location, length: q.length)
+                    }
+                    var alt = altRange
+                    if let altVal = AXValueCreate(.cfRange, &alt),
+                       let altRect = self.parameterizedRect(element, attribute: kAXBoundsForRangeParameterizedAttribute as String,
+                                                            parameter: altVal) {
+                        return altRect
+                    }
+                }
+                return nil
             }, markerBounds: { self.selectedMarkerCaretBounds(element) })
         guard let caret, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(caret) }) else {
             extractionCache.recordFailure()
@@ -1375,6 +1437,27 @@ final class AccessibilityService {
         return rect.intersection(visible)
     }
 
+    /// Reads NSAccessibilityLineSpacingAttribute if supported by the host editor element.
+    func focusedLineSpacing(element: AXUIElement? = nil) -> CGFloat? {
+        guard let targetElement = element ?? focusedTextElement() else { return nil }
+        AXUIElementSetMessagingTimeout(targetElement, 0.05)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(targetElement, "AXLineSpacing" as CFString, &value) == .success {
+            if let num = value as? NSNumber {
+                let val = CGFloat(num.doubleValue)
+                if val > 0 && val < 100 {
+                    return val
+                }
+            } else if let str = value as? String, let dbl = Double(str) {
+                let val = CGFloat(dbl)
+                if val > 0 && val < 100 {
+                    return val
+                }
+            }
+        }
+        return nil
+    }
+
     func focusedTextElement() -> AXUIElement? {
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, 0.05)
@@ -1426,7 +1509,7 @@ final class AccessibilityService {
         focusedChild: (Node) -> Node?, children: (Node) -> [Node],
         limit: Int = 128, shouldContinue: () -> Bool = { true }
     ) -> Node? {
-        let leafTextRoles: Set<String> = ["AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"]
+        let leafTextRoles: Set<String> = ["AXTextField", "AXTextArea", "AXSearchField", "AXComboBox", "AXGenericElement", "AXParagraph", "AXCell"]
         var pending: [(Node, Bool)] = [(root, true)]
         var visited: Set<Node> = []
         var result: Node?
@@ -1455,7 +1538,7 @@ final class AccessibilityService {
                 pending.append((child, true))
                 continue
             }
-            if ["AXWindow", "AXGroup", "AXWebArea", "AXScrollArea", "AXSplitGroup"].contains(info.role ?? "") {
+            if ["AXWindow", "AXGroup", "AXWebArea", "AXScrollArea", "AXSplitGroup", "AXTable", "AXRow", "AXLayoutArea", "AXLayoutItem"].contains(info.role ?? "") {
                 pending.append(contentsOf: children(node).reversed().map { ($0, false) })
             }
         }
@@ -1594,6 +1677,34 @@ final class AccessibilityService {
                       y: primaryScreenMaxY - rect.maxY, width: 1, height: rect.height)
     }
 
+    /// Maps selected range to local element coordinates using kAXSharedCharacterRangeAttribute
+    /// when the element represents a cell in a Microsoft Word table or complex multi-container layout.
+    static func mapToEffectiveRange(
+        selectedRange: CFRange,
+        sharedRange: CFRange?,
+        fullTextLength: Int? = nil
+    ) -> CFRange {
+        guard let shared = sharedRange, selectedRange.location >= shared.location else {
+            return selectedRange
+        }
+        let localOffset = selectedRange.location - shared.location
+        if let fullLen = fullTextLength {
+            guard localOffset <= fullLen else { return selectedRange }
+            return CFRange(location: localOffset, length: min(selectedRange.length, fullLen - localOffset))
+        }
+        return CFRange(location: localOffset, length: selectedRange.length)
+    }
+
+    /// Maps a local element range back to document coordinates using kAXSharedCharacterRangeAttribute
+    /// if the host application expects document-relative range coordinates.
+    static func mapToDocumentRange(
+        localRange: CFRange,
+        sharedRange: CFRange?
+    ) -> CFRange {
+        guard let shared = sharedRange else { return localRange }
+        return CFRange(location: localRange.location + shared.location, length: localRange.length)
+    }
+
     struct ReplacementTarget {
         let element: AXUIElement
         let processID: pid_t
@@ -1632,10 +1743,19 @@ final class AccessibilityService {
                                             &selectionValue) == .success,
               let selectionValue, CFGetTypeID(selectionValue) == AXValueGetTypeID() else { return false }
         var selection = CFRange()
-        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection),
-              let plan = Self.verifiedSuffixRange(text: text, selection: selection, expected: expected)
+        guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &selection) else { return false }
+        let sharedRange = copySharedCharacterRange(element: focused)
+        let effectiveSelection = Self.mapToEffectiveRange(
+            selectedRange: selection,
+            sharedRange: sharedRange,
+            fullTextLength: (text as NSString).length
+        )
+        guard let plan = Self.verifiedSuffixRange(text: text, selection: effectiveSelection, expected: expected)
         else { return false }
-        var range = CFRange(location: plan.location, length: plan.length)
+        let targetLocation = (sharedRange != nil && selection.location >= sharedRange!.location)
+            ? plan.location + sharedRange!.location
+            : plan.location
+        var range = CFRange(location: targetLocation, length: plan.length)
         guard let rangeValue = AXValueCreate(.cfRange, &range),
               AXUIElementSetAttributeValue(focused, kAXSelectedTextRangeAttribute as CFString,
                                             rangeValue) == .success else { return false }
@@ -1655,7 +1775,8 @@ final class AccessibilityService {
             restoreSelectionIfUnchanged(focused, selectedRange: range, original: selection)
             return false
         }
-        var endRange = CFRange(location: plan.location + (replacement as NSString).length, length: 0)
+        let endLocation = targetLocation + (replacement as NSString).length
+        var endRange = CFRange(location: endLocation, length: 0)
         if let rangeValue = AXValueCreate(.cfRange, &endRange) {
             AXUIElementSetAttributeValue(focused, kAXSelectedTextRangeAttribute as CFString, rangeValue)
         }
@@ -1836,22 +1957,28 @@ final class AccessibilityService {
         guard AXValueGetValue(selectionValue as! AXValue, .cfRange, &original) else {
             completion(false); return
         }
+        let sharedRange = copySharedCharacterRange(element: element)
+        let effectiveSelection = Self.mapToEffectiveRange(
+            selectedRange: original,
+            sharedRange: sharedRange,
+            fullTextLength: (text as NSString).length
+        )
         let fallbackCaret = original.length == 0 ? original : CFRange(location: original.location + original.length, length: 0)
 
         let plan: NSRange
-        if original.length == 0 {
-            guard let suffixPlan = Self.verifiedSuffixRange(text: text, selection: original, expected: expected) else {
+        if effectiveSelection.length == 0 {
+            guard let suffixPlan = Self.verifiedSuffixRange(text: text, selection: effectiveSelection, expected: expected) else {
                 completion(false); return
             }
             plan = suffixPlan
-        } else if original.length == expected.utf16.count {
+        } else if effectiveSelection.length == expected.utf16.count {
             // Text is already selected (e.g. from replaceVerifiedSuffix attempt)
             var selected: CFTypeRef?
             guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &selected) == .success,
                   selected as? String == expected else {
                 completion(false); return
             }
-            plan = NSRange(location: original.location, length: original.length)
+            plan = NSRange(location: effectiveSelection.location, length: effectiveSelection.length)
         } else {
             completion(false); return
         }
@@ -1861,8 +1988,11 @@ final class AccessibilityService {
               let up = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
             completion(false); return
         }
-        var range = CFRange(location: plan.location, length: plan.length)
-        if Self.requiresSelectionWrite(original: original, replacementRange: plan) {
+        let targetLocation = (sharedRange != nil && original.location >= sharedRange!.location)
+            ? plan.location + sharedRange!.location
+            : plan.location
+        var range = CFRange(location: targetLocation, length: plan.length)
+        if Self.requiresSelectionWrite(original: original, replacementRange: NSRange(location: targetLocation, length: plan.length)) {
             guard let rangeValue = AXValueCreate(.cfRange, &range),
                   AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, rangeValue) == .success else {
                 completion(false); return

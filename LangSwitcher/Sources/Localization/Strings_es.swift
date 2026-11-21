@@ -494,6 +494,7 @@ Comprueba también: Privacidad y seguridad → Monitorización de entrada: Dopis
         "ai.predictive.enable":           "Continuación predictiva de texto",
         "ai.predictive.desc":             "Sugiere de 2 a 4 palabras tras una pausa al escribir (350 ms).",
         "ai.predictive.wordCount":        "Longitud de continuación",
+        "ai.predictive.currentWordOnly":  "Solo palabra actual",
         "ai.predictive.words":            "%d palabras",
         "ai.predictive.debounceDelay":    "Retardo de sugerencia:",
         "ai.predictive.debounceDesc":     "Pausa al escribir antes de que la IA genere la continuación.",

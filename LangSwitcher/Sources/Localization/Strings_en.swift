@@ -473,6 +473,7 @@ Also check: Privacy & Security → Input Monitoring — Dopishi may need to be l
         "ai.predictive.enable":                  "Predictive Text Continuation",
         "ai.predictive.desc":                    "Suggests 2–4 words after a typing pause (350 ms).",
         "ai.predictive.wordCount":               "Continuation Length",
+        "ai.predictive.currentWordOnly":         "Current word only",
         "ai.predictive.words":                   "%d words",
         "ai.predictive.debounceDelay":           "Prediction delay:",
         "ai.predictive.debounceDesc":            "Typing pause before AI generates continuation.",

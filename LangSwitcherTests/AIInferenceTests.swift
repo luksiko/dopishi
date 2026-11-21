@@ -629,4 +629,183 @@ extension AIInferenceTests {
         let res4 = AIInferenceEngine.appendingClosedThinkingBlock(to: closed)
         XCTAssertEqual(res4, closed)
     }
+
+    // MARK: - Stage 2: FIM & Completion Length Mode Tests
+
+    func testFIMPromptConstructionWithSuffix() {
+        let prompt = AIInferenceEngine.buildCompletionPrompt(
+            context: "func calculateTotal(",
+            rawPrompt: "func calculateTotal(",
+            afterCaret: ") -> Double {",
+            instructions: nil,
+            screenContext: nil,
+            appName: "Xcode",
+            windowTitle: "Billing.swift",
+            webDomain: nil,
+            persona: nil,
+            allowProfanity: false
+        )
+
+        XCTAssertTrue(prompt.hasPrefix("<|fim_prefix|>"))
+        XCTAssertTrue(prompt.contains("<|fim_suffix|>) -> Double {<|fim_middle|>"))
+        XCTAssertTrue(prompt.contains("func calculateTotal("))
+        XCTAssertFalse(prompt.contains("<|im_start|>"), "FIM mode must not use forced chat templates")
+    }
+
+    func testRawContinuationPromptWithoutSuffix() {
+        let prompt = AIInferenceEngine.buildCompletionPrompt(
+            context: "Сегодня прекрасная погода для",
+            rawPrompt: "Сегодня прекрасная погода для",
+            afterCaret: "",
+            instructions: nil,
+            screenContext: nil,
+            appName: "Telegram",
+            windowTitle: "Chat with Alexey",
+            webDomain: nil,
+            persona: nil,
+            allowProfanity: false
+        )
+
+        XCTAssertFalse(prompt.contains("<|fim_prefix|>"))
+        XCTAssertFalse(prompt.contains("<|fim_suffix|>"))
+        XCTAssertFalse(prompt.contains("<|fim_middle|>"))
+        XCTAssertFalse(prompt.contains("<|im_start|>"), "Raw continuation must not force ChatML templates")
+        XCTAssertTrue(prompt.hasSuffix("Сегодня прекрасная погода для"))
+    }
+
+    func testCleanAndTrimContinuationStopsAtFIMTokens() {
+        // Output containing <|fim_suffix|> or <|fim_middle|>
+        let cleanedFim = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: " прогулки в парке<|fim_suffix|>ignored rest",
+            context: "Сегодня ",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertEqual(cleanedFim, " прогулки в парке")
+
+        let cleanedFileSep = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: " отличная идея<|file_separator|>second file",
+            context: "Это ",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertEqual(cleanedFileSep, " отличная идея")
+    }
+
+    func testCurrentWordOnlyCompletionLengthMode() {
+        // User typed "пров" and model generates "ерка всех тестов перед релизом"
+        let resultMidWord = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "ерка всех тестов",
+            context: "Запущена пров",
+            wordBuffer: "пров",
+            maxWords: 1
+        )
+        // With maxWords == 1 ("Current word only"), only the current word is finished
+        XCTAssertEqual(resultMidWord, "ерка")
+
+        // User typed space, model generates "function, which returns value"
+        let resultAfterSpace = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: "function, which returns value",
+            context: "Call the ",
+            wordBuffer: "",
+            maxWords: 1
+        )
+        XCTAssertEqual(resultAfterSpace, "function")
+    }
+
+    func testSettingsManagerCurrentWordOnlyFlag() {
+        let settings = SettingsManager.shared
+        let orig = settings.aiMaxContinuationWords
+        defer { settings.aiMaxContinuationWords = orig }
+
+        settings.aiMaxContinuationWords = 1
+        XCTAssertTrue(settings.isCurrentWordOnlyCompletion)
+
+        settings.aiMaxContinuationWords = 3
+        XCTAssertFalse(settings.isCurrentWordOnlyCompletion)
+    }
+
+    // MARK: - Microsoft Word Table & Complex Element Tests
+
+    func testMicrosoftWordSharedCharacterRangeMapping() {
+        // Word table cell text length = 20, document-relative caret = 1405, shared range = 1400..1420
+        let shared = CFRange(location: 1400, length: 20)
+        let selectedDocRelative = CFRange(location: 1407, length: 0)
+
+        let mapped = AccessibilityService.mapToEffectiveRange(
+            selectedRange: selectedDocRelative,
+            sharedRange: shared,
+            fullTextLength: 20
+        )
+        XCTAssertEqual(mapped.location, 7, "Caret location 1407 in shared range 1400 must map to local cell index 7")
+        XCTAssertEqual(mapped.length, 0)
+
+        // When caret is already local (location < shared.location)
+        let selectedLocal = CFRange(location: 5, length: 0)
+        let mappedLocal = AccessibilityService.mapToEffectiveRange(
+            selectedRange: selectedLocal,
+            sharedRange: shared,
+            fullTextLength: 20
+        )
+        XCTAssertEqual(mappedLocal.location, 5, "Local caret index should be preserved")
+    }
+
+    func testMicrosoftWordMapToDocumentRange() {
+        let shared = CFRange(location: 1400, length: 20)
+        let localRange = CFRange(location: 7, length: 5)
+        let docRange = AccessibilityService.mapToDocumentRange(localRange: localRange, sharedRange: shared)
+        XCTAssertEqual(docRange.location, 1407)
+        XCTAssertEqual(docRange.length, 5)
+
+        let noSharedRange = AccessibilityService.mapToDocumentRange(localRange: localRange, sharedRange: nil)
+        XCTAssertEqual(noSharedRange.location, 7)
+        XCTAssertEqual(noSharedRange.length, 5)
+    }
+
+    func testWordTableCellRoleSupportedInGateAndFocusNode() {
+        // AXCell must be accepted as an editable text input role in AutoCorrectionGate
+        XCTAssertTrue(AutoCorrectionGate.allowsAutoCorrection(role: "AXCell", subrole: nil, bundleID: "com.microsoft.Word"))
+        XCTAssertTrue(AutoCorrectionGate.allowsCompletions(role: "AXCell", subrole: nil, bundleID: "com.microsoft.Word"))
+
+        // AXCell must be resolved as a valid leaf text node in resolveFocusedTextNode
+        let cellNode = "word_table_cell"
+        let resolved = AccessibilityService.resolveFocusedTextNode(
+            root: "window",
+            attributes: { node in
+                if node == "window" { return (role: "AXWindow", subrole: nil, focused: true) }
+                if node == "table" { return (role: "AXTable", subrole: nil, focused: true) }
+                if node == "row" { return (role: "AXRow", subrole: nil, focused: true) }
+                if node == cellNode { return (role: "AXCell", subrole: nil, focused: true) }
+                return (role: nil, subrole: nil, focused: false)
+            },
+            focusedChild: { node in
+                if node == "window" { return "table" }
+                if node == "table" { return "row" }
+                if node == "row" { return cellNode }
+                return nil
+            },
+            children: { node in
+                if node == "window" { return ["table"] }
+                if node == "table" { return ["row"] }
+                if node == "row" { return [cellNode] }
+                return []
+            }
+        )
+        XCTAssertEqual(resolved, cellNode)
+    }
+
+    func testCleanAndTrimContinuationStopsAtEotId() {
+        let cleanedEot = AIInferenceEngine.cleanAndTrimContinuation(
+            raw: " world<|eot_id|>extra text after turn",
+            context: "Hello",
+            wordBuffer: "",
+            maxWords: 4
+        )
+        XCTAssertEqual(cleanedEot, " world")
+    }
+
+    func testSettingsManagerProFimEnabledDefault() {
+        let settings = SettingsManager.shared
+        XCTAssertTrue(settings.proFimEnabled, "proFimEnabled must default to true")
+    }
 }

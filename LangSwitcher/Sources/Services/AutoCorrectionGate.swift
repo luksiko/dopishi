@@ -1,4 +1,5 @@
 import Foundation
+import ApplicationServices
 
 // MARK: - Auto-Correction Gate
 // Pure policy: where the silent auto-correction may run.
@@ -16,7 +17,9 @@ enum AutoCorrectionGate {
         "AXComboBox",
         "AXWebArea",
         "AXGenericElement",
-        "AXParagraph"
+        "AXParagraph",
+        "AXGroup",
+        "AXCell"
     ]
     
     /// Accessibility identifier marking a password field — appears either
@@ -63,6 +66,118 @@ enum AutoCorrectionGate {
     static func isTerminalApp(bundleID: String?) -> Bool {
         guard let bundleID else { return false }
         return terminalBundleIDs.contains(bundleID)
+    }
+
+    // MARK: - Browser & Incognito Private Window Exclusion
+
+    /// Web browsers supporting private / incognito browsing windows
+    /// (Safari, Chrome, Firefox, Brave, Vivaldi, Comet, Zen, Arc, Edge, Opera).
+    static let privateCapableBrowserBundleIDs: Set<String> = [
+        "com.apple.Safari",
+        "com.apple.SafariTechnologyPreview",
+        "com.google.Chrome",
+        "com.google.Chrome.canary",
+        "com.google.Chrome.beta",
+        "com.google.Chrome.dev",
+        "org.mozilla.firefox",
+        "org.mozilla.nightly",
+        "com.brave.Browser",
+        "com.brave.Browser.beta",
+        "com.brave.Browser.nightly",
+        "com.vivaldi.Vivaldi",
+        "com.permacomputing.comet",
+        "org.comet.comet",
+        "com.comet.browser",
+        "ai.comet.browser",
+        "app.zen-browser.zen",
+        "io.github.zen_browser.zen",
+        "org.mozilla.zen",
+        "company.thebrowser.Arc",
+        "com.microsoft.edgemac",
+        "com.operasoftware.Opera"
+    ]
+
+    static func isPrivateCapableBrowser(bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        if privateCapableBrowserBundleIDs.contains(bundleID) { return true }
+        let lower = bundleID.lowercased()
+        return lower.contains("safari") || lower.contains("chrome") || lower.contains("firefox") ||
+               lower.contains("brave") || lower.contains("vivaldi") || lower.contains("comet") ||
+               lower.contains("zen")
+    }
+
+    /// Multilingual tokens that identify a browser window as private / incognito.
+    static let incognitoKeywords: [String] = [
+        "incognito", "инкогнито", "inkognito", "incógnito", "inprivate",
+        "private browsing", "частный доступ", "приватный просмотр",
+        "приватний перегляд", "анонімний перегляд", "navigation privée",
+        "privates surfen", "navegación privada", "privates fenster",
+        "private window", "приватное окно", "частное окно",
+        "private tab", "приватная вкладка", "приватна вкладка",
+        "onglet privé", "pestaña privada", "privater tab",
+        "ventana privada", "fenêtre privée", "privater modus",
+        "modo incógnito", "navegación de incógnito",
+        "(private)", "- private", "– private", "— private"
+    ]
+
+    /// Determines if the current window or frontmost browser is in private / incognito mode.
+    /// Strictly excludes Safari, Chrome, Firefox, Brave, Vivaldi, Comet, Zen and others from text logging.
+    static func isPrivateOrIncognitoWindow(
+        bundleID: String?,
+        windowTitle: String? = nil,
+        windowElement: AXUIElement? = nil
+    ) -> Bool {
+        guard let bundleID, isPrivateCapableBrowser(bundleID: bundleID) else { return false }
+
+        // 1. Direct window title inspection
+        if let title = windowTitle?.lowercased() {
+            for keyword in incognitoKeywords {
+                if title.contains(keyword) { return true }
+            }
+        }
+
+        // 2. AXUIElement window inspection (if provided)
+        if let win = windowElement {
+            var titleRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(win, kAXTitleAttribute as CFString, &titleRef) == .success,
+               let str = (titleRef as? String)?.lowercased() {
+                for keyword in incognitoKeywords {
+                    if str.contains(keyword) { return true }
+                }
+            }
+
+            var descRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(win, kAXDescriptionAttribute as CFString, &descRef) == .success,
+               let desc = (descRef as? String)?.lowercased() {
+                for keyword in incognitoKeywords {
+                    if desc.contains(keyword) { return true }
+                }
+            }
+
+            // Inspect window children (e.g. Incognito avatar/profile button in Chrome/Brave/Vivaldi)
+            var childrenRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(win, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+               let children = childrenRef as? [AXUIElement] {
+                for child in children.prefix(20) {
+                    var childTitleRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(child, kAXTitleAttribute as CFString, &childTitleRef) == .success,
+                       let childTitle = (childTitleRef as? String)?.lowercased() {
+                        for keyword in incognitoKeywords {
+                            if childTitle.contains(keyword) { return true }
+                        }
+                    }
+                    var childDescRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(child, kAXDescriptionAttribute as CFString, &childDescRef) == .success,
+                       let childDesc = (childDescRef as? String)?.lowercased() {
+                        for keyword in incognitoKeywords {
+                            if childDesc.contains(keyword) { return true }
+                        }
+                    }
+                }
+            }
+        }
+
+        return false
     }
     
     // MARK: - Secret Sanitizer Patterns (Cotypist-grade Privacy Protection)

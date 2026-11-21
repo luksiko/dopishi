@@ -472,6 +472,7 @@ Dopishi потребує дозволу на Доступність для зч�
         "ai.predictive.enable":                  "Предиктивне продовження тексту",
         "ai.predictive.desc":                    "Пропонує продовження на 2–4 слова при паузі в наборі (350 мс).",
         "ai.predictive.wordCount":               "Довжина продовження",
+        "ai.predictive.currentWordOnly":         "Тільки поточне слово",
         "ai.predictive.words":                   "%d слова",
         "ai.predictive.debounceDelay":           "Затримка підказок:",
         "ai.predictive.debounceDesc":            "Пауза в наборі тексту перед появою підказок AI.",

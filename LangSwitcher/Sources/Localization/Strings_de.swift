@@ -473,6 +473,7 @@ Prüfen Sie auch: Datenschutz & Sicherheit → Eingabeüberwachung — Dopishi m
         "ai.predictive.enable": "Vorausschauende Textfortsetzung",
         "ai.predictive.desc": "Schlägt 2–4 Wörter nach einer kurzen Tipppause (350 ms) vor.",
         "ai.predictive.wordCount": "Fortsetzungslänge",
+        "ai.predictive.currentWordOnly": "Nur aktuelles Wort",
         "ai.predictive.words": "%d Wörter",
         "ai.predictive.debounceDelay": "Verzögerung für Vorschläge:",
         "ai.predictive.debounceDesc": "Tipppause vor der Generierung von KI-Vorschlägen.",

@@ -472,6 +472,7 @@ Dopishi нуждается в разрешении универсального 
         "ai.predictive.enable":                  "Предиктивное продолжение текста",
         "ai.predictive.desc":                    "Предлагает продолжение на 2–4 слова при паузе в наборе (350 мс).",
         "ai.predictive.wordCount":               "Длина продолжения",
+        "ai.predictive.currentWordOnly":         "Только текущее слово",
         "ai.predictive.words":                   "%d слова",
         "ai.predictive.debounceDelay":           "Задержка подсказок:",
         "ai.predictive.debounceDesc":            "Пауза в наборе текста перед появлением подсказок AI.",

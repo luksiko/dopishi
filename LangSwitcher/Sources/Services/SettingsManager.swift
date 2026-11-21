@@ -425,9 +425,15 @@ final class SettingsManager: ObservableObject {
         }
     }
 
-    /// Maximum number of words in an AI prediction (2...4). Default: 3.
+    /// Maximum number of words in an AI prediction (1...15). Default: 3.
+    /// Setting value 1 corresponds to "Current word only" mode.
     @Published var aiMaxContinuationWords: Int {
         didSet { defaults.set(aiMaxContinuationWords, forKey: Keys.aiMaxContinuationWords) }
+    }
+
+    /// Whether completions should only finish the current word being typed without generating subsequent words.
+    var isCurrentWordOnlyCompletion: Bool {
+        aiMaxContinuationWords == 1
     }
 
     /// Typing debounce delay for AI continuation (in seconds). Default: 0.350 (350 ms).
@@ -641,6 +647,13 @@ final class SettingsManager: ObservableObject {
         case .custom:
             return matchKeyAndModifiers(keyCode: keyCode, flags: flags, targetKeyCode: autoCompletionCustomKeyCode, targetModifiers: autoCompletionCustomModifiers)
         }
+    }
+
+    /// Determines whether the given event matches the accept next word shortcut: ⌥→ (Option + Right Arrow)
+    func isAutocompletionAcceptNextWordKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        let hasOpt = flags.contains(.maskAlternate)
+        let otherMods = flags.intersection([.maskCommand, .maskControl, .maskShift])
+        return keyCode == 0x7C && hasOpt && otherMods.isEmpty
     }
 
     /// Determines whether the given event matches the configured accept all key (entire phrase)
@@ -909,7 +922,7 @@ final class SettingsManager: ObservableObject {
         self.autoCompletionMinPrefixLength = defaults.object(forKey: Keys.autoCompletionMinPrefixLength) as? Int ?? 2
         self.autoCompletionUseNumberShortcuts = defaults.object(forKey: Keys.autoCompletionUseNumberShortcuts) as? Bool ?? true
         self.autoCompletionIncludeTrailingSpace = defaults.object(forKey: Keys.autoCompletionIncludeTrailingSpace) as? Bool ?? true
-        self.autoCompletionAcceptEntirePhrase = defaults.object(forKey: Keys.autoCompletionAcceptEntirePhrase) as? Bool ?? false
+        self.autoCompletionAcceptEntirePhrase = defaults.object(forKey: Keys.autoCompletionAcceptEntirePhrase) as? Bool ?? true
         self.autoCompletionIncludeTrailingPunctuation = defaults.object(forKey: Keys.autoCompletionIncludeTrailingPunctuation) as? Bool ?? true
         let savedEscapeAction = defaults.string(forKey: Keys.autoCompletionEscapeAction)
         self.autoCompletionEscapeAction = savedEscapeAction.flatMap { AutocompletionEscapeAction(rawValue: $0) } ?? .pauseFewSeconds
@@ -970,7 +983,7 @@ final class SettingsManager: ObservableObject {
         self.savedClicksCount = defaults.integer(forKey: Keys.savedClicksCount)
         self.iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSyncEnabled)
         self.proMultiLanguageAutoDetect = defaults.bool(forKey: Keys.proMultiLanguageAutoDetect)
-        self.proFimEnabled = defaults.bool(forKey: Keys.proFimEnabled)
+        self.proFimEnabled = defaults.object(forKey: Keys.proFimEnabled) == nil ? true : defaults.bool(forKey: Keys.proFimEnabled)
         self.proDeepContextEnabled = defaults.bool(forKey: Keys.proDeepContextEnabled)
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         self.hasMigratedDefaultModelToGemma = defaults.bool(forKey: Keys.hasMigratedDefaultModelToGemma)

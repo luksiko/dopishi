@@ -100,4 +100,27 @@ final class EditorFontCustomizerTests: XCTestCase {
         let font = customizer.font(for: "com.unknown.calculator", caretHeight: 20.0)
         XCTAssertNil(font)
     }
+
+    func testFontResolutionForWarpTerminal() {
+        let customizer = EditorFontCustomizer()
+        let font = customizer.font(for: "dev.warp.Warp-Stable", caretHeight: 20.0)
+        XCTAssertNotNil(font)
+        XCTAssertTrue(font?.isFixedPitch == true || font?.fontName.contains("Mono") == true || font?.familyName?.contains("Mono") == true || font?.familyName == ".AppleSystemUIFontMonospaced")
+    }
+
+    func testIsCodeEditorOrTerminal() {
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "com.microsoft.VSCode"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "com.apple.Terminal"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "com.googlecode.iterm2"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "dev.warp.Warp-Stable"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "dev.warp.Warp-Main"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "dev.warp.Warp-GDK"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "dev.warp.Warp"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "com.mitchellh.ghostty"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "io.alacritty"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "net.kovidgoyal.kitty"))
+        XCTAssertTrue(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "dev.zed.Zed"))
+        XCTAssertFalse(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: "com.apple.Safari"))
+        XCTAssertFalse(EditorFontCustomizer.isCodeEditorOrTerminal(bundleID: nil))
+    }
 }
